@@ -8,7 +8,7 @@ services:
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://servereye:${DB_PASSWORD}@postgres:5432/servereye
+      - DATABASE_URL=postgresql://servereye:servereye_secure_password_2024@postgres:5432/servereye?sslmode=disable
       - ENVIRONMENT=production
     depends_on:
       postgres:
@@ -18,8 +18,6 @@ services:
     restart: unless-stopped
     networks:
       - servereye-network
-    ports:
-      - "8080:8080"  # For health checks
 
   redis:
     image: redis:7-alpine
@@ -43,7 +41,7 @@ services:
     environment:
       - POSTGRES_DB=servereye
       - POSTGRES_USER=servereye
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_PASSWORD=servereye_secure_password_2024
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped

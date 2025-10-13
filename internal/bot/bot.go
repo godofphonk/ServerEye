@@ -80,15 +80,20 @@ func (b *Bot) Start() error {
 		return fmt.Errorf("failed to initialize database: %v", err)
 	}
 
+	b.logger.Info("Настройка получения обновлений от Telegram")
+
 	// Start handling updates
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
+	b.logger.Info("Получение канала обновлений")
 	updates := b.tgBot.GetUpdatesChan(u)
 
+	b.logger.Info("Запуск обработчика обновлений в горутине")
 	// Handle updates in a separate goroutine
 	go b.handleUpdates(updates)
 
+	b.logger.Info("Обработчик обновлений запущен")
 	return nil
 }
 
@@ -103,10 +108,15 @@ func (b *Bot) Stop() error {
 
 // handleUpdates processes incoming Telegram updates
 func (b *Bot) handleUpdates(updates tgbotapi.UpdatesChannel) {
+	b.logger.Info("Начало обработки обновлений от Telegram")
+
 	for {
 		select {
 		case update := <-updates:
+			b.logger.Info("Получено обновление от Telegram")
+
 			if update.Message == nil {
+				b.logger.Info("Обновление без сообщения, пропускаем")
 				continue
 			}
 
@@ -114,11 +124,12 @@ func (b *Bot) handleUpdates(updates tgbotapi.UpdatesChannel) {
 				"user_id":  update.Message.From.ID,
 				"username": update.Message.From.UserName,
 				"text":     update.Message.Text,
-			}).Debug("Received message")
+			}).Info("Получено сообщение от Telegram")
 
 			b.handleMessage(update.Message)
 
 		case <-b.ctx.Done():
+			b.logger.Info("Остановка обработки обновлений")
 			return
 		}
 	}
@@ -126,25 +137,39 @@ func (b *Bot) handleUpdates(updates tgbotapi.UpdatesChannel) {
 
 // handleMessage processes a single message
 func (b *Bot) handleMessage(message *tgbotapi.Message) {
+	b.logger.WithFields(logrus.Fields{
+		"user_id":  message.From.ID,
+		"username": message.From.UserName,
+		"text":     message.Text,
+	}).Info("Получено сообщение от пользователя")
+
 	var response string
 
 	switch {
 	case strings.HasPrefix(message.Text, "/start"):
+		b.logger.Info("Обработка команды /start")
 		response = b.handleStart(message)
 	case strings.HasPrefix(message.Text, "/temp"):
+		b.logger.Info("Обработка команды /temp")
 		response = b.handleTemp(message)
 	case strings.HasPrefix(message.Text, "/status"):
+		b.logger.Info("Обработка команды /status")
 		response = b.handleStatus(message)
 	case strings.HasPrefix(message.Text, "/servers"):
+		b.logger.Info("Обработка команды /servers")
 		response = b.handleServers(message)
 	case strings.HasPrefix(message.Text, "/help"):
+		b.logger.Info("Обработка команды /help")
 		response = b.handleHelp(message)
 	case strings.HasPrefix(message.Text, "srv_"):
+		b.logger.Info("Обработка ключа сервера")
 		response = b.handleServerKey(message)
 	default:
+		b.logger.WithField("text", message.Text).Info("Неизвестная команда")
 		response = "❓ Unknown command. Use /help to see available commands."
 	}
 
+	b.logger.WithField("response_length", len(response)).Info("Отправка ответа пользователю")
 	b.sendMessage(message.Chat.ID, response)
 }
 
@@ -171,11 +196,15 @@ Available commands:
 
 // handleTemp handles the /temp command
 func (b *Bot) handleTemp(message *tgbotapi.Message) string {
+	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /temp")
+
 	servers, err := b.getUserServers(message.From.ID)
 	if err != nil {
 		b.logger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
 	}
+
+	b.logger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
 
 	if len(servers) == 0 {
 		return "📭 No servers connected. Send your server key to connect a server."
@@ -183,11 +212,15 @@ func (b *Bot) handleTemp(message *tgbotapi.Message) string {
 
 	// For now, use the first server
 	serverKey := servers[0]
+	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос температуры с сервера")
+
 	temp, err := b.getCPUTemperature(serverKey)
 	if err != nil {
+		b.logger.WithError(err).Error("Ошибка получения температуры")
 		return fmt.Sprintf("❌ Failed to get temperature: %v", err)
 	}
 
+	b.logger.WithField("temperature", temp).Info("Температура успешно получена")
 	return fmt.Sprintf("🌡️ CPU Temperature: %.1f°C", temp)
 }
 
@@ -226,7 +259,7 @@ To connect a server, send your secret key (starts with srv_)`
 // handleServerKey handles server key registration
 func (b *Bot) handleServerKey(message *tgbotapi.Message) string {
 	serverKey := strings.TrimSpace(message.Text)
-	
+
 	if err := b.connectServer(message.From.ID, serverKey); err != nil {
 		b.logger.WithError(err).Error("Failed to connect server")
 		return "❌ Failed to connect server. Please check your key."
@@ -252,44 +285,70 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 		return 0, fmt.Errorf("failed to serialize command: %v", err)
 	}
 
+	// Subscribe to response channel first
+	respChannel := redis.GetResponseChannel(serverKey)
+	b.logger.WithField("channel", respChannel).Info("Подписались на канал Redis")
+
+	msgChan, err := b.redisClient.Subscribe(b.ctx, respChannel)
+	if err != nil {
+		return 0, fmt.Errorf("failed to subscribe to response: %v", err)
+	}
+
+	// Small delay to ensure subscription is active
+	time.Sleep(100 * time.Millisecond)
+
 	// Send command to agent
 	cmdChannel := redis.GetCommandChannel(serverKey)
 	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
 		return 0, fmt.Errorf("failed to send command: %v", err)
 	}
 
-	// Subscribe to response channel
-	respChannel := redis.GetResponseChannel(serverKey)
-	msgChan, err := b.redisClient.Subscribe(b.ctx, respChannel)
-	if err != nil {
-		return 0, fmt.Errorf("failed to subscribe to response: %v", err)
-	}
+	b.logger.WithFields(logrus.Fields{
+		"command_id": cmd.ID,
+		"channel":    cmdChannel,
+	}).Info("Команда отправлена агенту")
 
 	// Wait for response with timeout
-	timeout := time.After(30 * time.Second)
-	select {
-	case respData := <-msgChan:
-		resp, err := protocol.FromJSON(respData)
-		if err != nil {
-			return 0, fmt.Errorf("failed to parse response: %v", err)
-		}
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case respData := <-msgChan:
+			b.logger.WithField("data", string(respData)).Debug("Получен ответ от агента")
 
-		if resp.Type == protocol.TypeErrorResponse {
-			return 0, fmt.Errorf("agent error: %v", resp.Payload)
-		}
-
-		if resp.Type == protocol.TypeCPUTempResponse {
-			// Parse temperature from payload
-			if payload, ok := resp.Payload.(map[string]interface{}); ok {
-				if temp, ok := payload["temperature"].(float64); ok {
-					return temp, nil
-				}
+			resp, err := protocol.FromJSON(respData)
+			if err != nil {
+				b.logger.WithError(err).Error("Failed to parse response")
+				continue
 			}
+
+			// Check if this response is for our command
+			if resp.ID != cmd.ID {
+				b.logger.WithFields(logrus.Fields{
+					"expected": cmd.ID,
+					"received": resp.ID,
+				}).Debug("Response ID mismatch, waiting for correct response")
+				continue
+			}
+
+			if resp.Type == protocol.TypeErrorResponse {
+				return 0, fmt.Errorf("agent error: %v", resp.Payload)
+			}
+
+			if resp.Type == protocol.TypeCPUTempResponse {
+				// Parse temperature from payload
+				if payload, ok := resp.Payload.(map[string]interface{}); ok {
+					if temp, ok := payload["temperature"].(float64); ok {
+						b.logger.WithField("temperature", temp).Info("Получена температура CPU")
+						return temp, nil
+					}
+				}
+				return 0, fmt.Errorf("invalid temperature data in response")
+			}
+
+			return 0, fmt.Errorf("unexpected response type: %s", resp.Type)
+
+		case <-timeout:
+			return 0, fmt.Errorf("timeout waiting for response")
 		}
-
-		return 0, fmt.Errorf("unexpected response type: %s", resp.Type)
-
-	case <-timeout:
-		return 0, fmt.Errorf("timeout waiting for response")
 	}
 }
