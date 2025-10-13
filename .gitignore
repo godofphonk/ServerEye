@@ -52,3 +52,6 @@ redis_data/
 # Temporary files
 tmp/
 temp/
+
+# Private deployment files
+private/
