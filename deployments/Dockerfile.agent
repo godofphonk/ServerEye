@@ -1,0 +1,47 @@
+# Build stage
+FROM golang:1.21-alpine AS builder
+
+# Install git and ca-certificates
+RUN apk add --no-cache git ca-certificates
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the agent binary
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o agent ./cmd/agent
+
+# Final stage
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
+
+# Create directories
+RUN mkdir -p /etc/servereye /var/log/servereye
+
+# Create non-root user
+RUN adduser -D -s /bin/sh servereye
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder stage
+COPY --from=builder /app/agent .
+
+# Change ownership
+RUN chown -R servereye:servereye /app /etc/servereye /var/log/servereye
+
+# Switch to non-root user
+USER servereye
+
+# Run the agent
+CMD ["./agent"]
