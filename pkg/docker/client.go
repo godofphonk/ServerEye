@@ -125,8 +125,14 @@ func (c *Client) convertToContainerInfo(dc dockerContainer) protocol.ContainerIn
 		}
 	}
 
+	// Use short ID (max 12 chars)
+	shortID := dc.ID
+	if len(dc.ID) > 12 {
+		shortID = dc.ID[:12]
+	}
+	
 	return protocol.ContainerInfo{
-		ID:     dc.ID[:12], // Short ID
+		ID:     shortID,
 		Name:   name,
 		Image:  dc.Image,
 		Status: dc.Status,
