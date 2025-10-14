@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/servereye/servereye/internal/config"
+	"github.com/servereye/servereye/pkg/docker"
 	"github.com/servereye/servereye/pkg/metrics"
 	"github.com/servereye/servereye/pkg/protocol"
 	"github.com/servereye/servereye/pkg/redis"
@@ -15,12 +16,13 @@ import (
 
 // Agent представляет агент ServerEye
 type Agent struct {
-	config      *config.AgentConfig
-	logger      *logrus.Logger
-	redisClient *redis.Client
-	cpuMetrics  *metrics.CPUMetrics
-	ctx         context.Context
-	cancel      context.CancelFunc
+	config        *config.AgentConfig
+	logger        *logrus.Logger
+	redisClient   *redis.Client
+	cpuMetrics    *metrics.CPUMetrics
+	dockerClient  *docker.Client
+	ctx           context.Context
+	cancel        context.CancelFunc
 }
 
 // New создает новый агент
@@ -38,12 +40,13 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Agent{
-		config:      cfg,
-		logger:      logger,
-		redisClient: redisClient,
-		cpuMetrics:  metrics.NewCPUMetrics(),
-		ctx:         ctx,
-		cancel:      cancel,
+		config:        cfg,
+		logger:        logger,
+		redisClient:   redisClient,
+		cpuMetrics:    metrics.NewCPUMetrics(),
+		dockerClient:  docker.NewClient(logger),
+		ctx:           ctx,
+		cancel:        cancel,
 	}, nil
 }
 
@@ -114,6 +117,8 @@ func (a *Agent) processCommand(data []byte) {
 	switch msg.Type {
 	case protocol.TypeGetCPUTemp:
 		response = a.handleGetCPUTemp(msg)
+	case protocol.TypeGetContainers:
+		response = a.handleGetContainers(msg)
 	case protocol.TypePing:
 		response = a.handlePing(msg)
 	default:
@@ -144,6 +149,22 @@ func (a *Agent) handleGetCPUTemp(msg *protocol.Message) *protocol.Message {
 	}
 
 	response := protocol.NewMessage(protocol.TypeCPUTempResponse, payload)
+	response.ID = msg.ID // Используем тот же ID для связи запроса и ответа
+	return response
+}
+
+// handleGetContainers обрабатывает команду получения списка Docker контейнеров
+func (a *Agent) handleGetContainers(msg *protocol.Message) *protocol.Message {
+	containers, err := a.dockerClient.GetContainers(a.ctx)
+	if err != nil {
+		a.logger.WithError(err).Error("Не удалось получить список Docker контейнеров")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorCommandTimeout,
+			ErrorMessage: err.Error(),
+		})
+	}
+
+	response := protocol.NewMessage(protocol.TypeContainersResponse, containers)
 	response.ID = msg.ID // Используем тот же ID для связи запроса и ответа
 	return response
 }

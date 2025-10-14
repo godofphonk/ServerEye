@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -152,6 +153,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	case strings.HasPrefix(message.Text, "/temp"):
 		b.logger.Info("Обработка команды /temp")
 		response = b.handleTemp(message)
+	case strings.HasPrefix(message.Text, "/containers"):
+		b.logger.Info("Обработка команды /containers")
+		response = b.handleContainers(message)
 	case strings.HasPrefix(message.Text, "/status"):
 		b.logger.Info("Обработка команды /status")
 		response = b.handleStatus(message)
@@ -224,6 +228,36 @@ func (b *Bot) handleTemp(message *tgbotapi.Message) string {
 	return fmt.Sprintf("🌡️ CPU Temperature: %.1f°C", temp)
 }
 
+// handleContainers handles the /containers command
+func (b *Bot) handleContainers(message *tgbotapi.Message) string {
+	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /containers")
+	
+	servers, err := b.getUserServers(message.From.ID)
+	if err != nil {
+		b.logger.WithError(err).Error("Failed to get user servers")
+		return "❌ Error retrieving your servers."
+	}
+
+	b.logger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
+	
+	if len(servers) == 0 {
+		return "📭 No servers connected. Send your server key to connect a server."
+	}
+
+	// For now, use the first server
+	serverKey := servers[0]
+	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос списка контейнеров с сервера")
+	
+	containers, err := b.getContainers(serverKey)
+	if err != nil {
+		b.logger.WithError(err).Error("Ошибка получения списка контейнеров")
+		return fmt.Sprintf("❌ Failed to get containers: %v", err)
+	}
+
+	b.logger.WithField("containers_count", len(containers.Containers)).Info("Список контейнеров успешно получен")
+	return b.formatContainers(containers)
+}
+
 // handleStatus handles the /status command
 func (b *Bot) handleStatus(message *tgbotapi.Message) string {
 	return "🟢 Server Status: Online\n⏱️ Uptime: 15 days 8 hours\n💾 Last activity: just now"
@@ -249,6 +283,7 @@ func (b *Bot) handleHelp(message *tgbotapi.Message) string {
 
 /start - Start using the bot
 /temp - Get CPU temperature
+/containers - List Docker containers
 /status - Get server status
 /servers - List your servers
 /help - Show this help
@@ -351,4 +386,120 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 			return 0, fmt.Errorf("timeout waiting for response")
 		}
 	}
+}
+
+// getContainers requests Docker containers list from agent
+func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, error) {
+	// Create command message
+	cmd := protocol.NewMessage(protocol.TypeGetContainers, nil)
+	data, err := cmd.ToJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize command: %v", err)
+	}
+
+	// Subscribe to response channel first
+	respChannel := redis.GetResponseChannel(serverKey)
+	b.logger.WithField("channel", respChannel).Info("Подписались на канал Redis")
+	
+	msgChan, err := b.redisClient.Subscribe(b.ctx, respChannel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
+	}
+
+	// Small delay to ensure subscription is active
+	time.Sleep(100 * time.Millisecond)
+
+	// Send command to agent
+	cmdChannel := redis.GetCommandChannel(serverKey)
+	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
+		return nil, fmt.Errorf("failed to send command: %v", err)
+	}
+
+	b.logger.WithFields(logrus.Fields{
+		"command_id": cmd.ID,
+		"channel": cmdChannel,
+	}).Info("Команда отправлена агенту")
+
+	// Wait for response with timeout
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case respData := <-msgChan:
+			b.logger.WithField("data", string(respData)).Debug("Получен ответ от агента")
+			
+			resp, err := protocol.FromJSON(respData)
+			if err != nil {
+				b.logger.WithError(err).Error("Failed to parse response")
+				continue
+			}
+
+			// Check if this response is for our command
+			if resp.ID != cmd.ID {
+				b.logger.WithFields(logrus.Fields{
+					"expected": cmd.ID,
+					"received": resp.ID,
+				}).Debug("Response ID mismatch, waiting for correct response")
+				continue
+			}
+
+			if resp.Type == protocol.TypeErrorResponse {
+				return nil, fmt.Errorf("agent error: %v", resp.Payload)
+			}
+
+			if resp.Type == protocol.TypeContainersResponse {
+				// Parse containers from payload
+				if payload, ok := resp.Payload.(map[string]interface{}); ok {
+					containersData, _ := json.Marshal(payload)
+					var containers protocol.ContainersPayload
+					if err := json.Unmarshal(containersData, &containers); err == nil {
+						b.logger.WithField("containers_count", containers.Total).Info("Получен список контейнеров")
+						return &containers, nil
+					}
+				}
+				return nil, fmt.Errorf("invalid containers data in response")
+			}
+
+			return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+
+		case <-timeout:
+			return nil, fmt.Errorf("timeout waiting for response")
+		}
+	}
+}
+
+// formatContainers formats containers list for display
+func (b *Bot) formatContainers(containers *protocol.ContainersPayload) string {
+	if containers.Total == 0 {
+		return "📦 No Docker containers found on the server."
+	}
+
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("🐳 **Docker Containers (%d total):**\n\n", containers.Total))
+
+	for i, container := range containers.Containers {
+		if i >= 10 { // Limit to 10 containers to avoid message length issues
+			result.WriteString(fmt.Sprintf("... and %d more containers\n", containers.Total-10))
+			break
+		}
+
+		// Status emoji
+		statusEmoji := "🔴" // Red for stopped
+		if strings.Contains(strings.ToLower(container.State), "running") {
+			statusEmoji = "🟢" // Green for running
+		} else if strings.Contains(strings.ToLower(container.State), "paused") {
+			statusEmoji = "🟡" // Yellow for paused
+		}
+
+		result.WriteString(fmt.Sprintf("%s **%s**\n", statusEmoji, container.Name))
+		result.WriteString(fmt.Sprintf("📷 Image: `%s`\n", container.Image))
+		result.WriteString(fmt.Sprintf("🔄 Status: %s\n", container.Status))
+		
+		if len(container.Ports) > 0 {
+			result.WriteString(fmt.Sprintf("🔌 Ports: %s\n", strings.Join(container.Ports, ", ")))
+		}
+		
+		result.WriteString("\n")
+	}
+
+	return result.String()
 }
