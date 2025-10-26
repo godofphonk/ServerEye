@@ -45,7 +45,7 @@ func main() {
 	}
 
 	// Create and start bot
-	botInstance, err := bot.New(cfg, logger)
+	botInstance, err := bot.NewFromConfig(cfg, logger)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to create bot")
 	}
