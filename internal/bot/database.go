@@ -209,3 +209,91 @@ func (b *Bot) logCommand(userID int64, serverKey, command string, response inter
 
 	return nil
 }
+
+// renameServer updates server name in database
+func (b *Bot) renameServer(serverKey, newName string) error {
+	query := `
+		UPDATE servers 
+		SET name = $1, updated_at = NOW()
+		WHERE secret_key = $2
+	`
+	
+	_, err := b.db.Exec(query, newName, serverKey)
+	return err
+}
+
+// removeServer removes server and user association
+func (b *Bot) removeServer(userID int64, serverKey string) error {
+	tx, err := b.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	
+	// Remove user-server association
+	_, err = tx.Exec(`
+		DELETE FROM user_servers 
+		WHERE user_id = $1 AND server_id = (
+			SELECT id FROM servers WHERE secret_key = $2
+		)
+	`, userID, serverKey)
+	if err != nil {
+		return err
+	}
+	
+	// Check if server has other users
+	var userCount int
+	err = tx.QueryRow(`
+		SELECT COUNT(*) FROM user_servers us
+		JOIN servers s ON us.server_id = s.id
+		WHERE s.secret_key = $1
+	`, serverKey).Scan(&userCount)
+	if err != nil {
+		return err
+	}
+	
+	// If no other users, delete server completely
+	if userCount == 0 {
+		_, err = tx.Exec(`DELETE FROM servers WHERE secret_key = $1`, serverKey)
+		if err != nil {
+			return err
+		}
+	}
+	
+	return tx.Commit()
+}
+
+// ServerInfo represents server information
+type ServerInfo struct {
+	SecretKey string
+	Name      string
+	Status    string
+}
+
+// getUserServersWithInfo returns list of servers with names for a user
+func (b *Bot) getUserServersWithInfo(userID int64) ([]ServerInfo, error) {
+	query := `
+		SELECT s.secret_key, s.name, s.status
+		FROM servers s
+		JOIN user_servers us ON s.id = us.server_id
+		WHERE us.user_id = $1
+		ORDER BY s.created_at DESC
+	`
+
+	rows, err := b.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var servers []ServerInfo
+	for rows.Next() {
+		var server ServerInfo
+		if err := rows.Scan(&server.SecretKey, &server.Name, &server.Status); err != nil {
+			return nil, err
+		}
+		servers = append(servers, server)
+	}
+
+	return servers, nil
+}

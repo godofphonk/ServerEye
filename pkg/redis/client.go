@@ -104,14 +104,19 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, 
 
 	// Запускаем горутину для чтения сообщений
 	go func() {
-		defer close(subscription.msgChan)
-		defer pubsub.Close()
+		defer func() {
+			if r := recover(); r != nil {
+				c.logger.WithField("panic", r).Error("Panic in Redis subscription goroutine")
+			}
+			pubsub.Close()
+		}()
 
 		ch := pubsub.Channel()
 		for {
 			select {
 			case msg := <-ch:
 				if msg == nil {
+					close(subscription.msgChan)
 					return
 				}
 				
@@ -123,9 +128,11 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, 
 				select {
 				case subscription.msgChan <- []byte(msg.Payload):
 				case <-ctx.Done():
+					close(subscription.msgChan)
 					return
 				}
 			case <-ctx.Done():
+				close(subscription.msgChan)
 				return
 			}
 		}

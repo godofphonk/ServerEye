@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -186,6 +187,12 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	case strings.HasPrefix(message.Text, "/help"):
 		b.logger.Info("Обработка команды /help")
 		response = b.handleHelp(message)
+	case strings.HasPrefix(message.Text, "/rename_server"):
+		b.logger.Info("Обработка команды /rename_server")
+		response = b.handleRenameServer(message)
+	case strings.HasPrefix(message.Text, "/remove_server"):
+		b.logger.Info("Обработка команды /remove_server")
+		response = b.handleRemoveServer(message)
 	case strings.HasPrefix(message.Text, "srv_"):
 		b.logger.Info("Обработка ключа сервера")
 		response = b.handleServerKey(message)
@@ -243,8 +250,12 @@ func (b *Bot) handleTemp(message *tgbotapi.Message) string {
 		return "📭 No servers connected. Send your server key to connect a server."
 	}
 
-	// For now, use the first server
-	serverKey := servers[0]
+	// Parse server number from command (e.g., "/temp 2")
+	serverKey, err := b.getServerFromCommand(message.Text, servers)
+	if err != nil {
+		return err.Error()
+	}
+
 	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос температуры с сервера")
 
 	temp, err := b.getCPUTemperature(serverKey)
@@ -273,8 +284,11 @@ func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 		return "📭 No servers connected. Send your server key to connect a server."
 	}
 
-	// For now, use the first server
-	serverKey := servers[0]
+	// Parse server number from command
+	serverKey, err := b.getServerFromCommand(message.Text, servers)
+	if err != nil {
+		return err.Error()
+	}
 	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос списка контейнеров с сервера")
 	
 	containers, err := b.getContainers(serverKey)
@@ -294,33 +308,155 @@ func (b *Bot) handleStatus(message *tgbotapi.Message) string {
 
 // handleServers handles the /servers command
 func (b *Bot) handleServers(message *tgbotapi.Message) string {
-	servers, err := b.getUserServers(message.From.ID)
+	servers, err := b.getUserServersWithInfo(message.From.ID)
 	if err != nil {
 		return "❌ Error retrieving servers."
 	}
 
 	if len(servers) == 0 {
-		return "📭 No servers connected."
+		return "📭 No servers connected.\n\n💡 To connect a server:\n1. Install ServerEye agent\n2. Send your server key here"
 	}
 
-	return fmt.Sprintf("📋 Your servers:\n🟢 Server (%s)", servers[0][:12]+"...")
+	if len(servers) == 1 {
+		statusIcon := "🟢"
+		if servers[0].Status == "offline" {
+			statusIcon = "🔴"
+		}
+		return fmt.Sprintf("📋 Your servers:\n%s **%s** (%s)\n\n💡 All commands will use this server automatically.\n\n🔧 Management:\n/rename_server 1 <name> - Rename server\n/remove_server 1 - Remove server", 
+			statusIcon, servers[0].Name, servers[0].SecretKey[:12]+"...")
+	}
+
+	// Multiple servers - show list with numbers
+	response := "📋 Your servers:\n\n"
+	for i, server := range servers {
+		statusIcon := "🟢"
+		if server.Status == "offline" {
+			statusIcon = "🔴"
+		}
+		response += fmt.Sprintf("%d. %s **%s** (%s)\n", i+1, statusIcon, server.Name, server.SecretKey[:12]+"...")
+	}
+	response += "\n💡 Use commands with server number:\n"
+	response += "Example: /temp 1 or /containers 2\n\n"
+	response += "🔧 Management:\n"
+	response += "/rename_server <#> <name> - Rename server\n"
+	response += "/remove_server <#> - Remove server"
+	
+	return response
+}
+
+// getServerFromCommand parses server number from command and returns server key
+func (b *Bot) getServerFromCommand(command string, servers []string) (string, error) {
+	parts := strings.Fields(command)
+	
+	// If no server number specified, use first server
+	if len(parts) == 1 {
+		if len(servers) > 1 {
+			return "", fmt.Errorf("❌ Multiple servers found. Please specify server number.\nExample: %s 1\n\nUse /servers to see your servers.", parts[0])
+		}
+		return servers[0], nil
+	}
+	
+	// Parse server number
+	if len(parts) >= 2 {
+		serverNum, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return "", fmt.Errorf("❌ Invalid server number. Use /servers to see available servers.")
+		}
+		
+		if serverNum < 1 || serverNum > len(servers) {
+			return "", fmt.Errorf("❌ Server number %d not found. You have %d servers.\nUse /servers to see available servers.", serverNum, len(servers))
+		}
+		
+		return servers[serverNum-1], nil
+	}
+	
+	return servers[0], nil
 }
 
 // handleHelp handles the /help command
 func (b *Bot) handleHelp(message *tgbotapi.Message) string {
 	return `🤖 ServerEye Bot Commands:
 
-/start - Start using the bot
-/temp - Get CPU temperature
-/containers - List Docker containers
-/start_container <id> - Start a Docker container
-/stop_container <id> - Stop a Docker container
-/restart_container <id> - Restart a Docker container
-/status - Get server status
-/servers - List your servers
-/help - Show this help
+📊 **Monitoring:**
+/temp [server#] - Get CPU temperature
+/memory [server#] - Get memory usage  
+/disk [server#] - Get disk usage
+/uptime [server#] - Get system uptime
+/processes [server#] - List running processes
 
-To connect a server, send your secret key (starts with srv_)`
+🐳 **Docker Management:**
+/containers [server#] - List Docker containers
+/start_container <id> [server#] - Start a container
+/stop_container <id> [server#] - Stop a container
+/restart_container <id> [server#] - Restart a container
+
+⚙️ **Server Management:**
+/servers - List your servers
+/status [server#] - Get server status
+/rename_server <#> <name> - Rename server
+/remove_server <#> - Remove server
+
+💡 **Multiple Servers:**
+If you have multiple servers, add server number:
+Example: /temp 1 or /containers 2
+
+🔗 **Connect Server:**
+Send your server key (starts with srv_)`
+}
+
+// handleRenameServer handles the /rename_server command
+func (b *Bot) handleRenameServer(message *tgbotapi.Message) string {
+	parts := strings.Fields(message.Text)
+	if len(parts) < 3 {
+		return "❌ Usage: /rename_server <server#> <new_name>\nExample: /rename_server 1 MyWebServer"
+	}
+	
+	servers, err := b.getUserServers(message.From.ID)
+	if err != nil || len(servers) == 0 {
+		return "❌ No servers found."
+	}
+	
+	serverNum, err := strconv.Atoi(parts[1])
+	if err != nil || serverNum < 1 || serverNum > len(servers) {
+		return fmt.Sprintf("❌ Invalid server number. You have %d servers.", len(servers))
+	}
+	
+	newName := strings.Join(parts[2:], " ")
+	if len(newName) > 50 {
+		return "❌ Server name too long (max 50 characters)."
+	}
+	
+	serverKey := servers[serverNum-1]
+	if err := b.renameServer(serverKey, newName); err != nil {
+		return "❌ Failed to rename server."
+	}
+	
+	return fmt.Sprintf("✅ Server renamed to: %s", newName)
+}
+
+// handleRemoveServer handles the /remove_server command
+func (b *Bot) handleRemoveServer(message *tgbotapi.Message) string {
+	parts := strings.Fields(message.Text)
+	if len(parts) < 2 {
+		return "❌ Usage: /remove_server <server#>\nExample: /remove_server 1\n\n⚠️ This will permanently remove the server!"
+	}
+	
+	servers, err := b.getUserServers(message.From.ID)
+	if err != nil || len(servers) == 0 {
+		return "❌ No servers found."
+	}
+	
+	serverNum, err := strconv.Atoi(parts[1])
+	if err != nil || serverNum < 1 || serverNum > len(servers) {
+		return fmt.Sprintf("❌ Invalid server number. You have %d servers.", len(servers))
+	}
+	
+	serverKey := servers[serverNum-1]
+	if err := b.removeServer(message.From.ID, serverKey); err != nil {
+		return "❌ Failed to remove server."
+	}
+	
+	return "✅ Server removed successfully."
 }
 
 // handleServerKey handles server key registration
