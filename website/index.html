@@ -31,7 +31,8 @@
             <div class="hero-content">
                 <h1>Monitor Your Servers via <span class="highlight">Telegram</span></h1>
                 <p class="hero-subtitle">
-                    Simple, secure server monitoring and Docker container management through your favorite messenger.
+                    Comprehensive server monitoring with RAM, disk, uptime, and process tracking. 
+                    Plus Docker container management - all through your favorite messenger.
                     No complex dashboards, just chat with your servers.
                 </p>
                 <div class="hero-buttons">
@@ -49,21 +50,35 @@
                 <div class="phone-mockup">
                     <div class="phone-screen">
                         <div class="telegram-chat">
+                            <div class="message user">
+                                <div class="message-content">/memory</div>
+                            </div>
                             <div class="message bot">
                                 <div class="message-content">
-                                    🌡️ CPU Temperature: 45.2°C<br>
-                                    🐳 Found 3 containers:<br>
-                                    🟢 nginx (running)<br>
-                                    🔴 redis (stopped)
+                                    🧠 Memory Usage<br>
+                                    💾 Total: 16.0 GB<br>
+                                    📊 Used: 8.2 GB (51.2%)<br>
+                                    ✅ Available: 7.8 GB
                                 </div>
                             </div>
                             <div class="message user">
-                                <div class="message-content">/start_container redis</div>
+                                <div class="message-content">/disk</div>
                             </div>
                             <div class="message bot">
                                 <div class="message-content">
-                                    ✅ Container redis started successfully<br>
-                                    🟢 New state: running
+                                    💽 Disk Usage<br>
+                                    🟢 / - 45.2 GB / 100 GB (45%)<br>
+                                    🟡 /var - 18.5 GB / 25 GB (74%)
+                                </div>
+                            </div>
+                            <div class="message user">
+                                <div class="message-content">/uptime</div>
+                            </div>
+                            <div class="message bot">
+                                <div class="message-content">
+                                    ⏰ System Uptime<br>
+                                    🚀 Uptime: 5 days, 12 hours<br>
+                                    📅 Boot: 2025-10-21 09:30:15
                                 </div>
                             </div>
                         </div>
@@ -94,10 +109,10 @@
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-thermometer-half"></i>
+                        <i class="fas fa-chart-line"></i>
                     </div>
-                    <h3>System Monitoring</h3>
-                    <p>Get real-time CPU temperature, system status, and resource usage information instantly.</p>
+                    <h3>Comprehensive Monitoring</h3>
+                    <p>Monitor CPU temperature, RAM usage, disk space, system uptime, and top processes. Complete system visibility in real-time.</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -134,6 +149,22 @@
                     <div class="command">
                         <code>/temp</code>
                         <span>Get CPU temperature</span>
+                    </div>
+                    <div class="command">
+                        <code>/memory</code>
+                        <span>Get RAM usage details</span>
+                    </div>
+                    <div class="command">
+                        <code>/disk</code>
+                        <span>Get disk space usage</span>
+                    </div>
+                    <div class="command">
+                        <code>/uptime</code>
+                        <span>Get system uptime</span>
+                    </div>
+                    <div class="command">
+                        <code>/processes</code>
+                        <span>Get top processes</span>
                     </div>
                     <div class="command">
                         <code>/status</code>
