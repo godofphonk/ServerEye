@@ -123,7 +123,7 @@ func (b *Bot) handleAddServer(message *tgbotapi.Message) string {
 	}
 	
 	if err := b.connectServerWithName(message.From.ID, serverKey, serverName); err != nil {
-		b.logger.WithError(err).Error("Failed to connect server")
+		b.legacyLogger.WithError(err).Error("Failed to connect server")
 		return "❌ Failed to connect server. Please check your key or server may already be connected."
 	}
 
@@ -135,7 +135,7 @@ func (b *Bot) handleServerKey(message *tgbotapi.Message) string {
 	serverKey := strings.TrimSpace(message.Text)
 
 	if err := b.connectServer(message.From.ID, serverKey); err != nil {
-		b.logger.WithError(err).Error("Failed to connect server")
+		b.legacyLogger.WithError(err).Error("Failed to connect server")
 		return "❌ Failed to connect server. Please check your key."
 	}
 

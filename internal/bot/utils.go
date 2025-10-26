@@ -12,7 +12,7 @@ import (
 func (b *Bot) sendMessage(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	if _, err := b.tgBot.Send(msg); err != nil {
-		b.logger.WithError(err).Error("Failed to send message")
+		b.legacyLogger.WithError(err).Error("Failed to send message")
 	}
 }
 
@@ -67,6 +67,6 @@ func (b *Bot) sendServerSelectionButtons(chatID int64, command, text string, ser
 	msg.ReplyMarkup = keyboard
 	
 	if _, err := b.tgBot.Send(msg); err != nil {
-		b.logger.WithError(err).Error("Failed to send server selection buttons")
+		b.legacyLogger.WithError(err).Error("Failed to send server selection buttons")
 	}
 }

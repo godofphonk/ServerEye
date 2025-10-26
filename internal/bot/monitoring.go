@@ -10,15 +10,15 @@ import (
 
 // handleTemp handles the /temp command
 func (b *Bot) handleTemp(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /temp")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /temp")
 
 	servers, err := b.getUserServersWithInfo(message.From.ID)
 	if err != nil {
-		b.logger.WithError(err).Error("Failed to get user servers")
+		b.legacyLogger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
 	}
 
-	b.logger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
+	b.legacyLogger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
 
 	if len(servers) == 0 {
 		return "📭 No servers connected. Use /add to connect a server."
@@ -45,25 +45,25 @@ func (b *Bot) handleTemp(message *tgbotapi.Message) string {
 		return err.Error()
 	}
 
-	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос температуры с сервера")
+	b.legacyLogger.WithField("server_key", serverKey[:12]+"...").Info("Запрос температуры с сервера")
 
 	temp, err := b.getCPUTemperature(serverKey)
 	if err != nil {
-		b.logger.WithError(err).Error("Ошибка получения температуры")
+		b.legacyLogger.WithError(err).Error("Ошибка получения температуры")
 		return fmt.Sprintf("❌ Failed to get temperature: %v", err)
 	}
 
-	b.logger.WithField("temperature", temp).Info("Температура успешно получена")
+	b.legacyLogger.WithField("temperature", temp).Info("Температура успешно получена")
 	return fmt.Sprintf("🌡️ CPU Temperature: %.1f°C", temp)
 }
 
 // handleMemory handles the /memory command
 func (b *Bot) handleMemory(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /memory")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /memory")
 
 	servers, err := b.getUserServersWithInfo(message.From.ID)
 	if err != nil {
-		b.logger.WithError(err).Error("Failed to get user servers")
+		b.legacyLogger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
 	}
 
@@ -91,11 +91,11 @@ func (b *Bot) handleMemory(message *tgbotapi.Message) string {
 	if err != nil {
 		return err.Error()
 	}
-	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос информации о памяти с сервера")
+	b.legacyLogger.WithField("server_key", serverKey[:12]+"...").Info("Запрос информации о памяти с сервера")
 
 	memInfo, err := b.getMemoryInfo(serverKey)
 	if err != nil {
-		b.logger.WithError(err).Error("Ошибка получения информации о памяти")
+		b.legacyLogger.WithError(err).Error("Ошибка получения информации о памяти")
 		return fmt.Sprintf("❌ Failed to get memory info: %v", err)
 	}
 
@@ -120,17 +120,17 @@ func (b *Bot) handleMemory(message *tgbotapi.Message) string {
 		float64(memInfo.Buffers)/1024/1024,
 		float64(memInfo.Cached)/1024/1024)
 
-	b.logger.WithField("used_percent", memInfo.UsedPercent).Info("Информация о памяти успешно получена")
+	b.legacyLogger.WithField("used_percent", memInfo.UsedPercent).Info("Информация о памяти успешно получена")
 	return response
 }
 
 // handleDisk handles the /disk command
 func (b *Bot) handleDisk(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /disk")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /disk")
 
 	servers, err := b.getUserServers(message.From.ID)
 	if err != nil {
-		b.logger.WithError(err).Error("Failed to get user servers")
+		b.legacyLogger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
 	}
 
@@ -140,11 +140,11 @@ func (b *Bot) handleDisk(message *tgbotapi.Message) string {
 
 	// For now, use the first server
 	serverKey := servers[0]
-	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос информации о дисках с сервера")
+	b.legacyLogger.WithField("server_key", serverKey[:12]+"...").Info("Запрос информации о дисках с сервера")
 
 	diskInfo, err := b.getDiskInfo(serverKey)
 	if err != nil {
-		b.logger.WithError(err).Error("Ошибка получения информации о дисках")
+		b.legacyLogger.WithError(err).Error("Ошибка получения информации о дисках")
 		return fmt.Sprintf("❌ Failed to get disk info: %v", err)
 	}
 
@@ -181,17 +181,17 @@ func (b *Bot) handleDisk(message *tgbotapi.Message) string {
 			disk.Filesystem)
 	}
 
-	b.logger.WithField("disks_count", len(diskInfo.Disks)).Info("Информация о дисках успешно получена")
+	b.legacyLogger.WithField("disks_count", len(diskInfo.Disks)).Info("Информация о дисках успешно получена")
 	return response
 }
 
 // handleUptime handles the /uptime command
 func (b *Bot) handleUptime(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /uptime")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /uptime")
 
 	servers, err := b.getUserServers(message.From.ID)
 	if err != nil {
-		b.logger.WithError(err).Error("Failed to get user servers")
+		b.legacyLogger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
 	}
 
@@ -201,11 +201,11 @@ func (b *Bot) handleUptime(message *tgbotapi.Message) string {
 
 	// For now, use the first server
 	serverKey := servers[0]
-	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос времени работы с сервера")
+	b.legacyLogger.WithField("server_key", serverKey[:12]+"...").Info("Запрос времени работы с сервера")
 
 	uptimeInfo, err := b.getUptime(serverKey)
 	if err != nil {
-		b.logger.WithError(err).Error("Ошибка получения времени работы")
+		b.legacyLogger.WithError(err).Error("Ошибка получения времени работы")
 		return fmt.Sprintf("❌ Failed to get uptime: %v", err)
 	}
 
@@ -221,17 +221,17 @@ func (b *Bot) handleUptime(message *tgbotapi.Message) string {
 		bootTime.Format("2006-01-02 15:04:05"),
 		uptimeInfo.Uptime)
 
-	b.logger.WithField("uptime", uptimeInfo.Formatted).Info("Время работы успешно получено")
+	b.legacyLogger.WithField("uptime", uptimeInfo.Formatted).Info("Время работы успешно получено")
 	return response
 }
 
 // handleProcesses handles the /processes command
 func (b *Bot) handleProcesses(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /processes")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /processes")
 
 	servers, err := b.getUserServers(message.From.ID)
 	if err != nil {
-		b.logger.WithError(err).Error("Failed to get user servers")
+		b.legacyLogger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
 	}
 
@@ -241,11 +241,11 @@ func (b *Bot) handleProcesses(message *tgbotapi.Message) string {
 
 	// For now, use the first server
 	serverKey := servers[0]
-	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос списка процессов с сервера")
+	b.legacyLogger.WithField("server_key", serverKey[:12]+"...").Info("Запрос списка процессов с сервера")
 
 	processes, err := b.getProcesses(serverKey)
 	if err != nil {
-		b.logger.WithError(err).Error("Ошибка получения списка процессов")
+		b.legacyLogger.WithError(err).Error("Ошибка получения списка процессов")
 		return fmt.Sprintf("❌ Failed to get processes: %v", err)
 	}
 
@@ -282,7 +282,7 @@ func (b *Bot) handleProcesses(message *tgbotapi.Message) string {
 			proc.Status)
 	}
 
-	b.logger.WithField("processes_count", len(processes.Processes)).Info("Список процессов успешно получен")
+	b.legacyLogger.WithField("processes_count", len(processes.Processes)).Info("Список процессов успешно получен")
 	return response
 }
 
@@ -324,15 +324,15 @@ func (b *Bot) handleStatus(message *tgbotapi.Message) string {
 
 // handleContainers handles the /containers command
 func (b *Bot) handleContainers(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /containers")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /containers")
 	
 	servers, err := b.getUserServersWithInfo(message.From.ID)
 	if err != nil {
-		b.logger.WithError(err).Error("Failed to get user servers")
+		b.legacyLogger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
 	}
 
-	b.logger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
+	b.legacyLogger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
 	
 	if len(servers) == 0 {
 		return "📭 No servers connected. Use /add to connect a server."
@@ -358,14 +358,14 @@ func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 	if err != nil {
 		return err.Error()
 	}
-	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос списка контейнеров с сервера")
+	b.legacyLogger.WithField("server_key", serverKey[:12]+"...").Info("Запрос списка контейнеров с сервера")
 	
 	containers, err := b.getContainers(serverKey)
 	if err != nil {
-		b.logger.WithError(err).Error("Ошибка получения списка контейнеров")
+		b.legacyLogger.WithError(err).Error("Ошибка получения списка контейнеров")
 		return fmt.Sprintf("❌ Failed to get containers: %v", err)
 	}
 
-	b.logger.WithField("containers_count", len(containers.Containers)).Info("Список контейнеров успешно получен")
+	b.legacyLogger.WithField("containers_count", len(containers.Containers)).Info("Список контейнеров успешно получен")
 	return b.formatContainers(containers)
 }

@@ -14,7 +14,7 @@ import (
 
 // handleStartContainer handles the /start_container command
 func (b *Bot) handleStartContainer(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /start_container")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /start_container")
 	
 	// Парсим команду
 	parts := strings.Fields(message.Text)
@@ -28,7 +28,7 @@ func (b *Bot) handleStartContainer(message *tgbotapi.Message) string {
 
 // handleStopContainer handles the /stop_container command
 func (b *Bot) handleStopContainer(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /stop_container")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /stop_container")
 	
 	// Парсим команду
 	parts := strings.Fields(message.Text)
@@ -42,7 +42,7 @@ func (b *Bot) handleStopContainer(message *tgbotapi.Message) string {
 
 // handleRestartContainer handles the /restart_container command
 func (b *Bot) handleRestartContainer(message *tgbotapi.Message) string {
-	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /restart_container")
+	b.legacyLogger.WithField("user_id", message.From.ID).Info("Обработка команды /restart_container")
 	
 	// Парсим команду
 	parts := strings.Fields(message.Text)
@@ -64,7 +64,7 @@ func (b *Bot) handleContainerAction(userID int64, containerID, action string) st
 	// Получаем серверы пользователя
 	servers, err := b.getUserServers(userID)
 	if err != nil {
-		b.logger.WithError(err).Error("Ошибка получения серверов пользователя")
+		b.legacyLogger.WithError(err).Error("Ошибка получения серверов пользователя")
 		return "❌ Error getting your servers. Please try again."
 	}
 	
@@ -72,11 +72,11 @@ func (b *Bot) handleContainerAction(userID int64, containerID, action string) st
 		return "❌ You don't have any connected servers. Use /add to connect a server first."
 	}
 	
-	b.logger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
+	b.legacyLogger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
 	
 	// Пока работаем только с первым сервером
 	serverKey := servers[0]
-	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Выполнение действия над контейнером")
+	b.legacyLogger.WithField("server_key", serverKey[:12]+"...").Info("Выполнение действия над контейнером")
 	
 	// Определяем тип команды
 	var messageType protocol.MessageType
@@ -100,11 +100,11 @@ func (b *Bot) handleContainerAction(userID int64, containerID, action string) st
 	
 	response, err := b.sendContainerAction(serverKey, messageType, payload)
 	if err != nil {
-		b.logger.WithError(err).Error("Ошибка выполнения действия над контейнером")
+		b.legacyLogger.WithError(err).Error("Ошибка выполнения действия над контейнером")
 		return fmt.Sprintf("❌ Failed to %s container: %v", action, err)
 	}
 	
-	b.logger.WithField("container_id", containerID).Info("Действие над контейнером успешно выполнено")
+	b.legacyLogger.WithField("container_id", containerID).Info("Действие над контейнером успешно выполнено")
 	return b.formatContainerActionResponse(response)
 }
 
@@ -118,7 +118,7 @@ func (b *Bot) sendContainerAction(serverKey string, messageType protocol.Message
 	}
 	defer subscription.Close()
 	
-	b.logger.WithField("channel", responseChannel).Info("Подписались на канал Redis")
+	b.legacyLogger.WithField("channel", responseChannel).Info("Подписались на канал Redis")
 	
 	// Отправляем команду
 	message := protocol.NewMessage(messageType, payload)
@@ -133,7 +133,7 @@ func (b *Bot) sendContainerAction(serverKey string, messageType protocol.Message
 		return nil, fmt.Errorf("failed to send command: %w", err)
 	}
 	
-	b.logger.WithFields(logrus.Fields{
+	b.legacyLogger.WithFields(logrus.Fields{
 		"channel":    commandChannel,
 		"command_id": message.ID,
 	}).Info("Команда отправлена агенту")
@@ -149,7 +149,7 @@ func (b *Bot) sendContainerAction(serverKey string, messageType protocol.Message
 		case msgBytes := <-subscription.Channel():
 			var response protocol.Message
 			if err := json.Unmarshal(msgBytes, &response); err != nil {
-				b.logger.WithError(err).Error("Ошибка парсинга ответа")
+				b.legacyLogger.WithError(err).Error("Ошибка парсинга ответа")
 				continue
 			}
 			
@@ -175,7 +175,7 @@ func (b *Bot) sendContainerAction(serverKey string, messageType protocol.Message
 					actionData, _ := json.Marshal(payload)
 					var actionResponse protocol.ContainerActionResponse
 					if err := json.Unmarshal(actionData, &actionResponse); err == nil {
-						b.logger.WithField("success", actionResponse.Success).Info("Получен ответ о действии над контейнером")
+						b.legacyLogger.WithField("success", actionResponse.Success).Info("Получен ответ о действии над контейнером")
 						return &actionResponse, nil
 					}
 				}

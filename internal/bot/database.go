@@ -61,7 +61,7 @@ func (b *Bot) initDatabase() error {
 		}
 	}
 
-	b.logger.Info("Database schema initialized successfully")
+	b.legacyLogger.Info("Database schema initialized successfully")
 	return nil
 }
 
@@ -83,7 +83,7 @@ func (b *Bot) registerUser(user *tgbotapi.User) error {
 		return fmt.Errorf("failed to register user: %v", err)
 	}
 
-	b.logger.WithField("user_id", user.ID).Info("User registered/updated")
+	b.legacyLogger.WithField("user_id", user.ID).Info("User registered/updated")
 	return nil
 }
 
@@ -132,7 +132,7 @@ func (b *Bot) connectServer(userID int64, serverKey string) error {
 		return fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
-	b.logger.WithFields(map[string]interface{}{
+	b.legacyLogger.WithFields(map[string]interface{}{
 		"user_id":    userID,
 		"server_key": serverKey[:12] + "...",
 	}).Info("Server connected to user")

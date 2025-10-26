@@ -10,18 +10,18 @@ import (
 )
 
 // handleCallbackQuery processes callback queries from inline keyboards
-func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
+func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 	// Answer the callback query
 	callback := tgbotapi.NewCallback(query.ID, "")
 	if _, err := b.tgBot.Request(callback); err != nil {
-		b.logger.WithError(err).Error("Failed to answer callback query")
+		b.legacyLogger.WithError(err).Error("Failed to answer callback query")
 	}
 
 	// Parse callback data (format: "command_serverNumber")
 	parts := strings.Split(query.Data, "_")
 	if len(parts) != 2 {
-		b.logger.WithField("data", query.Data).Error("Invalid callback data format")
-		return
+		b.legacyLogger.WithField("data", query.Data).Error("Invalid callback data format")
+		return fmt.Errorf("invalid callback data format: %s", query.Data)
 	}
 
 	command := parts[0]
@@ -30,8 +30,8 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 	// Get user's servers
 	servers, err := b.getUserServersWithInfo(query.From.ID)
 	if err != nil {
-		b.logger.WithError(err).Error("Failed to get user servers for callback")
-		return
+		b.legacyLogger.WithError(err).Error("Failed to get user servers for callback")
+		return err
 	}
 
 	// Execute command with selected server
@@ -57,6 +57,7 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 
 	// Send response
 	b.sendMessage(query.Message.Chat.ID, response)
+	return nil
 }
 
 // executeTemperatureCommand executes temperature command for specific server
