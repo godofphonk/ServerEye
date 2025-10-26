@@ -117,18 +117,26 @@ func (b *Bot) handleUpdates(updates tgbotapi.UpdatesChannel) {
 		case update := <-updates:
 			b.logger.Info("Получено обновление от Telegram")
 
-			if update.Message == nil {
-				b.logger.Info("Обновление без сообщения, пропускаем")
+			if update.Message != nil {
+				b.logger.WithFields(logrus.Fields{
+					"user_id":  update.Message.From.ID,
+					"username": update.Message.From.UserName,
+					"text":     update.Message.Text,
+				}).Info("Получено сообщение от Telegram")
+
+				b.handleMessage(update.Message)
+			} else if update.CallbackQuery != nil {
+				b.logger.WithFields(logrus.Fields{
+					"user_id":  update.CallbackQuery.From.ID,
+					"username": update.CallbackQuery.From.UserName,
+					"data":     update.CallbackQuery.Data,
+				}).Info("Получен callback query от Telegram")
+
+				b.handleCallbackQuery(update.CallbackQuery)
+			} else {
+				b.logger.Info("Обновление без сообщения или callback, пропускаем")
 				continue
 			}
-
-			b.logger.WithFields(logrus.Fields{
-				"user_id":  update.Message.From.ID,
-				"username": update.Message.From.UserName,
-				"text":     update.Message.Text,
-			}).Info("Получено сообщение от Telegram")
-
-			b.handleMessage(update.Message)
 
 		case <-b.ctx.Done():
 			b.logger.Info("Остановка обработки обновлений")
@@ -193,9 +201,12 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	case strings.HasPrefix(message.Text, "/remove_server"):
 		b.logger.Info("Обработка команды /remove_server")
 		response = b.handleRemoveServer(message)
+	case strings.HasPrefix(message.Text, "/add"):
+		b.logger.Info("Обработка команды /add")
+		response = b.handleAddServer(message)
 	case strings.HasPrefix(message.Text, "srv_"):
-		b.logger.Info("Обработка ключа сервера")
-		response = b.handleServerKey(message)
+		b.logger.Info("Обработка ключа сервера (deprecated)")
+		response = "❌ Please use /add command instead.\nExample: /add srv_your_key_here"
 	default:
 		b.logger.WithField("text", message.Text).Info("Неизвестная команда")
 		response = "❓ Unknown command. Use /help to see available commands."
@@ -203,6 +214,84 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 
 	b.logger.WithField("response_length", len(response)).Info("Отправка ответа пользователю")
 	b.sendMessage(message.Chat.ID, response)
+}
+
+// handleCallbackQuery processes callback queries from inline keyboards
+func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
+	// Answer the callback query
+	callback := tgbotapi.NewCallback(query.ID, "")
+	if _, err := b.tgBot.Request(callback); err != nil {
+		b.logger.WithError(err).Error("Failed to answer callback query")
+	}
+
+	// Parse callback data (format: "command_serverNumber")
+	parts := strings.Split(query.Data, "_")
+	if len(parts) != 2 {
+		b.logger.WithField("data", query.Data).Error("Invalid callback data format")
+		return
+	}
+
+	command := parts[0]
+	serverNum := parts[1]
+
+	// Get user's servers
+	servers, err := b.getUserServersWithInfo(query.From.ID)
+	if err != nil {
+		b.logger.WithError(err).Error("Failed to get user servers for callback")
+		return
+	}
+
+	// Execute command with selected server
+	var response string
+	switch command {
+	case "temp":
+		response = b.executeTemperatureCommand(servers, serverNum)
+	case "containers":
+		response = b.executeContainersCommand(servers, serverNum)
+	default:
+		response = "❌ Unknown command"
+	}
+
+	// Send response
+	b.sendMessage(query.Message.Chat.ID, response)
+}
+
+// executeTemperatureCommand executes temperature command for specific server
+func (b *Bot) executeTemperatureCommand(servers []ServerInfo, serverNum string) string {
+	num, err := strconv.Atoi(serverNum)
+	if err != nil || num < 1 || num > len(servers) {
+		return "❌ Invalid server selection"
+	}
+
+	serverKey := servers[num-1].SecretKey
+	serverName := servers[num-1].Name
+
+	temp, err := b.getCPUTemperature(serverKey)
+	if err != nil {
+		return fmt.Sprintf("❌ Failed to get temperature from %s: %v", serverName, err)
+	}
+
+	return fmt.Sprintf("🌡️ **%s** CPU Temperature: %.1f°C", serverName, temp)
+}
+
+// executeContainersCommand executes containers command for specific server
+func (b *Bot) executeContainersCommand(servers []ServerInfo, serverNum string) string {
+	num, err := strconv.Atoi(serverNum)
+	if err != nil || num < 1 || num > len(servers) {
+		return "❌ Invalid server selection"
+	}
+
+	serverKey := servers[num-1].SecretKey
+	serverName := servers[num-1].Name
+
+	containers, err := b.getContainers(serverKey)
+	if err != nil {
+		return fmt.Sprintf("❌ Failed to get containers from %s: %v", serverName, err)
+	}
+
+	response := fmt.Sprintf("🐳 **%s** Containers:\n\n", serverName)
+	response += b.formatContainers(containers)
+	return response
 }
 
 // handleStart handles the /start command
@@ -238,7 +327,7 @@ Available commands:
 func (b *Bot) handleTemp(message *tgbotapi.Message) string {
 	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /temp")
 
-	servers, err := b.getUserServers(message.From.ID)
+	servers, err := b.getUserServersWithInfo(message.From.ID)
 	if err != nil {
 		b.logger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
@@ -247,11 +336,26 @@ func (b *Bot) handleTemp(message *tgbotapi.Message) string {
 	b.logger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
 
 	if len(servers) == 0 {
-		return "📭 No servers connected. Send your server key to connect a server."
+		return "📭 No servers connected. Use /add to connect a server."
 	}
 
-	// Parse server number from command (e.g., "/temp 2")
-	serverKey, err := b.getServerFromCommand(message.Text, servers)
+	// If multiple servers, show selection buttons
+	if len(servers) > 1 {
+		parts := strings.Fields(message.Text)
+		if len(parts) == 1 {
+			// No server specified, show buttons
+			b.sendServerSelectionButtons(message.Chat.ID, "temp", "🌡️ Select server for temperature:", servers)
+			return ""
+		}
+	}
+
+	// Parse server number from command or use first server
+	serverKeys := make([]string, len(servers))
+	for i, server := range servers {
+		serverKeys[i] = server.SecretKey
+	}
+	
+	serverKey, err := b.getServerFromCommand(message.Text, serverKeys)
 	if err != nil {
 		return err.Error()
 	}
@@ -272,7 +376,7 @@ func (b *Bot) handleTemp(message *tgbotapi.Message) string {
 func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /containers")
 	
-	servers, err := b.getUserServers(message.From.ID)
+	servers, err := b.getUserServersWithInfo(message.From.ID)
 	if err != nil {
 		b.logger.WithError(err).Error("Failed to get user servers")
 		return "❌ Error retrieving your servers."
@@ -281,11 +385,26 @@ func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 	b.logger.WithField("servers_count", len(servers)).Info("Найдено серверов пользователя")
 	
 	if len(servers) == 0 {
-		return "📭 No servers connected. Send your server key to connect a server."
+		return "📭 No servers connected. Use /add to connect a server."
 	}
 
-	// Parse server number from command
-	serverKey, err := b.getServerFromCommand(message.Text, servers)
+	// If multiple servers, show selection buttons
+	if len(servers) > 1 {
+		parts := strings.Fields(message.Text)
+		if len(parts) == 1 {
+			// No server specified, show buttons
+			b.sendServerSelectionButtons(message.Chat.ID, "containers", "🐳 Select server for containers:", servers)
+			return ""
+		}
+	}
+
+	// Parse server number from command or use first server
+	serverKeys := make([]string, len(servers))
+	for i, server := range servers {
+		serverKeys[i] = server.SecretKey
+	}
+	
+	serverKey, err := b.getServerFromCommand(message.Text, serverKeys)
 	if err != nil {
 		return err.Error()
 	}
@@ -401,7 +520,33 @@ If you have multiple servers, add server number:
 Example: /temp 1 or /containers 2
 
 🔗 **Connect Server:**
-Send your server key (starts with srv_)`
+Use /add command: /add srv_your_key [name]`
+}
+
+// sendServerSelectionButtons sends inline keyboard with server selection
+func (b *Bot) sendServerSelectionButtons(chatID int64, command, text string, servers []ServerInfo) {
+	var buttons [][]tgbotapi.InlineKeyboardButton
+	
+	for i, server := range servers {
+		statusIcon := "🟢"
+		if server.Status == "offline" {
+			statusIcon = "🔴"
+		}
+		
+		buttonText := fmt.Sprintf("%s %s", statusIcon, server.Name)
+		callbackData := fmt.Sprintf("%s_%d", command, i+1)
+		
+		button := tgbotapi.NewInlineKeyboardButtonData(buttonText, callbackData)
+		buttons = append(buttons, []tgbotapi.InlineKeyboardButton{button})
+	}
+	
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ReplyMarkup = keyboard
+	
+	if _, err := b.tgBot.Send(msg); err != nil {
+		b.logger.WithError(err).Error("Failed to send server selection buttons")
+	}
 }
 
 // handleRenameServer handles the /rename_server command
@@ -457,6 +602,35 @@ func (b *Bot) handleRemoveServer(message *tgbotapi.Message) string {
 	}
 	
 	return "✅ Server removed successfully."
+}
+
+// handleAddServer handles the /add command
+func (b *Bot) handleAddServer(message *tgbotapi.Message) string {
+	parts := strings.Fields(message.Text)
+	if len(parts) < 2 {
+		return "❌ Usage: /add <server_key> [server_name]\nExample: /add srv_684eab33... MyWebServer"
+	}
+	
+	serverKey := strings.TrimSpace(parts[1])
+	if !strings.HasPrefix(serverKey, "srv_") {
+		return "❌ Invalid server key. Server key must start with 'srv_'"
+	}
+	
+	// Optional server name
+	serverName := "Server"
+	if len(parts) >= 3 {
+		serverName = strings.Join(parts[2:], " ")
+		if len(serverName) > 50 {
+			return "❌ Server name too long (max 50 characters)."
+		}
+	}
+	
+	if err := b.connectServerWithName(message.From.ID, serverKey, serverName); err != nil {
+		b.logger.WithError(err).Error("Failed to connect server")
+		return "❌ Failed to connect server. Please check your key or server may already be connected."
+	}
+
+	return fmt.Sprintf("✅ Server '%s' connected successfully!\n🟢 Status: Online\n\nUse /temp to get CPU temperature.", serverName)
 }
 
 // handleServerKey handles server key registration

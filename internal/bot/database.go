@@ -297,3 +297,65 @@ func (b *Bot) getUserServersWithInfo(userID int64) ([]ServerInfo, error) {
 
 	return servers, nil
 }
+
+// connectServerWithName connects a server with custom name
+func (b *Bot) connectServerWithName(userID int64, serverKey, serverName string) error {
+	tx, err := b.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Check if server already exists
+	var serverID string
+	err = tx.QueryRow(`SELECT id FROM servers WHERE secret_key = $1`, serverKey).Scan(&serverID)
+	
+	if err == sql.ErrNoRows {
+		// Create new server
+		err = tx.QueryRow(`
+			INSERT INTO servers (secret_key, name, status, owner_id)
+			VALUES ($1, $2, 'online', $3)
+			RETURNING id
+		`, serverKey, serverName, userID).Scan(&serverID)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	} else {
+		// Update server name if it exists
+		_, err = tx.Exec(`
+			UPDATE servers 
+			SET name = $1, updated_at = NOW()
+			WHERE secret_key = $2
+		`, serverName, serverKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Check if user-server association exists
+	var exists bool
+	err = tx.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM user_servers 
+			WHERE user_id = $1 AND server_id = $2
+		)
+	`, userID, serverID).Scan(&exists)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		// Create user-server association
+		_, err = tx.Exec(`
+			INSERT INTO user_servers (user_id, server_id)
+			VALUES ($1, $2)
+		`, userID, serverID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
