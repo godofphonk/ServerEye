@@ -153,6 +153,18 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	case strings.HasPrefix(message.Text, "/temp"):
 		b.logger.Info("Обработка команды /temp")
 		response = b.handleTemp(message)
+	case strings.HasPrefix(message.Text, "/memory"):
+		b.logger.Info("Обработка команды /memory")
+		response = b.handleMemory(message)
+	case strings.HasPrefix(message.Text, "/disk"):
+		b.logger.Info("Обработка команды /disk")
+		response = b.handleDisk(message)
+	case strings.HasPrefix(message.Text, "/uptime"):
+		b.logger.Info("Обработка команды /uptime")
+		response = b.handleUptime(message)
+	case strings.HasPrefix(message.Text, "/processes"):
+		b.logger.Info("Обработка команды /processes")
+		response = b.handleProcesses(message)
 	case strings.HasPrefix(message.Text, "/containers"):
 		b.logger.Info("Обработка команды /containers")
 		response = b.handleContainers(message)
@@ -202,6 +214,14 @@ Example: srv_a1b2c3d4e5f6g7h8
 
 Available commands:
 /temp - Get CPU temperature
+/memory - Get memory usage
+/disk - Get disk usage
+/uptime - Get system uptime
+/processes - Get top processes
+/containers - List Docker containers
+/start_container <id> - Start container
+/stop_container <id> - Stop container
+/restart_container <id> - Restart container
 /status - Get server status
 /servers - List your servers
 /help - Show this help`
@@ -517,6 +537,238 @@ func (b *Bot) formatContainers(containers *protocol.ContainersPayload) string {
 	return result.String()
 }
 
+// getMemoryInfo requests memory information from agent
+func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
+	cmd := protocol.NewMessage(protocol.TypeGetMemoryInfo, nil)
+	data, err := cmd.ToJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize command: %v", err)
+	}
+
+	respChannel := redis.GetResponseChannel(serverKey)
+	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
+	}
+	defer subscription.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cmdChannel := redis.GetCommandChannel(serverKey)
+	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
+		return nil, fmt.Errorf("failed to send command: %v", err)
+	}
+
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case respData := <-subscription.Channel():
+			resp, err := protocol.FromJSON(respData)
+			if err != nil {
+				continue
+			}
+
+			if resp.ID != cmd.ID {
+				continue
+			}
+
+			if resp.Type == protocol.TypeErrorResponse {
+				return nil, fmt.Errorf("agent error: %v", resp.Payload)
+			}
+
+			if resp.Type == protocol.TypeMemoryInfoResponse {
+				if payload, ok := resp.Payload.(map[string]interface{}); ok {
+					memData, _ := json.Marshal(payload)
+					var memInfo protocol.MemoryInfo
+					if err := json.Unmarshal(memData, &memInfo); err == nil {
+						return &memInfo, nil
+					}
+				}
+				return nil, fmt.Errorf("invalid memory data in response")
+			}
+
+			return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+
+		case <-timeout:
+			return nil, fmt.Errorf("timeout waiting for response")
+		}
+	}
+}
+
+// getDiskInfo requests disk information from agent
+func (b *Bot) getDiskInfo(serverKey string) (*protocol.DiskInfoPayload, error) {
+	cmd := protocol.NewMessage(protocol.TypeGetDiskInfo, nil)
+	data, err := cmd.ToJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize command: %v", err)
+	}
+
+	respChannel := redis.GetResponseChannel(serverKey)
+	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
+	}
+	defer subscription.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cmdChannel := redis.GetCommandChannel(serverKey)
+	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
+		return nil, fmt.Errorf("failed to send command: %v", err)
+	}
+
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case respData := <-subscription.Channel():
+			resp, err := protocol.FromJSON(respData)
+			if err != nil {
+				continue
+			}
+
+			if resp.ID != cmd.ID {
+				continue
+			}
+
+			if resp.Type == protocol.TypeErrorResponse {
+				return nil, fmt.Errorf("agent error: %v", resp.Payload)
+			}
+
+			if resp.Type == protocol.TypeDiskInfoResponse {
+				if payload, ok := resp.Payload.(map[string]interface{}); ok {
+					diskData, _ := json.Marshal(payload)
+					var diskInfo protocol.DiskInfoPayload
+					if err := json.Unmarshal(diskData, &diskInfo); err == nil {
+						return &diskInfo, nil
+					}
+				}
+				return nil, fmt.Errorf("invalid disk data in response")
+			}
+
+			return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+
+		case <-timeout:
+			return nil, fmt.Errorf("timeout waiting for response")
+		}
+	}
+}
+
+// getUptime requests uptime information from agent
+func (b *Bot) getUptime(serverKey string) (*protocol.UptimeInfo, error) {
+	cmd := protocol.NewMessage(protocol.TypeGetUptime, nil)
+	data, err := cmd.ToJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize command: %v", err)
+	}
+
+	respChannel := redis.GetResponseChannel(serverKey)
+	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
+	}
+	defer subscription.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cmdChannel := redis.GetCommandChannel(serverKey)
+	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
+		return nil, fmt.Errorf("failed to send command: %v", err)
+	}
+
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case respData := <-subscription.Channel():
+			resp, err := protocol.FromJSON(respData)
+			if err != nil {
+				continue
+			}
+
+			if resp.ID != cmd.ID {
+				continue
+			}
+
+			if resp.Type == protocol.TypeErrorResponse {
+				return nil, fmt.Errorf("agent error: %v", resp.Payload)
+			}
+
+			if resp.Type == protocol.TypeUptimeResponse {
+				if payload, ok := resp.Payload.(map[string]interface{}); ok {
+					uptimeData, _ := json.Marshal(payload)
+					var uptimeInfo protocol.UptimeInfo
+					if err := json.Unmarshal(uptimeData, &uptimeInfo); err == nil {
+						return &uptimeInfo, nil
+					}
+				}
+				return nil, fmt.Errorf("invalid uptime data in response")
+			}
+
+			return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+
+		case <-timeout:
+			return nil, fmt.Errorf("timeout waiting for response")
+		}
+	}
+}
+
+// getProcesses requests processes information from agent
+func (b *Bot) getProcesses(serverKey string) (*protocol.ProcessesPayload, error) {
+	cmd := protocol.NewMessage(protocol.TypeGetProcesses, nil)
+	data, err := cmd.ToJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize command: %v", err)
+	}
+
+	respChannel := redis.GetResponseChannel(serverKey)
+	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
+	}
+	defer subscription.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cmdChannel := redis.GetCommandChannel(serverKey)
+	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
+		return nil, fmt.Errorf("failed to send command: %v", err)
+	}
+
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case respData := <-subscription.Channel():
+			resp, err := protocol.FromJSON(respData)
+			if err != nil {
+				continue
+			}
+
+			if resp.ID != cmd.ID {
+				continue
+			}
+
+			if resp.Type == protocol.TypeErrorResponse {
+				return nil, fmt.Errorf("agent error: %v", resp.Payload)
+			}
+
+			if resp.Type == protocol.TypeProcessesResponse {
+				if payload, ok := resp.Payload.(map[string]interface{}); ok {
+					processData, _ := json.Marshal(payload)
+					var processes protocol.ProcessesPayload
+					if err := json.Unmarshal(processData, &processes); err == nil {
+						return &processes, nil
+					}
+				}
+				return nil, fmt.Errorf("invalid processes data in response")
+			}
+
+			return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+
+		case <-timeout:
+			return nil, fmt.Errorf("timeout waiting for response")
+		}
+	}
+}
+
 // handleStartContainer handles the /start_container command
 func (b *Bot) handleStartContainer(message *tgbotapi.Message) string {
 	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /start_container")
@@ -799,4 +1051,215 @@ func (b *Bot) isSystemContainer(containerName string) bool {
 	}
 	
 	return false
+}
+
+// handleMemory handles the /memory command
+func (b *Bot) handleMemory(message *tgbotapi.Message) string {
+	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /memory")
+
+	servers, err := b.getUserServers(message.From.ID)
+	if err != nil {
+		b.logger.WithError(err).Error("Failed to get user servers")
+		return "❌ Error retrieving your servers."
+	}
+
+	if len(servers) == 0 {
+		return "📭 No servers connected. Send your server key to connect a server."
+	}
+
+	// For now, use the first server
+	serverKey := servers[0]
+	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос информации о памяти с сервера")
+
+	memInfo, err := b.getMemoryInfo(serverKey)
+	if err != nil {
+		b.logger.WithError(err).Error("Ошибка получения информации о памяти")
+		return fmt.Sprintf("❌ Failed to get memory info: %v", err)
+	}
+
+	// Format memory information
+	totalGB := float64(memInfo.Total) / 1024 / 1024 / 1024
+	usedGB := float64(memInfo.Used) / 1024 / 1024 / 1024
+	availableGB := float64(memInfo.Available) / 1024 / 1024 / 1024
+	freeGB := float64(memInfo.Free) / 1024 / 1024 / 1024
+
+	response := fmt.Sprintf(`🧠 **Memory Usage**
+
+💾 **Total:** %.1f GB
+📊 **Used:** %.1f GB (%.1f%%)
+✅ **Available:** %.1f GB
+🆓 **Free:** %.1f GB
+📦 **Buffers:** %.1f MB
+🗂️ **Cached:** %.1f MB`,
+		totalGB,
+		usedGB, memInfo.UsedPercent,
+		availableGB,
+		freeGB,
+		float64(memInfo.Buffers)/1024/1024,
+		float64(memInfo.Cached)/1024/1024)
+
+	b.logger.WithField("used_percent", memInfo.UsedPercent).Info("Информация о памяти успешно получена")
+	return response
+}
+
+// handleDisk handles the /disk command
+func (b *Bot) handleDisk(message *tgbotapi.Message) string {
+	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /disk")
+
+	servers, err := b.getUserServers(message.From.ID)
+	if err != nil {
+		b.logger.WithError(err).Error("Failed to get user servers")
+		return "❌ Error retrieving your servers."
+	}
+
+	if len(servers) == 0 {
+		return "📭 No servers connected. Send your server key to connect a server."
+	}
+
+	// For now, use the first server
+	serverKey := servers[0]
+	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос информации о дисках с сервера")
+
+	diskInfo, err := b.getDiskInfo(serverKey)
+	if err != nil {
+		b.logger.WithError(err).Error("Ошибка получения информации о дисках")
+		return fmt.Sprintf("❌ Failed to get disk info: %v", err)
+	}
+
+	if len(diskInfo.Disks) == 0 {
+		return "💽 No disk information available"
+	}
+
+	response := "💽 **Disk Usage**\n\n"
+	for _, disk := range diskInfo.Disks {
+		totalGB := float64(disk.Total) / 1024 / 1024 / 1024
+		usedGB := float64(disk.Used) / 1024 / 1024 / 1024
+		freeGB := float64(disk.Free) / 1024 / 1024 / 1024
+
+		var statusEmoji string
+		if disk.UsedPercent >= 90 {
+			statusEmoji = "🔴"
+		} else if disk.UsedPercent >= 75 {
+			statusEmoji = "🟡"
+		} else {
+			statusEmoji = "🟢"
+		}
+
+		response += fmt.Sprintf(`%s **%s**
+📁 **Path:** %s
+📊 **Used:** %.1f GB / %.1f GB (%.1f%%)
+🆓 **Free:** %.1f GB
+💾 **Type:** %s
+
+`,
+			statusEmoji, disk.Path,
+			disk.Path,
+			usedGB, totalGB, disk.UsedPercent,
+			freeGB,
+			disk.Filesystem)
+	}
+
+	b.logger.WithField("disks_count", len(diskInfo.Disks)).Info("Информация о дисках успешно получена")
+	return response
+}
+
+// handleUptime handles the /uptime command
+func (b *Bot) handleUptime(message *tgbotapi.Message) string {
+	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /uptime")
+
+	servers, err := b.getUserServers(message.From.ID)
+	if err != nil {
+		b.logger.WithError(err).Error("Failed to get user servers")
+		return "❌ Error retrieving your servers."
+	}
+
+	if len(servers) == 0 {
+		return "📭 No servers connected. Send your server key to connect a server."
+	}
+
+	// For now, use the first server
+	serverKey := servers[0]
+	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос времени работы с сервера")
+
+	uptimeInfo, err := b.getUptime(serverKey)
+	if err != nil {
+		b.logger.WithError(err).Error("Ошибка получения времени работы")
+		return fmt.Sprintf("❌ Failed to get uptime: %v", err)
+	}
+
+	// Format boot time
+	bootTime := time.Unix(int64(uptimeInfo.BootTime), 0)
+	
+	response := fmt.Sprintf(`⏰ **System Uptime**
+
+🚀 **Uptime:** %s
+📅 **Boot Time:** %s
+⏱️ **Running for:** %d seconds`,
+		uptimeInfo.Formatted,
+		bootTime.Format("2006-01-02 15:04:05"),
+		uptimeInfo.Uptime)
+
+	b.logger.WithField("uptime", uptimeInfo.Formatted).Info("Время работы успешно получено")
+	return response
+}
+
+// handleProcesses handles the /processes command
+func (b *Bot) handleProcesses(message *tgbotapi.Message) string {
+	b.logger.WithField("user_id", message.From.ID).Info("Обработка команды /processes")
+
+	servers, err := b.getUserServers(message.From.ID)
+	if err != nil {
+		b.logger.WithError(err).Error("Failed to get user servers")
+		return "❌ Error retrieving your servers."
+	}
+
+	if len(servers) == 0 {
+		return "📭 No servers connected. Send your server key to connect a server."
+	}
+
+	// For now, use the first server
+	serverKey := servers[0]
+	b.logger.WithField("server_key", serverKey[:12]+"...").Info("Запрос списка процессов с сервера")
+
+	processes, err := b.getProcesses(serverKey)
+	if err != nil {
+		b.logger.WithError(err).Error("Ошибка получения списка процессов")
+		return fmt.Sprintf("❌ Failed to get processes: %v", err)
+	}
+
+	if len(processes.Processes) == 0 {
+		return "⚙️ No process information available"
+	}
+
+	response := "⚙️ **Top Processes**\n\n"
+	for i, proc := range processes.Processes {
+		if i >= 10 { // Limit to top 10
+			break
+		}
+
+		var statusEmoji string
+		if proc.CPUPercent >= 50 {
+			statusEmoji = "🔥"
+		} else if proc.CPUPercent >= 20 {
+			statusEmoji = "🟡"
+		} else {
+			statusEmoji = "🟢"
+		}
+
+		response += fmt.Sprintf(`%s **%s** (PID: %d)
+👤 **User:** %s
+🖥️ **CPU:** %.1f%%
+🧠 **Memory:** %d MB (%.1f%%)
+📊 **Status:** %s
+
+`,
+			statusEmoji, proc.Name, proc.PID,
+			proc.Username,
+			proc.CPUPercent,
+			proc.MemoryMB, proc.MemoryPercent,
+			proc.Status)
+	}
+
+	b.logger.WithField("processes_count", len(processes.Processes)).Info("Список процессов успешно получен")
+	return response
 }

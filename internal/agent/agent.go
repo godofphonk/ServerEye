@@ -18,11 +18,12 @@ import (
 type Agent struct {
 	config        *config.AgentConfig
 	logger        *logrus.Logger
-	redisClient   *redis.Client
-	cpuMetrics    *metrics.CPUMetrics
-	dockerClient  *docker.Client
-	ctx           context.Context
-	cancel        context.CancelFunc
+	redisClient    *redis.Client
+	cpuMetrics     *metrics.CPUMetrics
+	systemMonitor  *metrics.SystemMonitor
+	dockerClient   *docker.Client
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 // New создает новый агент
@@ -44,6 +45,7 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 		logger:        logger,
 		redisClient:   redisClient,
 		cpuMetrics:    metrics.NewCPUMetrics(),
+		systemMonitor: metrics.NewSystemMonitor(logger),
 		dockerClient:  docker.NewClient(logger),
 		ctx:           ctx,
 		cancel:        cancel,
@@ -125,6 +127,14 @@ func (a *Agent) processCommand(data []byte) {
 		response = a.handleStopContainer(msg)
 	case protocol.TypeRestartContainer:
 		response = a.handleRestartContainer(msg)
+	case protocol.TypeGetMemoryInfo:
+		response = a.handleGetMemoryInfo(msg)
+	case protocol.TypeGetDiskInfo:
+		response = a.handleGetDiskInfo(msg)
+	case protocol.TypeGetUptime:
+		response = a.handleGetUptime(msg)
+	case protocol.TypeGetProcesses:
+		response = a.handleGetProcesses(msg)
 	case protocol.TypePing:
 		response = a.handlePing(msg)
 	default:
@@ -364,4 +374,77 @@ func (a *Agent) handleRestartContainer(msg *protocol.Message) *protocol.Message 
 	
 	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно перезапущен")
 	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
+}
+
+// handleGetMemoryInfo обрабатывает команду получения информации о памяти
+func (a *Agent) handleGetMemoryInfo(msg *protocol.Message) *protocol.Message {
+	a.logger.Debug("Обработка команды получения информации о памяти")
+	
+	memInfo, err := a.systemMonitor.GetMemoryInfo()
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка получения информации о памяти")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    "MEMORY_INFO_ERROR",
+			ErrorMessage: fmt.Sprintf("Ошибка получения информации о памяти: %v", err),
+		})
+	}
+	
+	a.logger.WithFields(logrus.Fields{
+		"total_gb":     float64(memInfo.Total) / 1024 / 1024 / 1024,
+		"used_percent": memInfo.UsedPercent,
+	}).Info("Информация о памяти получена")
+	
+	return protocol.NewMessage(protocol.TypeMemoryInfoResponse, memInfo)
+}
+
+// handleGetDiskInfo обрабатывает команду получения информации о дисках
+func (a *Agent) handleGetDiskInfo(msg *protocol.Message) *protocol.Message {
+	a.logger.Debug("Обработка команды получения информации о дисках")
+	
+	diskInfo, err := a.systemMonitor.GetDiskInfo()
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка получения информации о дисках")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    "DISK_INFO_ERROR",
+			ErrorMessage: fmt.Sprintf("Ошибка получения информации о дисках: %v", err),
+		})
+	}
+	
+	a.logger.WithField("disks_count", len(diskInfo.Disks)).Info("Информация о дисках получена")
+	return protocol.NewMessage(protocol.TypeDiskInfoResponse, diskInfo)
+}
+
+// handleGetUptime обрабатывает команду получения времени работы системы
+func (a *Agent) handleGetUptime(msg *protocol.Message) *protocol.Message {
+	a.logger.Debug("Обработка команды получения времени работы")
+	
+	uptimeInfo, err := a.systemMonitor.GetUptime()
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка получения времени работы")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    "UPTIME_ERROR",
+			ErrorMessage: fmt.Sprintf("Ошибка получения времени работы: %v", err),
+		})
+	}
+	
+	a.logger.WithField("uptime", uptimeInfo.Formatted).Info("Время работы получено")
+	return protocol.NewMessage(protocol.TypeUptimeResponse, uptimeInfo)
+}
+
+// handleGetProcesses обрабатывает команду получения списка процессов
+func (a *Agent) handleGetProcesses(msg *protocol.Message) *protocol.Message {
+	a.logger.Debug("Обработка команды получения списка процессов")
+	
+	// По умолчанию показываем топ 10 процессов
+	processes, err := a.systemMonitor.GetTopProcesses(10)
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка получения списка процессов")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    "PROCESSES_ERROR",
+			ErrorMessage: fmt.Sprintf("Ошибка получения списка процессов: %v", err),
+		})
+	}
+	
+	a.logger.WithField("processes_count", len(processes.Processes)).Info("Список процессов получен")
+	return protocol.NewMessage(protocol.TypeProcessesResponse, processes)
 }
