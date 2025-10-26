@@ -219,14 +219,21 @@
                 </div>
                 <div class="tab-content">
                     <div class="tab-pane active" id="linux">
-                        <pre><code># Download and install ServerEye Agent
-curl -fsSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install.sh | bash
+                        <pre><code># Quick installation (Ubuntu/Debian)
+curl -fsSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/quick-install.sh | sudo bash
 
-# Configure your server
-sudo servereye-agent --setup
+# The script will:
+# - Install dependencies (Go, Redis)
+# - Build and install ServerEye agent
+# - Create systemd service
+# - Generate unique server key
+# - Start the service automatically
 
-# Start the service
-sudo systemctl enable --now servereye-agent</code></pre>
+# Check status
+sudo systemctl status servereye-agent
+
+# View logs
+sudo journalctl -u servereye-agent -f</code></pre>
                     </div>
                     <div class="tab-pane" id="windows">
                         <pre><code># Download ServerEye for Windows
