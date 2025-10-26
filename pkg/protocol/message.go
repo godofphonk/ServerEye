@@ -15,14 +15,18 @@ const (
 	TypeGetCPUTemp       MessageType = "get_cpu_temp"
 	TypeGetSystemInfo    MessageType = "get_system_info"
 	TypeGetContainers    MessageType = "get_containers"
+	TypeStartContainer   MessageType = "start_container"
+	TypeStopContainer    MessageType = "stop_container"
+	TypeRestartContainer MessageType = "restart_container"
 	TypePing             MessageType = "ping"
 
 	// Responses from agent to bot
-	TypeCPUTempResponse    MessageType = "cpu_temp_response"
-	TypeSystemInfoResponse MessageType = "system_info_response"
-	TypeContainersResponse MessageType = "containers_response"
-	TypePong               MessageType = "pong"
-	TypeErrorResponse      MessageType = "error_response"
+	TypeCPUTempResponse       MessageType = "cpu_temp_response"
+	TypeSystemInfoResponse    MessageType = "system_info_response"
+	TypeContainersResponse    MessageType = "containers_response"
+	TypeContainerActionResponse MessageType = "container_action_response"
+	TypePong                  MessageType = "pong"
+	TypeErrorResponse         MessageType = "error_response"
 )
 
 // Message represents a base protocol message
@@ -101,10 +105,30 @@ type ContainersPayload struct {
 	Total      int             `json:"total"`
 }
 
+// ContainerActionPayload represents container action request
+type ContainerActionPayload struct {
+	ContainerID   string `json:"container_id"`
+	ContainerName string `json:"container_name"`
+	Action        string `json:"action"` // "start", "stop", "restart"
+}
+
+// ContainerActionResponse represents container action result
+type ContainerActionResponse struct {
+	ContainerID   string `json:"container_id"`
+	ContainerName string `json:"container_name"`
+	Action        string `json:"action"`
+	Success       bool   `json:"success"`
+	Message       string `json:"message"`
+	NewState      string `json:"new_state,omitempty"`
+}
+
 // Error codes
 const (
-	ErrorSensorNotFound   = "SENSOR_NOT_FOUND"
-	ErrorPermissionDenied = "PERMISSION_DENIED"
-	ErrorCommandTimeout   = "COMMAND_TIMEOUT"
-	ErrorInvalidCommand   = "INVALID_COMMAND"
+	ErrorSensorNotFound     = "SENSOR_NOT_FOUND"
+	ErrorPermissionDenied   = "PERMISSION_DENIED"
+	ErrorCommandTimeout     = "COMMAND_TIMEOUT"
+	ErrorInvalidCommand     = "INVALID_COMMAND"
+	ErrorContainerNotFound  = "CONTAINER_NOT_FOUND"
+	ErrorContainerAction    = "CONTAINER_ACTION_FAILED"
+	ErrorDockerUnavailable  = "DOCKER_UNAVAILABLE"
 )

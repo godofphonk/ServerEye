@@ -67,7 +67,7 @@ func (a *Agent) Start() error {
 	a.logger.WithField("channel", cmdChannel).Info("Подписались на канал команд")
 
 	// Запускаем обработку команд
-	go a.handleCommands(msgChan)
+	go a.handleCommands(msgChan.Channel())
 
 	// Запускаем heartbeat
 	go a.startHeartbeat()
@@ -119,6 +119,12 @@ func (a *Agent) processCommand(data []byte) {
 		response = a.handleGetCPUTemp(msg)
 	case protocol.TypeGetContainers:
 		response = a.handleGetContainers(msg)
+	case protocol.TypeStartContainer:
+		response = a.handleStartContainer(msg)
+	case protocol.TypeStopContainer:
+		response = a.handleStopContainer(msg)
+	case protocol.TypeRestartContainer:
+		response = a.handleRestartContainer(msg)
 	case protocol.TypePing:
 		response = a.handlePing(msg)
 	default:
@@ -238,4 +244,124 @@ func (a *Agent) sendHeartbeat() {
 	if err := a.redisClient.Publish(a.ctx, heartbeatChannel, data); err != nil {
 		a.logger.WithError(err).Error("Не удалось отправить heartbeat")
 	}
+}
+
+// handleStartContainer обрабатывает команду запуска контейнера
+func (a *Agent) handleStartContainer(msg *protocol.Message) *protocol.Message {
+	a.logger.Info("Обработка команды start_container")
+	
+	// Парсим payload
+	payloadData, err := json.Marshal(msg.Payload)
+	if err != nil {
+		a.logger.WithError(err).Error("Не удалось сериализовать payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+	
+	var actionPayload protocol.ContainerActionPayload
+	if err := json.Unmarshal(payloadData, &actionPayload); err != nil {
+		a.logger.WithError(err).Error("Не удалось распарсить payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+	
+	// Выполняем команду
+	response, err := a.dockerClient.StartContainer(a.ctx, actionPayload.ContainerID)
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка при запуске контейнера")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorContainerAction,
+			ErrorMessage: fmt.Sprintf("Ошибка при запуске контейнера: %v", err),
+		})
+	}
+	
+	// Добавляем имя контейнера в ответ
+	response.ContainerName = actionPayload.ContainerName
+	
+	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно запущен")
+	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
+}
+
+// handleStopContainer обрабатывает команду остановки контейнера
+func (a *Agent) handleStopContainer(msg *protocol.Message) *protocol.Message {
+	a.logger.Info("Обработка команды stop_container")
+	
+	// Парсим payload
+	payloadData, err := json.Marshal(msg.Payload)
+	if err != nil {
+		a.logger.WithError(err).Error("Не удалось сериализовать payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+	
+	var actionPayload protocol.ContainerActionPayload
+	if err := json.Unmarshal(payloadData, &actionPayload); err != nil {
+		a.logger.WithError(err).Error("Не удалось распарсить payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+	
+	// Выполняем команду
+	response, err := a.dockerClient.StopContainer(a.ctx, actionPayload.ContainerID)
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка при остановке контейнера")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorContainerAction,
+			ErrorMessage: fmt.Sprintf("Ошибка при остановке контейнера: %v", err),
+		})
+	}
+	
+	// Добавляем имя контейнера в ответ
+	response.ContainerName = actionPayload.ContainerName
+	
+	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно остановлен")
+	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
+}
+
+// handleRestartContainer обрабатывает команду перезапуска контейнера
+func (a *Agent) handleRestartContainer(msg *protocol.Message) *protocol.Message {
+	a.logger.Info("Обработка команды restart_container")
+	
+	// Парсим payload
+	payloadData, err := json.Marshal(msg.Payload)
+	if err != nil {
+		a.logger.WithError(err).Error("Не удалось сериализовать payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+	
+	var actionPayload protocol.ContainerActionPayload
+	if err := json.Unmarshal(payloadData, &actionPayload); err != nil {
+		a.logger.WithError(err).Error("Не удалось распарсить payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+	
+	// Выполняем команду
+	response, err := a.dockerClient.RestartContainer(a.ctx, actionPayload.ContainerID)
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка при перезапуске контейнера")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorContainerAction,
+			ErrorMessage: fmt.Sprintf("Ошибка при перезапуске контейнера: %v", err),
+		})
+	}
+	
+	// Добавляем имя контейнера в ответ
+	response.ContainerName = actionPayload.ContainerName
+	
+	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно перезапущен")
+	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
 }

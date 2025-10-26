@@ -65,8 +65,26 @@ func (c *Client) Publish(ctx context.Context, channel string, message []byte) er
 	return nil
 }
 
-// Subscribe подписывается на канал и возвращает канал для получения сообщений
-func (c *Client) Subscribe(ctx context.Context, channel string) (<-chan []byte, error) {
+// Subscription represents a Redis subscription
+type Subscription struct {
+	pubsub *redis.PubSub
+	msgChan chan []byte
+	logger *logrus.Logger
+}
+
+// Close closes the subscription
+func (s *Subscription) Close() error {
+	close(s.msgChan)
+	return s.pubsub.Close()
+}
+
+// Channel returns the message channel
+func (s *Subscription) Channel() <-chan []byte {
+	return s.msgChan
+}
+
+// Subscribe подписывается на канал и возвращает объект подписки
+func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, error) {
 	pubsub := c.rdb.Subscribe(ctx, channel)
 
 	// Проверяем подписку
@@ -77,12 +95,16 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (<-chan []byte, 
 
 	c.logger.WithField("channel", channel).Info("Подписались на канал Redis")
 
-	// Создаем канал для сообщений
-	msgChan := make(chan []byte, 100)
+	// Создаем объект подписки
+	subscription := &Subscription{
+		pubsub: pubsub,
+		msgChan: make(chan []byte, 100),
+		logger: c.logger,
+	}
 
 	// Запускаем горутину для чтения сообщений
 	go func() {
-		defer close(msgChan)
+		defer close(subscription.msgChan)
 		defer pubsub.Close()
 
 		ch := pubsub.Channel()
@@ -99,7 +121,7 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (<-chan []byte, 
 				}).Debug("Получено сообщение из Redis")
 
 				select {
-				case msgChan <- []byte(msg.Payload):
+				case subscription.msgChan <- []byte(msg.Payload):
 				case <-ctx.Done():
 					return
 				}
@@ -109,7 +131,7 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (<-chan []byte, 
 		}
 	}()
 
-	return msgChan, nil
+	return subscription, nil
 }
 
 // Close закрывает соединение с Redis
