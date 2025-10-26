@@ -188,30 +188,27 @@
                 </div>
                 <div class="tab-content">
                     <div class="tab-pane active" id="linux">
-                        <pre><code># Quick installation (Ubuntu/Debian)
-curl -fsSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/simple-install.sh | sudo bash
+                        <pre><code># 1. Download ServerEye
+wget https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-linux-amd64
 
-# The script will:
-# - Install dependencies (Go, Redis)
-# - Build and install ServerEye agent
-# - Create systemd service
-# - Generate unique server key
-# - Start the service automatically
+# 2. Make executable and install
+chmod +x servereye-linux-amd64
+sudo ./servereye-linux-amd64 --install
 
-# Check status
-sudo systemctl status servereye-agent
+# 3. Copy the server key it shows and send to your Telegram bot
 
-# View logs
-sudo journalctl -u servereye-agent -f</code></pre>
+# That's it! 🎉</code></pre>
                     </div>
                     <div class="tab-pane" id="windows">
-                        <pre><code># Download ServerEye for Windows
-# Run PowerShell as Administrator
-Invoke-WebRequest -Uri "https://github.com/godofphonk/ServerEye/releases/latest/download/servereye-windows-amd64.zip" -OutFile "servereye.zip"
+                        <pre><code># 1. Download ServerEye (Run PowerShell as Administrator)
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-windows-amd64.exe" -OutFile "servereye.exe"
 
-# Extract and install
-Expand-Archive servereye.zip -DestinationPath "C:\ServerEye"
-C:\ServerEye\install.ps1</code></pre>
+# 2. Install
+.\servereye.exe --install
+
+# 3. Copy the server key it shows and send to your Telegram bot
+
+# That's it! 🎉</code></pre>
                     </div>
                     <div class="tab-pane" id="docker">
                         <pre><code># Using Docker Compose
