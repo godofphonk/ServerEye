@@ -66,14 +66,8 @@ detect_arch() {
 
 # Get latest release version
 get_latest_version() {
-    log_info "Getting latest ServerEye version..."
-    local version=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    if [[ -z "$version" ]]; then
-        log_warning "Could not get latest version, using master branch"
-        echo "master"
-    else
-        echo "$version"
-    fi
+    log_info "Using master branch (no releases yet)"
+    echo "master"
 }
 
 # Download and install binary
@@ -110,11 +104,18 @@ install_binary() {
     cd ServerEye
     
     log_info "Building ServerEye agent..."
-    go build -o servereye-agent ./cmd/agent
+    export CGO_ENABLED=0
+    go build -ldflags="-s -w" -o servereye-agent ./cmd/agent
     
     # Install binary
     cp servereye-agent "$INSTALL_DIR/"
     chmod +x "$INSTALL_DIR/servereye-agent"
+    
+    # Test binary exists
+    if [[ ! -f "$INSTALL_DIR/servereye-agent" ]]; then
+        log_error "Failed to build ServerEye agent"
+        exit 1
+    fi
     
     log_success "ServerEye agent installed to $INSTALL_DIR"
 }
