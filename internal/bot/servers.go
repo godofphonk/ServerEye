@@ -24,7 +24,7 @@ func (b *Bot) handleServers(message *tgbotapi.Message) string {
 		if servers[0].Status == "offline" {
 			statusIcon = "🔴"
 		}
-		return fmt.Sprintf("📋 Your servers:\n%s **%s** (%s)\n\n💡 All commands will use this server automatically.\n\n🔧 Management:\n/rename_server 1 <name> - Rename server\n/remove_server 1 - Remove server", 
+		return fmt.Sprintf("📋 Your servers:\n%s **%s** (%s)\n\n💡 All commands will use this server automatically.\n\n🔧 Management:\n/rename_server 1 <name> - Rename server\n/remove_server 1 - Remove server",
 			statusIcon, servers[0].Name, servers[0].SecretKey[:12]+"...")
 	}
 
@@ -42,7 +42,7 @@ func (b *Bot) handleServers(message *tgbotapi.Message) string {
 	response += "🔧 Management:\n"
 	response += "/rename_server <#> <name> - Rename server\n"
 	response += "/remove_server <#> - Remove server"
-	
+
 	return response
 }
 
@@ -52,27 +52,27 @@ func (b *Bot) handleRenameServer(message *tgbotapi.Message) string {
 	if len(parts) < 3 {
 		return "❌ Usage: /rename_server <server#> <new_name>\nExample: /rename_server 1 MyWebServer"
 	}
-	
+
 	servers, err := b.getUserServers(message.From.ID)
 	if err != nil || len(servers) == 0 {
 		return "❌ No servers found."
 	}
-	
+
 	serverNum, err := strconv.Atoi(parts[1])
 	if err != nil || serverNum < 1 || serverNum > len(servers) {
 		return fmt.Sprintf("❌ Invalid server number. You have %d servers.", len(servers))
 	}
-	
+
 	newName := strings.Join(parts[2:], " ")
 	if len(newName) > 50 {
 		return "❌ Server name too long (max 50 characters)."
 	}
-	
+
 	serverKey := servers[serverNum-1]
 	if err := b.renameServer(serverKey, newName); err != nil {
 		return "❌ Failed to rename server."
 	}
-	
+
 	return fmt.Sprintf("✅ Server renamed to: %s", newName)
 }
 
@@ -82,22 +82,22 @@ func (b *Bot) handleRemoveServer(message *tgbotapi.Message) string {
 	if len(parts) < 2 {
 		return "❌ Usage: /remove_server <server#>\nExample: /remove_server 1\n\n⚠️ This will permanently remove the server!"
 	}
-	
+
 	servers, err := b.getUserServers(message.From.ID)
 	if err != nil || len(servers) == 0 {
 		return "❌ No servers found."
 	}
-	
+
 	serverNum, err := strconv.Atoi(parts[1])
 	if err != nil || serverNum < 1 || serverNum > len(servers) {
 		return fmt.Sprintf("❌ Invalid server number. You have %d servers.", len(servers))
 	}
-	
+
 	serverKey := servers[serverNum-1]
 	if err := b.removeServer(message.From.ID, serverKey); err != nil {
 		return "❌ Failed to remove server."
 	}
-	
+
 	return "✅ Server removed successfully."
 }
 
@@ -107,12 +107,12 @@ func (b *Bot) handleAddServer(message *tgbotapi.Message) string {
 	if len(parts) < 2 {
 		return "❌ Usage: /add <server_key> [server_name]\nExample: /add srv_684eab33... MyWebServer"
 	}
-	
+
 	serverKey := strings.TrimSpace(parts[1])
 	if !strings.HasPrefix(serverKey, "srv_") {
 		return "❌ Invalid server key. Server key must start with 'srv_'"
 	}
-	
+
 	// Optional server name
 	serverName := "Server"
 	if len(parts) >= 3 {
@@ -121,7 +121,7 @@ func (b *Bot) handleAddServer(message *tgbotapi.Message) string {
 			return "❌ Server name too long (max 50 characters)."
 		}
 	}
-	
+
 	if err := b.connectServerWithName(message.From.ID, serverKey, serverName); err != nil {
 		b.legacyLogger.WithError(err).Error("Failed to connect server")
 		return "❌ Failed to connect server. Please check your key or server may already be connected."
@@ -145,14 +145,14 @@ func (b *Bot) handleServerKey(message *tgbotapi.Message) string {
 // handleDebug shows debug information about user and servers
 func (b *Bot) handleDebug(message *tgbotapi.Message) string {
 	userID := message.From.ID
-	
+
 	// Check if user exists in database
 	var userExists bool
 	err := b.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE telegram_id = $1)", userID).Scan(&userExists)
 	if err != nil {
 		return fmt.Sprintf("❌ Database error: %v", err)
 	}
-	
+
 	// Get user servers count
 	var serverCount int
 	err = b.db.QueryRow(`
@@ -163,12 +163,14 @@ func (b *Bot) handleDebug(message *tgbotapi.Message) string {
 	if err != nil {
 		return fmt.Sprintf("❌ Error getting servers: %v", err)
 	}
-	
+
 	// Get total users and servers in database
-	var totalUsers, totalServers int
+	var totalUsers, totalServers, totalKeys, connectedKeys int
 	b.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&totalUsers)
 	b.db.QueryRow("SELECT COUNT(*) FROM servers").Scan(&totalServers)
-	
+	b.db.QueryRow("SELECT COUNT(*) FROM generated_keys").Scan(&totalKeys)
+	b.db.QueryRow("SELECT COUNT(*) FROM generated_keys WHERE status = 'connected'").Scan(&connectedKeys)
+
 	return fmt.Sprintf(`🔍 **Debug Information**
 
 👤 **Your Status:**
@@ -178,9 +180,79 @@ func (b *Bot) handleDebug(message *tgbotapi.Message) string {
 📊 **Database Stats:**
 • Total users: %d
 • Total servers: %d
+• Generated keys: %d
+• Connected keys: %d
 
 💡 **Tip:** If you have 0 servers after bot restart, use:
 /start
-/add srv_your_key MyServer`, 
-		userExists, serverCount, totalUsers, totalServers)
+/add srv_your_key MyServer`,
+		userExists, serverCount, totalUsers, totalServers, totalKeys, connectedKeys)
+}
+
+// handleStats shows detailed statistics about generated keys (admin command)
+func (b *Bot) handleStats(message *tgbotapi.Message) string {
+	// Simple admin check - you can make this more sophisticated
+	adminUsers := []int64{1805441944} // Add your Telegram ID here
+	isAdmin := false
+	for _, adminID := range adminUsers {
+		if message.From.ID == adminID {
+			isAdmin = true
+			break
+		}
+	}
+
+	if !isAdmin {
+		return "❌ This command is only available for administrators."
+	}
+
+	// Get detailed statistics
+	var totalKeys, connectedKeys, generatedToday int
+	var firstKeyDate, lastKeyDate string
+
+	b.db.QueryRow("SELECT COUNT(*) FROM generated_keys").Scan(&totalKeys)
+	b.db.QueryRow("SELECT COUNT(*) FROM generated_keys WHERE status = 'connected'").Scan(&connectedKeys)
+	b.db.QueryRow("SELECT COUNT(*) FROM generated_keys WHERE generated_at >= CURRENT_DATE").Scan(&generatedToday)
+	b.db.QueryRow("SELECT MIN(generated_at)::date, MAX(generated_at)::date FROM generated_keys").Scan(&firstKeyDate, &lastKeyDate)
+
+	// Get keys by status
+	var statusStats string
+	rows, err := b.db.Query(`
+		SELECT status, COUNT(*) 
+		FROM generated_keys 
+		GROUP BY status 
+		ORDER BY COUNT(*) DESC
+	`)
+	if err == nil {
+		defer rows.Close()
+		statusStats = "\n📊 **Keys by Status:**\n"
+		for rows.Next() {
+			var status string
+			var count int
+			rows.Scan(&status, &count)
+			statusStats += fmt.Sprintf("• %s: %d\n", status, count)
+		}
+	}
+
+	connectionRate := float64(0)
+	if totalKeys > 0 {
+		connectionRate = float64(connectedKeys) / float64(totalKeys) * 100
+	}
+
+	return fmt.Sprintf(`📈 **ServerEye Statistics**
+
+🔑 **Key Generation:**
+• Total keys generated: %d
+• Keys connected: %d (%.1f%%)
+• Generated today: %d
+• First key: %s
+• Latest key: %s
+%s
+📊 **Usage Insights:**
+• Connection rate: %.1f%%
+• Active installations: %d
+
+🔧 **System Health:**
+This data helps track ServerEye adoption and usage patterns.`,
+		totalKeys, connectedKeys, connectionRate, generatedToday,
+		firstKeyDate, lastKeyDate, statusStats, connectionRate, connectedKeys)
 }

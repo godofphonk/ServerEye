@@ -49,10 +49,25 @@ func (b *Bot) initDatabase() error {
 			executed_at TIMESTAMP DEFAULT NOW()
 		)`,
 		
+		`CREATE TABLE IF NOT EXISTS generated_keys (
+			id BIGSERIAL PRIMARY KEY,
+			secret_key VARCHAR(64) UNIQUE NOT NULL,
+			generated_at TIMESTAMP DEFAULT NOW(),
+			first_connection TIMESTAMP,
+			last_seen TIMESTAMP,
+			connection_count INTEGER DEFAULT 0,
+			agent_version VARCHAR(50),
+			os_info VARCHAR(100),
+			hostname VARCHAR(255),
+			status VARCHAR(20) DEFAULT 'generated'
+		)`,
+		
 		`CREATE INDEX IF NOT EXISTS idx_servers_secret_key ON servers(secret_key)`,
 		`CREATE INDEX IF NOT EXISTS idx_servers_owner_id ON servers(owner_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_servers_user_id ON user_servers(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_command_history_server_id ON command_history(server_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_generated_keys_secret_key ON generated_keys(secret_key)`,
+		`CREATE INDEX IF NOT EXISTS idx_generated_keys_status ON generated_keys(status)`,
 	}
 
 	for _, query := range queries {
@@ -311,6 +326,9 @@ func (b *Bot) connectServerWithName(userID int64, serverKey, serverName string) 
 	err = tx.QueryRow(`SELECT id FROM servers WHERE secret_key = $1`, serverKey).Scan(&serverID)
 	
 	if err == sql.ErrNoRows {
+		// Record the key as generated (if not already recorded)
+		b.recordGeneratedKey(serverKey)
+		
 		// Create new server
 		err = tx.QueryRow(`
 			INSERT INTO servers (secret_key, name, status, owner_id)
@@ -358,4 +376,44 @@ func (b *Bot) connectServerWithName(userID int64, serverKey, serverName string) 
 	}
 
 	return tx.Commit()
+}
+
+// recordGeneratedKey records a newly generated server key
+func (b *Bot) recordGeneratedKey(secretKey string) error {
+	query := `
+		INSERT INTO generated_keys (secret_key, status)
+		VALUES ($1, 'generated')
+		ON CONFLICT (secret_key) DO NOTHING
+	`
+	
+	_, err := b.db.Exec(query, secretKey)
+	if err != nil {
+		return fmt.Errorf("failed to record generated key: %v", err)
+	}
+	
+	b.legacyLogger.WithField("key_prefix", secretKey[:12]+"...").Info("Generated key recorded")
+	return nil
+}
+
+// updateKeyConnection updates key connection info when agent connects
+func (b *Bot) updateKeyConnection(secretKey, agentVersion, osInfo, hostname string) error {
+	query := `
+		UPDATE generated_keys 
+		SET 
+			first_connection = COALESCE(first_connection, NOW()),
+			last_seen = NOW(),
+			connection_count = connection_count + 1,
+			agent_version = $2,
+			os_info = $3,
+			hostname = $4,
+			status = 'connected'
+		WHERE secret_key = $1
+	`
+	
+	_, err := b.db.Exec(query, secretKey, agentVersion, osInfo, hostname)
+	if err != nil {
+		return fmt.Errorf("failed to update key connection: %v", err)
+	}
+	
+	return nil
 }

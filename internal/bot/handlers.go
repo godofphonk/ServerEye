@@ -69,6 +69,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	case strings.HasPrefix(message.Text, "/debug"):
 		b.legacyLogger.Info("Обработка команды /debug")
 		response = b.handleDebug(message)
+	case strings.HasPrefix(message.Text, "/stats"):
+		b.legacyLogger.Info("Обработка команды /stats")
+		response = b.handleStats(message)
 	case strings.HasPrefix(message.Text, "srv_"):
 		b.legacyLogger.Info("Обработка ключа сервера (deprecated)")
 		response = "❌ Please use /add command instead.\nExample: /add srv_your_key_here"
