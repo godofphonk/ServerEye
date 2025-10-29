@@ -10,6 +10,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://servereye:${DB_PASSWORD}@postgres:5432/servereye?sslmode=disable
       - ENVIRONMENT=production
+    ports:
+      - "8090:8080"  # HTTP API for agent key registration
     depends_on:
       postgres:
         condition: service_healthy

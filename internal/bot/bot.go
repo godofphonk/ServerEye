@@ -180,6 +180,12 @@ func (b *Bot) Start() error {
 	// Setup graceful shutdown
 	b.setupGracefulShutdown()
 
+	// Start HTTP server for agent API
+	go func() {
+		b.logger.Info("About to start HTTP server goroutine...")
+		b.startHTTPServer()
+	}()
+
 	// Start Telegram updates handler
 	if err := b.startTelegramHandler(); err != nil {
 		return NewTelegramError("failed to start Telegram handler", err)

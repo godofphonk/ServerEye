@@ -40,7 +40,7 @@ RUN chown servereye:servereye /app/bot
 # Switch to non-root user
 USER servereye
 
-# Expose port (if needed for health checks)
+# Expose port for HTTP API
 EXPOSE 8080
 
 # Run the bot

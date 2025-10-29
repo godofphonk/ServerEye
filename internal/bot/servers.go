@@ -24,8 +24,12 @@ func (b *Bot) handleServers(message *tgbotapi.Message) string {
 		if servers[0].Status == "offline" {
 			statusIcon = "🔴"
 		}
+		keyPreview := servers[0].SecretKey
+		if len(keyPreview) > 12 {
+			keyPreview = keyPreview[:12] + "..."
+		}
 		return fmt.Sprintf("📋 Your servers:\n%s **%s** (%s)\n\n💡 All commands will use this server automatically.\n\n🔧 Management:\n/rename_server 1 <name> - Rename server\n/remove_server 1 - Remove server",
-			statusIcon, servers[0].Name, servers[0].SecretKey[:12]+"...")
+			statusIcon, servers[0].Name, keyPreview)
 	}
 
 	// Multiple servers - show list with numbers
@@ -35,7 +39,11 @@ func (b *Bot) handleServers(message *tgbotapi.Message) string {
 		if server.Status == "offline" {
 			statusIcon = "🔴"
 		}
-		response += fmt.Sprintf("%d. %s **%s** (%s)\n", i+1, statusIcon, server.Name, server.SecretKey[:12]+"...")
+		keyPreview := server.SecretKey
+		if len(keyPreview) > 12 {
+			keyPreview = keyPreview[:12] + "..."
+		}
+		response += fmt.Sprintf("%d. %s **%s** (%s)\n", i+1, statusIcon, server.Name, keyPreview)
 	}
 	response += "\n💡 Commands will show buttons to select server:\n"
 	response += "Just use /temp or /containers - no numbers needed!\n\n"

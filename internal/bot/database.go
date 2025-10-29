@@ -391,7 +391,11 @@ func (b *Bot) recordGeneratedKey(secretKey string) error {
 		return fmt.Errorf("failed to record generated key: %v", err)
 	}
 	
-	b.legacyLogger.WithField("key_prefix", secretKey[:12]+"...").Info("Generated key recorded")
+	keyPrefix := secretKey
+	if len(keyPrefix) > 12 {
+		keyPrefix = keyPrefix[:12] + "..."
+	}
+	b.legacyLogger.WithField("key_prefix", keyPrefix).Info("Generated key recorded")
 	return nil
 }
 
