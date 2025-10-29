@@ -66,6 +66,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	case strings.HasPrefix(message.Text, "/add"):
 		b.legacyLogger.Info("Обработка команды /add")
 		response = b.handleAddServer(message)
+	case strings.HasPrefix(message.Text, "/debug"):
+		b.legacyLogger.Info("Обработка команды /debug")
+		response = b.handleDebug(message)
 	case strings.HasPrefix(message.Text, "srv_"):
 		b.legacyLogger.Info("Обработка ключа сервера (deprecated)")
 		response = "❌ Please use /add command instead.\nExample: /add srv_your_key_here"
@@ -132,6 +135,9 @@ func (b *Bot) handleHelp(message *tgbotapi.Message) string {
 /rename_server <#> <name> - Rename server
 /remove_server <#> - Remove server
 /add <key> [name] - Add new server
+
+🔍 **Debug:**
+/debug - Show connection status
 
 💡 **Multiple Servers:**
 If you have multiple servers, select from buttons that appear when you use commands.

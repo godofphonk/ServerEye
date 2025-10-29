@@ -141,3 +141,46 @@ func (b *Bot) handleServerKey(message *tgbotapi.Message) string {
 
 	return "✅ Server connected successfully!\n🟢 Status: Online\n\nUse /temp to get CPU temperature."
 }
+
+// handleDebug shows debug information about user and servers
+func (b *Bot) handleDebug(message *tgbotapi.Message) string {
+	userID := message.From.ID
+	
+	// Check if user exists in database
+	var userExists bool
+	err := b.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE telegram_id = $1)", userID).Scan(&userExists)
+	if err != nil {
+		return fmt.Sprintf("❌ Database error: %v", err)
+	}
+	
+	// Get user servers count
+	var serverCount int
+	err = b.db.QueryRow(`
+		SELECT COUNT(*) FROM user_servers us 
+		JOIN servers s ON us.server_id = s.id 
+		WHERE us.user_id = $1
+	`, userID).Scan(&serverCount)
+	if err != nil {
+		return fmt.Sprintf("❌ Error getting servers: %v", err)
+	}
+	
+	// Get total users and servers in database
+	var totalUsers, totalServers int
+	b.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&totalUsers)
+	b.db.QueryRow("SELECT COUNT(*) FROM servers").Scan(&totalServers)
+	
+	return fmt.Sprintf(`🔍 **Debug Information**
+
+👤 **Your Status:**
+• User registered: %v
+• Connected servers: %d
+
+📊 **Database Stats:**
+• Total users: %d
+• Total servers: %d
+
+💡 **Tip:** If you have 0 servers after bot restart, use:
+/start
+/add srv_your_key MyServer`, 
+		userExists, serverCount, totalUsers, totalServers)
+}
