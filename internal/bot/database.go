@@ -321,20 +321,38 @@ func (b *Bot) connectServerWithName(userID int64, serverKey, serverName string) 
 	}
 	defer tx.Rollback()
 
+	// First, check if the key exists in generated_keys table
+	var keyExists bool
+	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM generated_keys WHERE secret_key = $1)`, serverKey).Scan(&keyExists)
+	if err != nil {
+		return err
+	}
+	
+	if !keyExists {
+		return fmt.Errorf("invalid server key: key not found in generated keys")
+	}
+
 	// Check if server already exists
 	var serverID string
 	err = tx.QueryRow(`SELECT id FROM servers WHERE secret_key = $1`, serverKey).Scan(&serverID)
 	
 	if err == sql.ErrNoRows {
-		// Record the key as generated (if not already recorded)
-		b.recordGeneratedKey(serverKey)
-		
-		// Create new server
+		// Create new server (key is valid since it exists in generated_keys)
 		err = tx.QueryRow(`
 			INSERT INTO servers (secret_key, name, status, owner_id)
 			VALUES ($1, $2, 'online', $3)
 			RETURNING id
 		`, serverKey, serverName, userID).Scan(&serverID)
+		if err != nil {
+			return err
+		}
+		
+		// Update generated_keys status to connected
+		_, err = tx.Exec(`
+			UPDATE generated_keys 
+			SET status = 'connected', first_connection = COALESCE(first_connection, NOW()), last_seen = NOW(), connection_count = connection_count + 1
+			WHERE secret_key = $1
+		`, serverKey)
 		if err != nil {
 			return err
 		}
