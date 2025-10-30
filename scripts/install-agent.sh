@@ -11,9 +11,18 @@ CONFIG_DIR="/etc/servereye"
 LOG_DIR="/var/log/servereye"
 SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
 AGENT_URL="https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-linux-amd64"
-BOT_URL="${SERVEREYE_BOT_URL:-http://192.168.0.105:8090}"  # Can be overridden with env var
+BOT_URL="${SERVEREYE_BOT_URL:-http://localhost:8090}"  # Can be overridden with env var
 
 echo "🚀 Installing ServerEye Agent..."
+
+# Check dependencies
+echo "🔍 Checking dependencies..."
+for cmd in wget curl openssl systemctl; do
+    if ! command -v $cmd &> /dev/null; then
+        echo "❌ Required command '$cmd' not found. Please install it first."
+        exit 1
+    fi
+done
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
@@ -137,9 +146,16 @@ if systemctl is-active --quiet servereye-agent; then
     echo "🔑 Your secret key: $SECRET_KEY"
     echo ""
     echo "📱 To connect to Telegram bot:"
-    echo "1. Find @ServerEyeBot"
+    echo "1. Find @ServerEyeBot in Telegram"
     echo "2. Send /start command"
     echo "3. Send: /add $SECRET_KEY"
+    echo ""
+    echo "🎯 Available commands after connection:"
+    echo "• /temp - Get CPU temperature"
+    echo "• /memory - Get memory usage"
+    echo "• /disk - Get disk usage"
+    echo "• /containers - List Docker containers"
+    echo "• /status - Get server status"
     echo ""
     echo "📋 Service management:"
     echo "• Status: sudo systemctl status servereye-agent"
@@ -147,6 +163,8 @@ if systemctl is-active --quiet servereye-agent; then
     echo "• Restart: sudo systemctl restart servereye-agent"
     echo ""
     echo "🎉 Installation complete! Your server is now monitored."
+    echo ""
+    echo "ℹ️  Note: If bot registration failed, you can manually add the key later."
 else
     echo "❌ Service failed to start. Check logs:"
     echo "sudo journalctl -u servereye-agent -n 20"
