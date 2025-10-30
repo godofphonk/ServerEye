@@ -188,14 +188,23 @@
                 </div>
                 <div class="tab-content">
                     <div class="tab-pane active" id="linux">
-                        <pre><code># 1. Download ServerEye
-wget https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-linux-amd64
+                        <pre><code># One-line installation:
+curl -sSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install.sh | sudo bash
 
-# 2. Make executable and install
-chmod +x servereye-linux-amd64
-sudo ./servereye-linux-amd64 --install
+# Or download and run:
+wget https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh
+sudo chmod +x install-agent.sh
+sudo ./install-agent.sh
 
-# 3. Copy the server key it shows and send to your Telegram bot
+# The script will:
+# ✅ Download and install the agent
+# ✅ Generate a unique server key
+# ✅ Register the key automatically
+# ✅ Start the monitoring service
+# ✅ Enable auto-start on boot
+
+# Just copy the key shown and add it to the Telegram bot:
+# /add srv_your_generated_key
 
 # That's it! 🎉</code></pre>
                     </div>
