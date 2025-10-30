@@ -1,0 +1,25 @@
+[Unit]
+Description=ServerEye Agent - Server Monitoring Agent
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=servereye
+Group=servereye
+WorkingDirectory=/opt/servereye
+ExecStart=/opt/servereye/servereye-agent -config /etc/servereye/config.yaml
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/servereye /etc/servereye
+
+[Install]
+WantedBy=multi-user.target
