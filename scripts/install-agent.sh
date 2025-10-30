@@ -11,7 +11,7 @@ CONFIG_DIR="/etc/servereye"
 LOG_DIR="/var/log/servereye"
 SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
 AGENT_URL="https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-linux-amd64"
-BOT_URL="${SERVEREYE_BOT_URL:-http://localhost:8090}"  # Can be overridden with env var
+BOT_URL="${SERVEREYE_BOT_URL:-https://viewpicture-infrastructure-johnston-julia.trycloudflare.com}"  # Public Cloudflare tunnel
 
 echo "🚀 Installing ServerEye Agent..."
 
