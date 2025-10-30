@@ -51,21 +51,35 @@
 
 ## 📖 How to Use
 
-### 1. Install Agent on Your Server
+### 1. One-Line Installation
 ```bash
-# Download agent
-wget https://github.com/godofphonk/ServerEye/releases/latest/download/servereye-agent-linux
-chmod +x servereye-agent-linux
-
-# Run agent
-./servereye-agent-linux -redis-url redis://your-redis-server:6379
+# Automatic installation with systemd service
+curl -sSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install.sh | sudo bash
 ```
 
-### 2. Connect Server to Bot
-In Telegram,find bot - @ServerYeyBot and send:
+### 2. Manual Installation
+```bash
+# Download and run installer
+wget https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh
+sudo chmod +x install-agent.sh
+sudo ./install-agent.sh
 ```
-/start
-/add srv_your_server_key 
+
+### 3. What Happens Automatically
+- ✅ Downloads and installs the agent
+- ✅ Generates a unique server key
+- ✅ Registers the key with ServerEye bot
+- ✅ Starts the monitoring service
+- ✅ Enables auto-start on boot
+
+### 4. Start Monitoring
+Your server is now monitored! Find **@ServerEyeBot** in Telegram and use:
+```
+/temp           - CPU temperature
+/memory         - Memory usage
+/disk           - Disk usage
+/containers     - Docker containers
+/status         - Server status
 ```
 
 ## 🎯 Usage Examples

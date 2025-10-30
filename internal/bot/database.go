@@ -417,6 +417,30 @@ func (b *Bot) recordGeneratedKey(secretKey string) error {
 	return nil
 }
 
+// Command represents a pending command for an agent
+type Command struct {
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	Data      map[string]interface{} `json:"data,omitempty"`
+	Timestamp int64                  `json:"timestamp"`
+}
+
+// getPendingCommands retrieves pending commands for a server
+func (b *Bot) getPendingCommands(serverKey string) []Command {
+	// For now, return empty array - we'll implement Redis storage later
+	return []Command{}
+}
+
+// processAgentResult processes a result from an agent
+func (b *Bot) processAgentResult(serverKey string, result map[string]interface{}) {
+	// For now, just log - we'll implement proper processing later
+	keyPrefix := serverKey
+	if len(keyPrefix) > 12 {
+		keyPrefix = keyPrefix[:12] + "..."
+	}
+	b.legacyLogger.WithField("server_key", keyPrefix).WithField("result", result).Info("Processing agent result")
+}
+
 // updateKeyConnection updates key connection info when agent connects
 func (b *Bot) updateKeyConnection(secretKey, agentVersion, osInfo, hostname string) error {
 	query := `

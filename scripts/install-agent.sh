@@ -11,7 +11,7 @@ CONFIG_DIR="/etc/servereye"
 LOG_DIR="/var/log/servereye"
 SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
 AGENT_URL="https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-linux-amd64"
-BOT_URL="${SERVEREYE_BOT_URL:-https://viewpicture-infrastructure-johnston-julia.trycloudflare.com}"  # Public Cloudflare tunnel
+BOT_URL="${SERVEREYE_BOT_URL:-https://behalf-ntsc-sparc-editors.trycloudflare.com}"  # Public Cloudflare tunnel
 
 echo "🚀 Installing ServerEye Agent..."
 
@@ -62,7 +62,7 @@ server:
   secret_key: "$SECRET_KEY"
 
 redis:
-  address: "${REDIS_URL:-localhost:6379}"
+  address: "${REDIS_URL:-192.168.0.105:6379}"
   password: ""
   db: 0
 
