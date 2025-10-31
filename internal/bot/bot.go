@@ -35,6 +35,9 @@ type Bot struct {
 	// Direct database access for internal methods
 	db *sql.DB
 	
+	// Mutex to prevent concurrent Redis operations
+	redisMutex sync.Mutex
+	
 	
 	// Context management
 	ctx    context.Context

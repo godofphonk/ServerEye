@@ -28,6 +28,10 @@ func (b *Bot) startHTTPServer() {
 	http.HandleFunc("/api/health", b.handleHealth)
 	http.HandleFunc("/api/redis/publish", b.handleRedisPublish)
 	http.HandleFunc("/api/redis/subscribe", b.handleRedisSubscribe)
+	http.HandleFunc("/api/monitoring/memory", b.handleMemoryRequest)
+	http.HandleFunc("/api/monitoring/disk", b.handleDiskRequest)
+	http.HandleFunc("/api/monitoring/uptime", b.handleUptimeRequest)
+	http.HandleFunc("/api/monitoring/processes", b.handleProcessesRequest)
 	
 	b.logger.Info("Info message")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
@@ -117,9 +121,12 @@ func (b *Bot) handleRedisPublish(w http.ResponseWriter, r *http.Request) {
 
 	var req RedisPublishRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		b.logger.Error("Failed to decode JSON in publish request", err)
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	
+	b.logger.Info("Received publish request")
 
 	// Validate channel format (should be resp:srv_*)
 	if !strings.HasPrefix(req.Channel, "resp:srv_") {
@@ -128,11 +135,13 @@ func (b *Bot) handleRedisPublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Publish to Redis
+	b.logger.Info("Publishing to Redis")
 	if err := b.redisClient.Publish(b.ctx, req.Channel, []byte(req.Message)); err != nil {
-		b.logger.Error("Error occurred", err)
+		b.logger.Error("Redis publish failed", err)
 		http.Error(w, "Redis publish failed", http.StatusInternalServerError)
 		return
 	}
+	b.logger.Info("Redis publish successful")
 
 	response := map[string]interface{}{
 		"success": true,
@@ -162,10 +171,11 @@ func (b *Bot) handleRedisSubscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set default timeout
+	// Set default timeout - very short to not miss commands
 	if req.Timeout == 0 {
-		req.Timeout = 30 // 30 seconds default
+		req.Timeout = 1
 	}
+	// No delay - need immediate response
 
 	// Subscribe to Redis channel
 	subscription, err := b.redisClient.Subscribe(b.ctx, req.Channel)
@@ -217,5 +227,50 @@ func (b *Bot) handleRedisSubscribe(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewEncoder(w).Encode(response)
 	}
+}
+
+// handleMemoryRequest handles direct memory requests from agents
+func (b *Bot) handleMemoryRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get server key from request
+	var req struct {
+		ServerKey string `json:"server_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Get memory info directly
+	memInfo, err := b.getMemoryInfo(req.ServerKey)
+	if err != nil {
+		b.logger.Error("Failed to get memory info", err)
+		http.Error(w, "Failed to get memory info", http.StatusInternalServerError)
+		return
+	}
+
+	// Return memory info as JSON
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    memInfo,
+	})
+}
+
+// Placeholder handlers for other monitoring endpoints
+func (b *Bot) handleDiskRequest(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Not implemented yet", http.StatusNotImplemented)
+}
+
+func (b *Bot) handleUptimeRequest(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Not implemented yet", http.StatusNotImplemented)
+}
+
+func (b *Bot) handleProcessesRequest(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Not implemented yet", http.StatusNotImplemented)
 }
 

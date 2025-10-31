@@ -127,6 +127,8 @@ func (c *HTTPClient) Publish(ctx context.Context, channel string, message []byte
 
 // Subscribe subscribes to a Redis channel via HTTP
 func (c *HTTPClient) Subscribe(ctx context.Context, channel string) (*HTTPSubscription, error) {
+	// Removed delay - need to catch commands immediately
+	
 	subCtx, cancel := context.WithCancel(ctx)
 	
 	subscription := &HTTPSubscription{
@@ -158,7 +160,10 @@ func (c *HTTPClient) Subscribe(ctx context.Context, channel string) (*HTTPSubscr
 						return // Context cancelled
 					}
 					c.logger.WithError(err).Error("Error polling for messages")
-					time.Sleep(1 * time.Second) // Wait before retry
+					time.Sleep(5 * time.Second) // Wait before retry
+				} else {
+					// Minimal delay between successful polls to not miss commands
+					time.Sleep(100 * time.Millisecond)
 				}
 			}
 		}

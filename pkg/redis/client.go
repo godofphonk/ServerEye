@@ -74,7 +74,20 @@ type Subscription struct {
 
 // Close closes the subscription
 func (s *Subscription) Close() error {
-	close(s.msgChan)
+	// Безопасно закрываем канал
+	defer func() {
+		if r := recover(); r != nil {
+			// Игнорируем панику от закрытия уже закрытого канала
+		}
+	}()
+	
+	select {
+	case <-s.msgChan:
+		// Канал уже закрыт
+	default:
+		close(s.msgChan)
+	}
+	
 	return s.pubsub.Close()
 }
 
@@ -116,7 +129,13 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, 
 			select {
 			case msg := <-ch:
 				if msg == nil {
-					close(subscription.msgChan)
+					// Безопасно закрываем канал
+					select {
+					case <-subscription.msgChan:
+						// Канал уже закрыт
+					default:
+						close(subscription.msgChan)
+					}
 					return
 				}
 				
@@ -154,4 +173,14 @@ func GetCommandChannel(serverKey string) string {
 // GetResponseChannel возвращает имя канала для ответов
 func GetResponseChannel(serverKey string) string {
 	return fmt.Sprintf("resp:%s", serverKey)
+}
+
+// GetCommandChannelForType возвращает имя канала для команд определенного типа
+func GetCommandChannelForType(serverKey, cmdType string) string {
+	return fmt.Sprintf("cmd_%s:%s", cmdType, serverKey)
+}
+
+// GetResponseChannelForType возвращает имя канала для ответов определенного типа
+func GetResponseChannelForType(serverKey, cmdType string) string {
+	return fmt.Sprintf("resp_%s:%s", cmdType, serverKey)
 }

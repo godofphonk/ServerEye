@@ -12,6 +12,7 @@ import (
 
 // getCPUTemperature requests CPU temperature from agent
 func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
+	// Removed mutex - it was blocking response reception
 	// Create command message
 	cmd := protocol.NewMessage(protocol.TypeGetCPUTemp, nil)
 	data, err := cmd.ToJSON()
@@ -33,8 +34,8 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 		}
 	}()
 
-	// Small delay to ensure subscription is active
-	time.Sleep(100 * time.Millisecond)
+	// Longer delay to ensure subscription is stable and avoid race condition
+	time.Sleep(500 * time.Millisecond)
 
 	// Send command to agent
 	cmdChannel := redis.GetCommandChannel(serverKey)
@@ -103,9 +104,14 @@ func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
 	}
+	defer func() {
+		if subscription != nil {
+			subscription.Close()
+		}
+	}()
 
 	// Small delay to ensure subscription is active
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Send command to agent
 	cmdChannel := redis.GetCommandChannel(serverKey)
@@ -198,61 +204,87 @@ func (b *Bot) formatContainers(containers *protocol.ContainersPayload) string {
 
 // getMemoryInfo requests memory information from agent
 func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
+	// Removed mutex - it was blocking response reception
+	b.logger.Info("🔵 [MEMORY] Starting getMemoryInfo")
+	
 	cmd := protocol.NewMessage(protocol.TypeGetMemoryInfo, nil)
+	b.logger.Info("🔵 [MEMORY] Command ID: " + cmd.ID)
+	
 	data, err := cmd.ToJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize command: %v", err)
 	}
 
 	respChannel := redis.GetResponseChannel(serverKey)
+	b.logger.Info("🔵 [MEMORY] Subscribing to response channel: " + respChannel)
+	
 	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
 	}
 	defer func() {
 		if subscription != nil {
+			b.logger.Info("🔵 [MEMORY] Closing subscription")
 			subscription.Close()
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	b.logger.Info("🔵 [MEMORY] Subscription created, waiting 500ms")
+	time.Sleep(500 * time.Millisecond)
 
 	cmdChannel := redis.GetCommandChannel(serverKey)
+	b.logger.Info("🔵 [MEMORY] Publishing command to: " + cmdChannel)
+	
 	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
 		return nil, fmt.Errorf("failed to send command: %v", err)
 	}
+	
+	b.logger.Info("🔵 [MEMORY] Command published successfully, waiting for response...")
 
 	timeout := time.After(10 * time.Second)
 	for {
 		select {
 		case respData := <-subscription.Channel():
+			b.logger.Info("🔵 [MEMORY] Received data from subscription channel!")
 			resp, err := protocol.FromJSON(respData)
 			if err != nil {
+				b.logger.Error("🔴 [MEMORY] Failed to parse JSON", err)
 				continue
 			}
+			
+			b.logger.Info("🔵 [MEMORY] Parsed response - ID: " + resp.ID + ", Type: " + string(resp.Type))
+			b.logger.Info("🔵 [MEMORY] Expected ID: " + cmd.ID)
 
 			if resp.ID != cmd.ID {
+				b.logger.Info("🟡 [MEMORY] ID mismatch, skipping...")
 				continue
 			}
+			
+			b.logger.Info("🟢 [MEMORY] ID matched! Processing response...")
 
 			if resp.Type == protocol.TypeErrorResponse {
 				return nil, fmt.Errorf("agent error: %v", resp.Payload)
 			}
 
 			if resp.Type == protocol.TypeMemoryInfoResponse {
+				b.logger.Info("🟢 [MEMORY] Type is MemoryInfoResponse, parsing payload...")
 				if payload, ok := resp.Payload.(map[string]interface{}); ok {
 					memData, _ := json.Marshal(payload)
 					var memInfo protocol.MemoryInfo
 					if err := json.Unmarshal(memData, &memInfo); err == nil {
+						b.logger.Info("🟢 [MEMORY] Successfully parsed memory info, returning!")
 						return &memInfo, nil
 					}
 				}
+				b.logger.Error("🔴 [MEMORY] Invalid memory data in response", nil)
 				return nil, fmt.Errorf("invalid memory data in response")
 			}
 
+			b.logger.Error("🔴 [MEMORY] Unexpected response type: " + string(resp.Type), nil)
 			return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
 
 		case <-timeout:
+			b.logger.Error("🔴 [MEMORY] TIMEOUT after 10 seconds!", nil)
 			return nil, fmt.Errorf("timeout waiting for response")
 		}
 	}
@@ -260,6 +292,8 @@ func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 
 // getDiskInfo requests disk information from agent
 func (b *Bot) getDiskInfo(serverKey string) (*protocol.DiskInfoPayload, error) {
+	// Removed mutex - it was blocking response reception
+	
 	cmd := protocol.NewMessage(protocol.TypeGetDiskInfo, nil)
 	data, err := cmd.ToJSON()
 	if err != nil {
@@ -277,7 +311,7 @@ func (b *Bot) getDiskInfo(serverKey string) (*protocol.DiskInfoPayload, error) {
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	cmdChannel := redis.GetCommandChannel(serverKey)
 	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
@@ -322,6 +356,8 @@ func (b *Bot) getDiskInfo(serverKey string) (*protocol.DiskInfoPayload, error) {
 
 // getUptime requests uptime information from agent
 func (b *Bot) getUptime(serverKey string) (*protocol.UptimeInfo, error) {
+	// Removed mutex - it was blocking response reception
+	
 	cmd := protocol.NewMessage(protocol.TypeGetUptime, nil)
 	data, err := cmd.ToJSON()
 	if err != nil {
@@ -339,7 +375,7 @@ func (b *Bot) getUptime(serverKey string) (*protocol.UptimeInfo, error) {
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	cmdChannel := redis.GetCommandChannel(serverKey)
 	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
@@ -384,6 +420,8 @@ func (b *Bot) getUptime(serverKey string) (*protocol.UptimeInfo, error) {
 
 // getProcesses requests processes information from agent
 func (b *Bot) getProcesses(serverKey string) (*protocol.ProcessesPayload, error) {
+	// Removed mutex - it was blocking response reception
+	
 	cmd := protocol.NewMessage(protocol.TypeGetProcesses, nil)
 	data, err := cmd.ToJSON()
 	if err != nil {
@@ -401,7 +439,7 @@ func (b *Bot) getProcesses(serverKey string) (*protocol.ProcessesPayload, error)
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	cmdChannel := redis.GetCommandChannel(serverKey)
 	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
