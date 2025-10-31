@@ -10,7 +10,7 @@ echo "🚀 ServerEye Quick Installer"
 echo "Downloading and running installation script..."
 
 # Download and execute the main installer
-curl -sSL "$INSTALL_SCRIPT_URL" | bash
+curl -sSL "$INSTALL_SCRIPT_URL" | sudo bash
 
 echo "✅ ServerEye installation completed!"
 echo "Check the output above for your secret key and next steps."
