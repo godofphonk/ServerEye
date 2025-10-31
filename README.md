@@ -54,18 +54,10 @@
 ### 1. One-Line Installation
 ```bash
 # Automatic installation with systemd service
-curl -sSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install.sh | sudo bash
+wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
 ```
 
-### 2. Manual Installation
-```bash
-# Download and run installer
-wget https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh
-sudo chmod +x install-agent.sh
-sudo ./install-agent.sh
-```
-
-### 3. What Happens Automatically
+### 2. What Happens Automatically
 - ✅ Downloads and installs the agent
 - ✅ Generates a unique server key
 - ✅ Registers the key with ServerEye bot

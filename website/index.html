@@ -189,26 +189,10 @@
                 <div class="tab-content">
                     <div class="tab-pane active" id="linux">
                         <pre><code># One-line installation:
-curl -sSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install.sh | sudo bash
+wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
 
-# Or download and run:
-wget https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh
-sudo chmod +x install-agent.sh
-sudo ./install-agent.sh
-
-# The script automatically:
-# ✅ Downloads and installs the agent
-# ✅ Generates a unique server key  
-# ✅ Registers the key with ServerEye bot
-# ✅ Starts the monitoring service
-# ✅ Enables auto-start on boot
-
-# Your server is now monitored! Use these Telegram commands:
-# /temp - CPU temperature
-# /memory - Memory usage
-# /disk - Disk usage
-# /containers - Docker containers
-# /status - Server status
+# Alternative (if wget not available):
+curl -sSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
 
 # That's it! 🎉</code></pre>
                     </div>
