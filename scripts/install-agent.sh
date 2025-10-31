@@ -62,7 +62,7 @@ server:
   secret_key: "$SECRET_KEY"
 
 redis:
-  address: "${REDIS_URL:-redis.servereye.dev:6379}"
+  address: "${REDIS_URL:-servereye.dev:6379}"
   password: ""
   db: 0
 
