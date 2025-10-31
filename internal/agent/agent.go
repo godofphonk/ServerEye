@@ -153,6 +153,24 @@ func (a *Agent) processCommand(data []byte) {
 
 	var response *protocol.Message
 
+	// Обрабатываем команду с обработкой паники
+	defer func() {
+		if r := recover(); r != nil {
+			a.logger.WithFields(logrus.Fields{
+				"command_id":   msg.ID,
+				"command_type": msg.Type,
+				"panic":        r,
+			}).Error("Паника при обработке команды")
+			
+			response = protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+				ErrorCode:    "PANIC_ERROR",
+				ErrorMessage: fmt.Sprintf("Внутренняя ошибка при обработке команды: %v", r),
+			})
+			response.ID = msg.ID
+			a.sendResponse(response)
+		}
+	}()
+
 	// Обрабатываем команду
 	switch msg.Type {
 	case protocol.TypeGetCPUTemp:
@@ -180,8 +198,19 @@ func (a *Agent) processCommand(data []byte) {
 	}
 
 	// Отправляем ответ
-	if err := a.sendResponse(response); err != nil {
-		a.logger.WithError(err).Error("Не удалось отправить ответ")
+	if response != nil {
+		a.logger.WithFields(logrus.Fields{
+			"command_id":    msg.ID,
+			"response_type": response.Type,
+		}).Info("Отправляем ответ")
+		
+		if err := a.sendResponse(response); err != nil {
+			a.logger.WithError(err).Error("Не удалось отправить ответ")
+		} else {
+			a.logger.WithField("command_id", msg.ID).Info("Ответ успешно отправлен")
+		}
+	} else {
+		a.logger.WithField("command_id", msg.ID).Error("Ответ не сгенерирован")
 	}
 }
 
@@ -432,7 +461,9 @@ func (a *Agent) handleGetMemoryInfo(msg *protocol.Message) *protocol.Message {
 		"used_percent": memInfo.UsedPercent,
 	}).Info("Информация о памяти получена")
 	
-	return protocol.NewMessage(protocol.TypeMemoryInfoResponse, memInfo)
+	response := protocol.NewMessage(protocol.TypeMemoryInfoResponse, memInfo)
+	response.ID = msg.ID
+	return response
 }
 
 // handleGetDiskInfo обрабатывает команду получения информации о дисках
@@ -449,7 +480,9 @@ func (a *Agent) handleGetDiskInfo(msg *protocol.Message) *protocol.Message {
 	}
 	
 	a.logger.WithField("disks_count", len(diskInfo.Disks)).Info("Информация о дисках получена")
-	return protocol.NewMessage(protocol.TypeDiskInfoResponse, diskInfo)
+	response := protocol.NewMessage(protocol.TypeDiskInfoResponse, diskInfo)
+	response.ID = msg.ID
+	return response
 }
 
 // handleGetUptime обрабатывает команду получения времени работы системы
@@ -466,7 +499,9 @@ func (a *Agent) handleGetUptime(msg *protocol.Message) *protocol.Message {
 	}
 	
 	a.logger.WithField("uptime", uptimeInfo.Formatted).Info("Время работы получено")
-	return protocol.NewMessage(protocol.TypeUptimeResponse, uptimeInfo)
+	response := protocol.NewMessage(protocol.TypeUptimeResponse, uptimeInfo)
+	response.ID = msg.ID
+	return response
 }
 
 // handleGetProcesses обрабатывает команду получения списка процессов
@@ -484,7 +519,9 @@ func (a *Agent) handleGetProcesses(msg *protocol.Message) *protocol.Message {
 	}
 	
 	a.logger.WithField("processes_count", len(processes.Processes)).Info("Список процессов получен")
-	return protocol.NewMessage(protocol.TypeProcessesResponse, processes)
+	response := protocol.NewMessage(protocol.TypeProcessesResponse, processes)
+	response.ID = msg.ID
+	return response
 }
 
 // HTTPClientAdapter адаптер для HTTP клиента

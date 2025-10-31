@@ -27,7 +27,11 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to subscribe to response: %v", err)
 	}
-	defer subscription.Close()
+	defer func() {
+		if subscription != nil {
+			subscription.Close()
+		}
+	}()
 
 	// Small delay to ensure subscription is active
 	time.Sleep(100 * time.Millisecond)
@@ -205,7 +209,11 @@ func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
 	}
-	defer subscription.Close()
+	defer func() {
+		if subscription != nil {
+			subscription.Close()
+		}
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -263,7 +271,11 @@ func (b *Bot) getDiskInfo(serverKey string) (*protocol.DiskInfoPayload, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
 	}
-	defer subscription.Close()
+	defer func() {
+		if subscription != nil {
+			subscription.Close()
+		}
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -321,7 +333,11 @@ func (b *Bot) getUptime(serverKey string) (*protocol.UptimeInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
 	}
-	defer subscription.Close()
+	defer func() {
+		if subscription != nil {
+			subscription.Close()
+		}
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -379,7 +395,11 @@ func (b *Bot) getProcesses(serverKey string) (*protocol.ProcessesPayload, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
 	}
-	defer subscription.Close()
+	defer func() {
+		if subscription != nil {
+			subscription.Close()
+		}
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
