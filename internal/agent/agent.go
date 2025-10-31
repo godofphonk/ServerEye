@@ -14,28 +14,66 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// RedisClientInterface общий интерфейс для Redis клиентов
+type RedisClientInterface interface {
+	Subscribe(ctx context.Context, channel string) (SubscriptionInterface, error)
+	Publish(ctx context.Context, channel string, message []byte) error
+	Close() error
+}
+
+// SubscriptionInterface общий интерфейс для подписок
+type SubscriptionInterface interface {
+	Channel() <-chan []byte
+	Close() error
+}
+
 // Agent представляет агент ServerEye
 type Agent struct {
 	config        *config.AgentConfig
 	logger        *logrus.Logger
-	redisClient    *redis.Client
-	cpuMetrics     *metrics.CPUMetrics
-	systemMonitor  *metrics.SystemMonitor
-	dockerClient   *docker.Client
-	ctx            context.Context
-	cancel         context.CancelFunc
+	redisClient   RedisClientInterface
+	cpuMetrics    *metrics.CPUMetrics
+	systemMonitor *metrics.SystemMonitor
+	dockerClient  *docker.Client
+	ctx           context.Context
+	cancel        context.CancelFunc
 }
 
 // New создает новый агент
 func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
-	// Создаем Redis клиент
-	redisClient, err := redis.NewClient(redis.Config{
-		Address:  cfg.Redis.Address,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-	}, logger)
-	if err != nil {
-		return nil, fmt.Errorf("не удалось создать Redis клиент: %v", err)
+	var redisClient RedisClientInterface
+	
+	// Выбираем тип клиента на основе конфигурации
+	if cfg.API.BaseURL != "" {
+		// Используем HTTP клиент
+		timeout := 30 * time.Second
+		if cfg.API.Timeout != "" {
+			if parsedTimeout, err := time.ParseDuration(cfg.API.Timeout); err == nil {
+				timeout = parsedTimeout
+			}
+		}
+		
+		httpClient, err := redis.NewHTTPClient(redis.HTTPConfig{
+			BaseURL: cfg.API.BaseURL,
+			Timeout: timeout,
+		}, logger)
+		if err != nil {
+			return nil, fmt.Errorf("не удалось создать HTTP клиент: %v", err)
+		}
+		redisClient = &HTTPClientAdapter{client: httpClient}
+		logger.Info("Используется HTTP клиент для связи с сервером")
+	} else {
+		// Используем прямой Redis клиент
+		directClient, err := redis.NewClient(redis.Config{
+			Address:  cfg.Redis.Address,
+			Password: cfg.Redis.Password,
+			DB:       cfg.Redis.DB,
+		}, logger)
+		if err != nil {
+			return nil, fmt.Errorf("не удалось создать Redis клиент: %v", err)
+		}
+		redisClient = &DirectClientAdapter{client: directClient}
+		logger.Info("Используется прямой Redis клиент")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -447,4 +485,72 @@ func (a *Agent) handleGetProcesses(msg *protocol.Message) *protocol.Message {
 	
 	a.logger.WithField("processes_count", len(processes.Processes)).Info("Список процессов получен")
 	return protocol.NewMessage(protocol.TypeProcessesResponse, processes)
+}
+
+// HTTPClientAdapter адаптер для HTTP клиента
+type HTTPClientAdapter struct {
+	client *redis.HTTPClient
+}
+
+func (h *HTTPClientAdapter) Subscribe(ctx context.Context, channel string) (SubscriptionInterface, error) {
+	sub, err := h.client.Subscribe(ctx, channel)
+	if err != nil {
+		return nil, err
+	}
+	return &HTTPSubscriptionAdapter{sub: sub}, nil
+}
+
+func (h *HTTPClientAdapter) Publish(ctx context.Context, channel string, message []byte) error {
+	return h.client.Publish(ctx, channel, message)
+}
+
+func (h *HTTPClientAdapter) Close() error {
+	return h.client.Close()
+}
+
+// HTTPSubscriptionAdapter адаптер для HTTP подписки
+type HTTPSubscriptionAdapter struct {
+	sub *redis.HTTPSubscription
+}
+
+func (h *HTTPSubscriptionAdapter) Channel() <-chan []byte {
+	return h.sub.Channel()
+}
+
+func (h *HTTPSubscriptionAdapter) Close() error {
+	return h.sub.Close()
+}
+
+// DirectClientAdapter адаптер для прямого Redis клиента
+type DirectClientAdapter struct {
+	client *redis.Client
+}
+
+func (d *DirectClientAdapter) Subscribe(ctx context.Context, channel string) (SubscriptionInterface, error) {
+	sub, err := d.client.Subscribe(ctx, channel)
+	if err != nil {
+		return nil, err
+	}
+	return &DirectSubscriptionAdapter{sub: sub}, nil
+}
+
+func (d *DirectClientAdapter) Publish(ctx context.Context, channel string, message []byte) error {
+	return d.client.Publish(ctx, channel, message)
+}
+
+func (d *DirectClientAdapter) Close() error {
+	return d.client.Close()
+}
+
+// DirectSubscriptionAdapter адаптер для прямой Redis подписки
+type DirectSubscriptionAdapter struct {
+	sub *redis.Subscription
+}
+
+func (d *DirectSubscriptionAdapter) Channel() <-chan []byte {
+	return d.sub.Channel()
+}
+
+func (d *DirectSubscriptionAdapter) Close() error {
+	return d.sub.Close()
 }

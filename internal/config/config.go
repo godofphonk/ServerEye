@@ -9,8 +9,9 @@ import (
 
 // AgentConfig конфигурация агента
 type AgentConfig struct {
-	Server ServerConfig `yaml:"server"`
-	Redis  RedisConfig  `yaml:"redis"`
+	Server  ServerConfig  `yaml:"server"`
+	Redis   RedisConfig   `yaml:"redis,omitempty"`
+	API     APIConfig     `yaml:"api,omitempty"`
 	Metrics MetricsConfig `yaml:"metrics"`
 	Logging LoggingConfig `yaml:"logging"`
 }
@@ -35,6 +36,12 @@ type RedisConfig struct {
 	Address  string `yaml:"address"`
 	Password string `yaml:"password"`
 	DB       int    `yaml:"db"`
+}
+
+// APIConfig конфигурация HTTP API
+type APIConfig struct {
+	BaseURL string `yaml:"base_url"`
+	Timeout string `yaml:"timeout,omitempty"`
 }
 
 // MetricsConfig конфигурация метрик

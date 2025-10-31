@@ -61,10 +61,9 @@ server:
   description: "ServerEye monitored server"
   secret_key: "$SECRET_KEY"
 
-redis:
-  address: "${REDIS_URL:-servereye.dev:6379}"
-  password: ""
-  db: 0
+api:
+  base_url: "${API_URL:-https://api.servereye.dev}"
+  timeout: "30s"
 
 metrics:
   cpu_temperature: true
