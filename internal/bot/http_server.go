@@ -174,7 +174,11 @@ func (b *Bot) handleRedisSubscribe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Redis subscribe failed", http.StatusInternalServerError)
 		return
 	}
-	defer subscription.Close()
+	defer func() {
+		if subscription != nil {
+			subscription.Close()
+		}
+	}()
 
 	// Set response headers for streaming
 	w.Header().Set("Content-Type", "application/json")
