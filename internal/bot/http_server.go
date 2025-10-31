@@ -19,40 +19,40 @@ type KeyRegistrationRequest struct {
 func (b *Bot) startHTTPServer() {
 	defer func() {
 		if r := recover(); r != nil {
-			b.legacyLogger.WithField("panic", r).Error("HTTP server panicked")
+			b.logger.Error("Operation failed", nil)
 		}
 	}()
 
-	b.legacyLogger.Info("Setting up HTTP routes...")
+	b.logger.Info("Info message")
 	http.HandleFunc("/api/register-key", b.handleRegisterKey)
 	http.HandleFunc("/api/health", b.handleHealth)
 	http.HandleFunc("/api/redis/publish", b.handleRedisPublish)
 	http.HandleFunc("/api/redis/subscribe", b.handleRedisSubscribe)
 	
-	b.legacyLogger.Info("Starting HTTP server on :8080")
+	b.logger.Info("Info message")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
-		b.legacyLogger.WithError(err).Error("HTTP server failed")
+		b.logger.Error("Error occurred", err)
 	}
 }
 
 // handleRegisterKey handles key registration from agent
 func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
-	b.legacyLogger.WithField("method", r.Method).WithField("url", r.URL.Path).Info("HTTP request received")
+	b.logger.Info("HTTP request received")
 	
 	if r.Method != http.MethodPost {
-		b.legacyLogger.Error("Invalid method for register-key")
+		b.logger.Error("Error message", nil)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req KeyRegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to decode JSON")
+		b.logger.Error("Error occurred", err)
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 	
-	b.legacyLogger.WithField("secret_key", req.SecretKey).Info("Received key registration request")
+	b.logger.Info("Operation completed")
 
 	// Validate secret key
 	if !strings.HasPrefix(req.SecretKey, "srv_") {
@@ -62,7 +62,7 @@ func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 
 	// Record the key
 	if err := b.recordGeneratedKey(req.SecretKey); err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to record generated key")
+		b.logger.Error("Error occurred", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -70,11 +70,11 @@ func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 	// If agent info provided, update connection info
 	if req.AgentVersion != "" || req.OSInfo != "" || req.Hostname != "" {
 		if err := b.updateKeyConnection(req.SecretKey, req.AgentVersion, req.OSInfo, req.Hostname); err != nil {
-			b.legacyLogger.WithError(err).Error("Failed to update key connection info")
+			b.logger.Error("Error occurred", err)
 		}
 	}
 
-	b.legacyLogger.WithField("key_prefix", req.SecretKey[:12]+"...").Info("Key registered via HTTP API")
+	b.logger.Info("Operation completed")
 
 	response := map[string]interface{}{
 		"success": true,
@@ -129,7 +129,7 @@ func (b *Bot) handleRedisPublish(w http.ResponseWriter, r *http.Request) {
 
 	// Publish to Redis
 	if err := b.redisClient.Publish(b.ctx, req.Channel, []byte(req.Message)); err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to publish to Redis")
+		b.logger.Error("Error occurred", err)
 		http.Error(w, "Redis publish failed", http.StatusInternalServerError)
 		return
 	}
@@ -170,7 +170,7 @@ func (b *Bot) handleRedisSubscribe(w http.ResponseWriter, r *http.Request) {
 	// Subscribe to Redis channel
 	subscription, err := b.redisClient.Subscribe(b.ctx, req.Channel)
 	if err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to subscribe to Redis")
+		b.logger.Error("Error occurred", err)
 		http.Error(w, "Redis subscribe failed", http.StatusInternalServerError)
 		return
 	}

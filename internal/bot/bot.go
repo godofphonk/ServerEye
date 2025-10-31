@@ -32,10 +32,9 @@ type Bot struct {
 	validator   Validator
 	metrics     Metrics
 	
-	// Legacy fields for backward compatibility (TODO: remove after migration)
-	legacyLogger *LegacyLoggerWrapper
-	tgBot        *tgbotapi.BotAPI
-	db           *sql.DB
+	// Direct database access for internal methods
+	db *sql.DB
+	
 	
 	// Context management
 	ctx    context.Context
@@ -154,14 +153,10 @@ func NewFromConfig(cfg *config.BotConfig, logger *logrus.Logger) (*Bot, error) {
 		return nil, err
 	}
 	
-	// Set legacy fields for backward compatibility
-	bot.legacyLogger = NewLegacyLoggerWrapper(logger)
-	bot.tgBot = tgBot
-	bot.db = db
-	
-	// Update adapter references
+	// Update adapter references and set direct DB access
 	dbAdapter.bot = bot
 	agentAdapter.bot = bot
+	bot.db = db
 	
 	return bot, nil
 }

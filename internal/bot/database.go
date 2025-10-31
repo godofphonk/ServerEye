@@ -76,7 +76,7 @@ func (b *Bot) initDatabase() error {
 		}
 	}
 
-	b.legacyLogger.Info("Database schema initialized successfully")
+	b.logger.Info("Info message")
 	return nil
 }
 
@@ -98,7 +98,7 @@ func (b *Bot) registerUser(user *tgbotapi.User) error {
 		return fmt.Errorf("failed to register user: %v", err)
 	}
 
-	b.legacyLogger.WithField("user_id", user.ID).Info("User registered/updated")
+	b.logger.Info("Operation completed")
 	return nil
 }
 
@@ -147,10 +147,7 @@ func (b *Bot) connectServer(userID int64, serverKey string) error {
 		return fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
-	b.legacyLogger.WithFields(map[string]interface{}{
-		"user_id":    userID,
-		"server_key": serverKey[:12] + "...",
-	}).Info("Server connected to user")
+	b.logger.Info("Server connected to user")
 
 	return nil
 }
@@ -413,7 +410,7 @@ func (b *Bot) recordGeneratedKey(secretKey string) error {
 	if len(keyPrefix) > 12 {
 		keyPrefix = keyPrefix[:12] + "..."
 	}
-	b.legacyLogger.WithField("key_prefix", keyPrefix).Info("Generated key recorded")
+	b.logger.Info("Operation completed")
 	return nil
 }
 
@@ -438,7 +435,7 @@ func (b *Bot) processAgentResult(serverKey string, result map[string]interface{}
 	if len(keyPrefix) > 12 {
 		keyPrefix = keyPrefix[:12] + "..."
 	}
-	b.legacyLogger.WithField("server_key", keyPrefix).WithField("result", result).Info("Processing agent result")
+	b.logger.Info("Processing agent result")
 }
 
 // updateKeyConnection updates key connection info when agent connects

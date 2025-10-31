@@ -11,8 +11,8 @@ import (
 // sendMessage sends a message to a chat
 func (b *Bot) sendMessage(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
-	if _, err := b.tgBot.Send(msg); err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to send message")
+	if _, err := b.telegramAPI.Send(msg); err != nil {
+		b.logger.Error("Error occurred", err)
 	}
 }
 
@@ -66,7 +66,7 @@ func (b *Bot) sendServerSelectionButtons(chatID int64, command, text string, ser
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = keyboard
 	
-	if _, err := b.tgBot.Send(msg); err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to send server selection buttons")
+	if _, err := b.telegramAPI.Send(msg); err != nil {
+		b.logger.Error("Error occurred", err)
 	}
 }

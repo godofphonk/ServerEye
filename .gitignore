@@ -55,3 +55,7 @@ temp/
 
 # Private deployment files
 private/
+
+# Built binaries (exclude from root)
+servereye-*
+!downloads/servereye-*

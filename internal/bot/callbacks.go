@@ -13,14 +13,14 @@ import (
 func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 	// Answer the callback query
 	callback := tgbotapi.NewCallback(query.ID, "")
-	if _, err := b.tgBot.Request(callback); err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to answer callback query")
+	if _, err := b.telegramAPI.Request(callback); err != nil {
+		b.logger.Error("Error occurred", err)
 	}
 
 	// Parse callback data (format: "command_serverNumber")
 	parts := strings.Split(query.Data, "_")
 	if len(parts) != 2 {
-		b.legacyLogger.WithField("data", query.Data).Error("Invalid callback data format")
+		b.logger.Error("Operation failed", nil)
 		return fmt.Errorf("invalid callback data format: %s", query.Data)
 	}
 
@@ -30,7 +30,7 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 	// Get user's servers
 	servers, err := b.getUserServersWithInfo(query.From.ID)
 	if err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to get user servers for callback")
+		b.logger.Error("Error occurred", err)
 		return err
 	}
 

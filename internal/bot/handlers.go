@@ -4,83 +4,78 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/sirupsen/logrus"
 )
 
 // handleMessage processes a single message
 func (b *Bot) handleMessage(message *tgbotapi.Message) error {
-	b.legacyLogger.WithFields(logrus.Fields{
-		"user_id":  message.From.ID,
-		"username": message.From.UserName,
-		"text":     message.Text,
-	}).Info("Получено сообщение от пользователя")
+	b.logger.Info("Получено сообщение от пользователя")
 
 	var response string
 
 	switch {
 	case strings.HasPrefix(message.Text, "/start"):
-		b.legacyLogger.Info("Обработка команды /start")
+		b.logger.Info("Info message")
 		response = b.handleStart(message)
 	case strings.HasPrefix(message.Text, "/temp"):
-		b.legacyLogger.Info("Обработка команды /temp")
+		b.logger.Info("Info message")
 		response = b.handleTemp(message)
 	case strings.HasPrefix(message.Text, "/memory"):
-		b.legacyLogger.Info("Обработка команды /memory")
+		b.logger.Info("Info message")
 		response = b.handleMemory(message)
 	case strings.HasPrefix(message.Text, "/disk"):
-		b.legacyLogger.Info("Обработка команды /disk")
+		b.logger.Info("Info message")
 		response = b.handleDisk(message)
 	case strings.HasPrefix(message.Text, "/uptime"):
-		b.legacyLogger.Info("Обработка команды /uptime")
+		b.logger.Info("Info message")
 		response = b.handleUptime(message)
 	case strings.HasPrefix(message.Text, "/processes"):
-		b.legacyLogger.Info("Обработка команды /processes")
+		b.logger.Info("Info message")
 		response = b.handleProcesses(message)
 	case strings.HasPrefix(message.Text, "/containers"):
-		b.legacyLogger.Info("Обработка команды /containers")
+		b.logger.Info("Info message")
 		response = b.handleContainers(message)
 	case strings.HasPrefix(message.Text, "/start_container"):
-		b.legacyLogger.Info("Обработка команды /start_container")
+		b.logger.Info("Info message")
 		response = b.handleStartContainer(message)
 	case strings.HasPrefix(message.Text, "/stop_container"):
-		b.legacyLogger.Info("Обработка команды /stop_container")
+		b.logger.Info("Info message")
 		response = b.handleStopContainer(message)
 	case strings.HasPrefix(message.Text, "/restart_container"):
-		b.legacyLogger.Info("Обработка команды /restart_container")
+		b.logger.Info("Info message")
 		response = b.handleRestartContainer(message)
 	case strings.HasPrefix(message.Text, "/status"):
-		b.legacyLogger.Info("Обработка команды /status")
+		b.logger.Info("Info message")
 		response = b.handleStatus(message)
 	case strings.HasPrefix(message.Text, "/servers"):
-		b.legacyLogger.Info("Обработка команды /servers")
+		b.logger.Info("Info message")
 		response = b.handleServers(message)
 	case strings.HasPrefix(message.Text, "/help"):
-		b.legacyLogger.Info("Обработка команды /help")
+		b.logger.Info("Info message")
 		response = b.handleHelp(message)
 	case strings.HasPrefix(message.Text, "/rename_server"):
-		b.legacyLogger.Info("Обработка команды /rename_server")
+		b.logger.Info("Info message")
 		response = b.handleRenameServer(message)
 	case strings.HasPrefix(message.Text, "/remove_server"):
-		b.legacyLogger.Info("Обработка команды /remove_server")
+		b.logger.Info("Info message")
 		response = b.handleRemoveServer(message)
 	case strings.HasPrefix(message.Text, "/add"):
-		b.legacyLogger.Info("Обработка команды /add")
+		b.logger.Info("Info message")
 		response = b.handleAddServer(message)
 	case strings.HasPrefix(message.Text, "/debug"):
-		b.legacyLogger.Info("Обработка команды /debug")
+		b.logger.Info("Info message")
 		response = b.handleDebug(message)
 	case strings.HasPrefix(message.Text, "/stats"):
-		b.legacyLogger.Info("Обработка команды /stats")
+		b.logger.Info("Info message")
 		response = b.handleStats(message)
 	case strings.HasPrefix(message.Text, "srv_"):
-		b.legacyLogger.Info("Обработка ключа сервера (deprecated)")
+		b.logger.Info("Info message")
 		response = "❌ Please use /add command instead.\nExample: /add srv_your_key_here"
 	default:
-		b.legacyLogger.WithField("text", message.Text).Info("Неизвестная команда")
+		b.logger.Info("Operation completed")
 		response = "❓ Unknown command. Use /help to see available commands."
 	}
 
-	b.legacyLogger.WithField("response_length", len(response)).Info("Отправка ответа пользователю")
+	b.logger.Info("Отправка ответа пользователю")
 	b.sendMessage(message.Chat.ID, response)
 	return nil
 }
@@ -89,7 +84,7 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 func (b *Bot) handleStart(message *tgbotapi.Message) string {
 	// Register user if not exists
 	if err := b.registerUser(message.From); err != nil {
-		b.legacyLogger.WithError(err).Error("Failed to register user")
+		b.logger.Error("Error occurred", err)
 		return "❌ Error occurred during registration. Please try again."
 	}
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/servereye/servereye/pkg/protocol"
 	"github.com/servereye/servereye/pkg/redis"
-	"github.com/sirupsen/logrus"
 )
 
 // getCPUTemperature requests CPU temperature from agent
@@ -22,7 +21,7 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 
 	// Subscribe to response channel first
 	respChannel := redis.GetResponseChannel(serverKey)
-	b.legacyLogger.WithField("channel", respChannel).Info("Подписались на канал Redis")
+	b.logger.Info("Подписались на канал Redis")
 
 	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
 	if err != nil {
@@ -39,30 +38,24 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 		return 0, fmt.Errorf("failed to send command: %v", err)
 	}
 
-	b.legacyLogger.WithFields(logrus.Fields{
-		"command_id": cmd.ID,
-		"channel":    cmdChannel,
-	}).Info("Команда отправлена агенту")
+	b.logger.Info("Команда отправлена агенту")
 
 	// Wait for response with timeout
 	timeout := time.After(10 * time.Second)
 	for {
 		select {
 		case respData := <-subscription.Channel():
-			b.legacyLogger.WithField("data", string(respData)).Debug("Получен ответ от агента")
+			b.logger.Debug("Получен ответ от агента")
 
 			resp, err := protocol.FromJSON(respData)
 			if err != nil {
-				b.legacyLogger.WithError(err).Error("Failed to parse response")
+				b.logger.Error("Failed to parse response", err)
 				continue
 			}
 
 			// Check if this response is for our command
 			if resp.ID != cmd.ID {
-				b.legacyLogger.WithFields(logrus.Fields{
-					"expected": cmd.ID,
-					"received": resp.ID,
-				}).Debug("Response ID mismatch, waiting for correct response")
+				b.logger.Debug("Response ID mismatch, waiting for correct response")
 				continue
 			}
 
@@ -74,7 +67,7 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 				// Parse temperature from payload
 				if payload, ok := resp.Payload.(map[string]interface{}); ok {
 					if temp, ok := payload["temperature"].(float64); ok {
-						b.legacyLogger.WithField("temperature", temp).Info("Получена температура CPU")
+						b.logger.Info("Получена температура CPU")
 						return temp, nil
 					}
 				}
@@ -100,7 +93,7 @@ func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, erro
 
 	// Subscribe to response channel first
 	respChannel := redis.GetResponseChannel(serverKey)
-	b.legacyLogger.WithField("channel", respChannel).Info("Подписались на канал Redis")
+	b.logger.Info("Подписались на канал Redis")
 	
 	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
 	if err != nil {
@@ -116,30 +109,24 @@ func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, erro
 		return nil, fmt.Errorf("failed to send command: %v", err)
 	}
 
-	b.legacyLogger.WithFields(logrus.Fields{
-		"command_id": cmd.ID,
-		"channel": cmdChannel,
-	}).Info("Команда отправлена агенту")
+	b.logger.Info("Команда отправлена агенту")
 
 	// Wait for response with timeout
 	timeout := time.After(10 * time.Second)
 	for {
 		select {
 		case respData := <-subscription.Channel():
-			b.legacyLogger.WithField("data", string(respData)).Debug("Получен ответ от агента")
+			b.logger.Debug("Получен ответ от агента")
 			
 			resp, err := protocol.FromJSON(respData)
 			if err != nil {
-				b.legacyLogger.WithError(err).Error("Failed to parse response")
+				b.logger.Error("Failed to parse response", err)
 				continue
 			}
 
 			// Check if this response is for our command
 			if resp.ID != cmd.ID {
-				b.legacyLogger.WithFields(logrus.Fields{
-					"expected": cmd.ID,
-					"received": resp.ID,
-				}).Debug("Response ID mismatch, waiting for correct response")
+				b.logger.Debug("Response ID mismatch, waiting for correct response")
 				continue
 			}
 
@@ -153,7 +140,7 @@ func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, erro
 					containersData, _ := json.Marshal(payload)
 					var containers protocol.ContainersPayload
 					if err := json.Unmarshal(containersData, &containers); err == nil {
-						b.legacyLogger.WithField("containers_count", containers.Total).Info("Получен список контейнеров")
+						b.logger.Info("Получен список контейнеров")
 						return &containers, nil
 					}
 				}
