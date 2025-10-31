@@ -114,9 +114,12 @@ func (c *AgentConfig) validate() error {
 	if c.Server.SecretKey == "" {
 		return fmt.Errorf("секретный ключ не может быть пустым")
 	}
-	if c.Redis.Address == "" {
-		return fmt.Errorf("адрес Redis не может быть пустым")
+	
+	// Проверяем, что есть либо Redis, либо HTTP API конфигурация
+	if c.Redis.Address == "" && c.API.BaseURL == "" {
+		return fmt.Errorf("должен быть указан либо адрес Redis, либо базовый URL API")
 	}
+	
 	return nil
 }
 
