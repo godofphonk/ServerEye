@@ -38,19 +38,35 @@ if ! id "$AGENT_USER" &>/dev/null; then
     useradd -r -s /bin/false -d "$AGENT_DIR" "$AGENT_USER"
 fi
 
+# Check if this is an update
+UPDATE_MODE=false
+if systemctl is-active --quiet servereye-agent 2>/dev/null; then
+    UPDATE_MODE=true
+    echo "🔄 Existing installation detected - running in UPDATE mode"
+    echo "⏸️  Stopping agent service..."
+    systemctl stop servereye-agent
+    sleep 1
+fi
+
 # Create directories
 echo "📁 Creating directories..."
 mkdir -p "$AGENT_DIR" "$CONFIG_DIR" "$LOG_DIR"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR" "$LOG_DIR"
 chmod 755 "$CONFIG_DIR"
 
+# Backup existing binary if updating
+if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
+    echo "💾 Backing up current binary..."
+    cp "$AGENT_DIR/servereye-agent" "$AGENT_DIR/servereye-agent.backup"
+fi
+
 # Download and install agent binary
 echo "⬇️  Downloading ServerEye agent..."
-wget -O "$AGENT_DIR/servereye-agent" "$AGENT_URL"
+wget -O "$AGENT_DIR/servereye-agent.new" "$AGENT_URL"
 
 # Verify checksum
 echo "🔐 Verifying binary integrity..."
-ACTUAL_CHECKSUM=$(sha256sum "$AGENT_DIR/servereye-agent" | awk '{print $1}')
+ACTUAL_CHECKSUM=$(sha256sum "$AGENT_DIR/servereye-agent.new" | awk '{print $1}')
 if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
     echo "❌ Checksum verification failed!"
     echo "   Expected: $EXPECTED_CHECKSUM"
@@ -62,22 +78,30 @@ if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
     echo "   - Binary version mismatch"
     echo ""
     echo "🛡️  For security, installation has been aborted."
-    rm -f "$AGENT_DIR/servereye-agent"
+    rm -f "$AGENT_DIR/servereye-agent.new"
     exit 1
 fi
 echo "✅ Binary integrity verified!"
 
+# Move new binary to final location
+mv "$AGENT_DIR/servereye-agent.new" "$AGENT_DIR/servereye-agent"
 chmod +x "$AGENT_DIR/servereye-agent"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR/servereye-agent"
 
-# Generate secret key and config
-echo "🔑 Generating secret key..."
-SECRET_KEY=$(openssl rand -hex 16 | sed 's/^/srv_/')
-HOSTNAME=$(hostname)
+# Configuration handling
+if [ "$UPDATE_MODE" = true ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
+    echo "📝 Keeping existing configuration..."
+    # Extract existing secret key for display
+    SECRET_KEY=$(grep 'secret_key:' "$CONFIG_DIR/config.yaml" | awk '{print $2}' | tr -d '"')
+else
+    # Generate secret key and config for new installation
+    echo "🔑 Generating secret key..."
+    SECRET_KEY=$(openssl rand -hex 16 | sed 's/^/srv_/')
+    HOSTNAME=$(hostname)
 
-# Create configuration file
-echo "📝 Creating configuration..."
-cat > "$CONFIG_DIR/config.yaml" << EOF
+    # Create configuration file
+    echo "📝 Creating configuration..."
+    cat > "$CONFIG_DIR/config.yaml" << EOF
 server:
   name: "$HOSTNAME"
   description: "ServerEye monitored server"
@@ -96,15 +120,16 @@ logging:
   file: "$LOG_DIR/agent.log"
 EOF
 
-chown root:$AGENT_USER "$CONFIG_DIR/config.yaml"
-chmod 640 "$CONFIG_DIR/config.yaml"
+    chown root:$AGENT_USER "$CONFIG_DIR/config.yaml"
+    chmod 640 "$CONFIG_DIR/config.yaml"
 
-# Register key with bot
-echo "🔄 Registering key with ServerEye bot..."
-AGENT_VERSION="1.0.0"
-OS_INFO=$(uname -s)" "$(uname -m)
+    # Register key with bot (only for new installations)
+    echo "🔄 Registering key with ServerEye bot..."
+    AGENT_VERSION="1.0.0"
+    OS_INFO=$(uname -s)" "$(uname -m)
+    HOSTNAME=$(hostname)
 
-JSON_PAYLOAD=$(cat << EOF
+    JSON_PAYLOAD=$(cat << EOF
 {
   "secret_key": "$SECRET_KEY",
   "agent_version": "$AGENT_VERSION",
@@ -114,13 +139,14 @@ JSON_PAYLOAD=$(cat << EOF
 EOF
 )
 
-if curl -s -X POST "$BOT_URL/api/register-key" \
-   -H "Content-Type: application/json" \
-   -d "$JSON_PAYLOAD" > /dev/null; then
-    echo "✅ Key registered with ServerEye bot!"
-else
-    echo "⚠️  Could not register key with bot (bot may be offline)"
-    echo "   You can still use the key manually: $SECRET_KEY"
+    if curl -s -X POST "$BOT_URL/api/register-key" \
+       -H "Content-Type: application/json" \
+       -d "$JSON_PAYLOAD" > /dev/null; then
+        echo "✅ Key registered with ServerEye bot!"
+    else
+        echo "⚠️  Could not register key with bot (bot may be offline)"
+        echo "   You can still use the key manually: $SECRET_KEY"
+    fi
 fi
 
 # Install systemd service
@@ -154,40 +180,72 @@ WantedBy=multi-user.target
 EOF
 
 # Enable and start service
-echo "🔄 Starting ServerEye agent service..."
 systemctl daemon-reload
 systemctl enable servereye-agent
-systemctl start servereye-agent
+
+if [ "$UPDATE_MODE" = true ]; then
+    echo "🔄 Restarting ServerEye agent service..."
+    systemctl start servereye-agent
+else
+    echo "🔄 Starting ServerEye agent service..."
+    systemctl start servereye-agent
+fi
 
 # Wait a moment and check status
 sleep 2
 if systemctl is-active --quiet servereye-agent; then
-    echo "✅ ServerEye Agent installed and started successfully!"
-    echo ""
-    echo "🔑 Your secret key: $SECRET_KEY"
-    echo ""
-    echo "📱 To connect to Telegram bot:"
-    echo "1. Find @ServerEyeBot in Telegram"
-    echo "2. Send /start command"
-    echo "3. Send: /add $SECRET_KEY"
-    echo ""
-    echo "🎯 Available commands after connection:"
-    echo "• /temp - Get CPU temperature"
-    echo "• /memory - Get memory usage"
-    echo "• /disk - Get disk usage"
-    echo "• /containers - List Docker containers"
-    echo "• /status - Get server status"
-    echo ""
-    echo "📋 Service management:"
-    echo "• Status: sudo systemctl status servereye-agent"
-    echo "• Logs: sudo journalctl -u servereye-agent -f"
-    echo "• Restart: sudo systemctl restart servereye-agent"
-    echo ""
-    echo "🎉 Installation complete! Your server is now monitored."
-    echo ""
-    echo "ℹ️  Note: If bot registration failed, you can manually add the key later."
+    if [ "$UPDATE_MODE" = true ]; then
+        echo "✅ ServerEye Agent updated successfully!"
+        echo ""
+        echo "🔑 Your secret key: $SECRET_KEY"
+        echo ""
+        echo "📋 What was updated:"
+        echo "• Agent binary updated to latest version"
+        echo "• Configuration preserved"
+        echo "• Service restarted"
+        echo "• Previous version backed up to: $AGENT_DIR/servereye-agent.backup"
+        echo ""
+        echo "📋 Service management:"
+        echo "• Status: sudo systemctl status servereye-agent"
+        echo "• Logs: sudo journalctl -u servereye-agent -f"
+        echo "• Rollback: sudo cp $AGENT_DIR/servereye-agent.backup $AGENT_DIR/servereye-agent && sudo systemctl restart servereye-agent"
+        echo ""
+        echo "🎉 Update complete! Your server is now running the latest version."
+    else
+        echo "✅ ServerEye Agent installed and started successfully!"
+        echo ""
+        echo "🔑 Your secret key: $SECRET_KEY"
+        echo ""
+        echo "📱 To connect to Telegram bot:"
+        echo "1. Find @ServerEyeBot in Telegram"
+        echo "2. Send /start command"
+        echo "3. Send: /add $SECRET_KEY"
+        echo ""
+        echo "🎯 Available commands after connection:"
+        echo "• /temp - Get CPU temperature"
+        echo "• /memory - Get memory usage"
+        echo "• /disk - Get disk usage"
+        echo "• /containers - List Docker containers"
+        echo "• /status - Get server status"
+        echo ""
+        echo "📋 Service management:"
+        echo "• Status: sudo systemctl status servereye-agent"
+        echo "• Logs: sudo journalctl -u servereye-agent -f"
+        echo "• Restart: sudo systemctl restart servereye-agent"
+        echo ""
+        echo "🎉 Installation complete! Your server is now monitored."
+        echo ""
+        echo "ℹ️  Note: If bot registration failed, you can manually add the key later."
+    fi
 else
     echo "❌ Service failed to start. Check logs:"
     echo "sudo journalctl -u servereye-agent -n 20"
+    if [ "$UPDATE_MODE" = true ]; then
+        echo ""
+        echo "🔄 To rollback to previous version:"
+        echo "sudo systemctl stop servereye-agent"
+        echo "sudo cp $AGENT_DIR/servereye-agent.backup $AGENT_DIR/servereye-agent"
+        echo "sudo systemctl start servereye-agent"
+    fi
     exit 1
 fi
