@@ -56,7 +56,13 @@
 # Automatic installation with systemd service
 wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
 ```
-
+> **🔒 Security Notice:** The script includes SHA256 checksum verification to ensure binary integrity. For extra security, you can review the script first:
+> ```bash
+> # Download and inspect before running
+> wget [https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh](https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh)
+> less install-agent.sh
+> sudo bash install-agent.sh
+> ```
 ### 2. What Happens Automatically
 - ✅ Downloads and installs the agent
 - ✅ Generates a unique server key

@@ -10,14 +10,16 @@ AGENT_DIR="/opt/servereye"
 CONFIG_DIR="/etc/servereye"
 LOG_DIR="/var/log/servereye"
 SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
-AGENT_URL="https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-linux-amd64"
+AGENT_URL="https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-agent-linux"
+CHECKSUM_URL="https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/SHA256SUMS"
+EXPECTED_CHECKSUM="979aafae68c93f1af80f04238b692dad7828d26d14a79de34e8b68e7c0ded651"
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"  #  API endpoint
 
 echo "🚀 Installing ServerEye Agent..."
 
 # Check dependencies
 echo "🔍 Checking dependencies..."
-for cmd in wget curl openssl systemctl; do
+for cmd in wget curl openssl systemctl sha256sum; do
     if ! command -v $cmd &> /dev/null; then
         echo "❌ Required command '$cmd' not found. Please install it first."
         exit 1
@@ -45,6 +47,26 @@ chmod 755 "$CONFIG_DIR"
 # Download and install agent binary
 echo "⬇️  Downloading ServerEye agent..."
 wget -O "$AGENT_DIR/servereye-agent" "$AGENT_URL"
+
+# Verify checksum
+echo "🔐 Verifying binary integrity..."
+ACTUAL_CHECKSUM=$(sha256sum "$AGENT_DIR/servereye-agent" | awk '{print $1}')
+if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+    echo "❌ Checksum verification failed!"
+    echo "   Expected: $EXPECTED_CHECKSUM"
+    echo "   Got:      $ACTUAL_CHECKSUM"
+    echo ""
+    echo "⚠️  This could indicate:"
+    echo "   - Binary was tampered with (MITM attack)"
+    echo "   - Download was corrupted"
+    echo "   - Binary version mismatch"
+    echo ""
+    echo "🛡️  For security, installation has been aborted."
+    rm -f "$AGENT_DIR/servereye-agent"
+    exit 1
+fi
+echo "✅ Binary integrity verified!"
+
 chmod +x "$AGENT_DIR/servereye-agent"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR/servereye-agent"
 
