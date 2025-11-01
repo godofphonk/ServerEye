@@ -1,5 +1,6 @@
 # 🔍 ServerEye - Server Monitoring via Telegram Bot
 
+[![CI Status](https://github.com/godofphonk/ServerEye/workflows/CI/badge.svg)](https://github.com/godofphonk/ServerEye/actions)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=flat-square&logo=telegram)](https://telegram.org/)

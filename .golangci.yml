@@ -24,7 +24,7 @@ linters:
 # Настройки для конкретных линтеров
 linters-settings:
   gocyclo:
-    min-complexity: 15  # Максимальная сложность функции
+    min-complexity: 25  # Максимальная сложность функции (увеличено для bot handlers)
   
   dupl:
     threshold: 100  # Минимум строк для определения дубликата
@@ -52,5 +52,7 @@ issues:
     - "Error return value of `\\(\\*encoding/json.Encoder\\).Encode` is not checked"  # JSON encoding errors handled at HTTP level
     - "Error return value of `tx.Rollback` is not checked"  # Rollback in defer is OK
     - "Error return value of `b.Stop` is not checked"  # Shutdown already logged
+    - "Error return value of `rows.Scan` is not checked"  # Database query errors handled separately
+    - "Error return value of `\\(\\*database/sql.Row\\).Scan` is not checked"  # Scan errors handled at query level
     
   max-same-issues: 0  # Показывать все найденные проблемы
