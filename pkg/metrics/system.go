@@ -173,7 +173,11 @@ func (s *SystemMonitor) GetUptime() (*protocol.UptimeInfo, error) {
 	}
 
 	uptimeSeconds := uint64(uptimeFloat)
-	bootTime := uint64(time.Now().Unix()) - uptimeSeconds
+	now := time.Now().Unix()
+	if now < 0 {
+		now = 0 // Should never happen, but for gosec
+	}
+	bootTime := uint64(now) - uptimeSeconds
 
 	// Format uptime in human readable format
 	days := uptimeSeconds / 86400

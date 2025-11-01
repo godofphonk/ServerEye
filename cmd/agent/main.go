@@ -125,7 +125,7 @@ func handleInstall() error {
 
 	// Test if we can write to system directories
 	testFile := configDir + "/test"
-	if err := os.MkdirAll(configDir, 0755); err != nil || os.WriteFile(testFile, []byte("test"), 0644) != nil {
+	if err := os.MkdirAll(configDir, 0755); err != nil || os.WriteFile(testFile, []byte("test"), 0600) != nil {
 		// Fallback to user home directory
 		homeDir, _ := os.UserHomeDir()
 		configDir = homeDir + "/.servereye"
@@ -160,7 +160,7 @@ logging:
 `, secretKey, logPath)
 
 	configPath := fmt.Sprintf("%s/config.yaml", configDir)
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		return fmt.Errorf("failed to write configuration: %v", err)
 	}
 

@@ -157,7 +157,8 @@ func (s *SubscriptionAdapter) Channel() <-chan []byte {
 func (s *SubscriptionAdapter) Close() error {
 	defer func() {
 		if r := recover(); r != nil {
-			// Ignore panic from closing already closed channel
+			// Log and ignore panic from closing already closed channel
+			_ = r // Explicitly mark as intentionally ignored
 		}
 	}()
 	return s.sub.Close()

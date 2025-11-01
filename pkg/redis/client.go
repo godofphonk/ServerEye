@@ -78,6 +78,7 @@ func (s *Subscription) Close() error {
 	defer func() {
 		if r := recover(); r != nil {
 			// Игнорируем панику от закрытия уже закрытого канала
+			_ = r // Explicitly mark as intentionally ignored
 		}
 	}()
 

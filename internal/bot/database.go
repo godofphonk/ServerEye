@@ -368,7 +368,7 @@ func (b *Bot) recordGeneratedKey(secretKey string) error {
 	if len(keyPrefix) > 12 {
 		keyPrefix = keyPrefix[:12] + "..."
 	}
-	b.logger.Info("Operation completed")
+	b.logger.Info("Generated key recorded", Field{Key: "key", Value: keyPrefix})
 	return nil
 }
 

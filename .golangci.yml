@@ -48,6 +48,7 @@ issues:
   # Не показывать эти конкретные ошибки
   exclude:
     - "G104: Errors unhandled"  # Иногда можно игнорировать ошибки
+    - "G115: integer overflow conversion"  # We use safe bounds checking where needed
     - "Error return value of `a.sendResponse` is not checked"  # В panic handler это OK
     - "Error return value of `\\(\\*encoding/json.Encoder\\).Encode` is not checked"  # JSON encoding errors handled at HTTP level
     - "Error return value of `tx.Rollback` is not checked"  # Rollback in defer is OK

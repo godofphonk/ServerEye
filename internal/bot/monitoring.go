@@ -209,8 +209,12 @@ func (b *Bot) handleUptime(message *tgbotapi.Message) string {
 		return fmt.Sprintf("❌ Failed to get uptime: %v", err)
 	}
 
-	// Format boot time
-	bootTime := time.Unix(int64(uptimeInfo.BootTime), 0)
+	// Format boot time - safe conversion from uint64 to int64
+	bootTimeUnix := uptimeInfo.BootTime
+	if bootTimeUnix > (1<<63 - 1) {
+		bootTimeUnix = 1<<63 - 1 // Cap at max int64
+	}
+	bootTime := time.Unix(int64(bootTimeUnix), 0)
 
 	response := fmt.Sprintf(`⏰ **System Uptime**
 

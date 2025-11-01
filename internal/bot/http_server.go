@@ -34,7 +34,16 @@ func (b *Bot) startHTTPServer() {
 	http.HandleFunc("/api/monitoring/processes", b.handleProcessesRequest)
 
 	b.logger.Info("Info message")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+
+	// Create HTTP server with proper timeouts for security
+	server := &http.Server{
+		Addr:         ":8080",
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	if err := server.ListenAndServe(); err != nil {
 		b.logger.Error("Error occurred", err)
 	}
 }

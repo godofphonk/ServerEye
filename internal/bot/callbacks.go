@@ -200,7 +200,12 @@ func (b *Bot) executeUptimeCommand(servers []ServerInfo, serverNum string) strin
 		return fmt.Sprintf("❌ Failed to get uptime from %s: %v", serverName, err)
 	}
 
-	bootTime := time.Unix(int64(uptimeInfo.BootTime), 0)
+	// Safe conversion from uint64 to int64
+	bootTimeUnix := uptimeInfo.BootTime
+	if bootTimeUnix > (1<<63 - 1) {
+		bootTimeUnix = 1<<63 - 1 // Cap at max int64
+	}
+	bootTime := time.Unix(int64(bootTimeUnix), 0)
 
 	return fmt.Sprintf(`⏰ **%s** System Uptime
 
