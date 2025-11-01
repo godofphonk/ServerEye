@@ -9,10 +9,10 @@ import (
 
 // KeyRegistrationRequest represents a request to register a generated key
 type KeyRegistrationRequest struct {
-	SecretKey     string `json:"secret_key"`
-	AgentVersion  string `json:"agent_version,omitempty"`
-	OSInfo        string `json:"os_info,omitempty"`
-	Hostname      string `json:"hostname,omitempty"`
+	SecretKey    string `json:"secret_key"`
+	AgentVersion string `json:"agent_version,omitempty"`
+	OSInfo       string `json:"os_info,omitempty"`
+	Hostname     string `json:"hostname,omitempty"`
 }
 
 // startHTTPServer starts HTTP server for agent API
@@ -32,7 +32,7 @@ func (b *Bot) startHTTPServer() {
 	http.HandleFunc("/api/monitoring/disk", b.handleDiskRequest)
 	http.HandleFunc("/api/monitoring/uptime", b.handleUptimeRequest)
 	http.HandleFunc("/api/monitoring/processes", b.handleProcessesRequest)
-	
+
 	b.logger.Info("Info message")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		b.logger.Error("Error occurred", err)
@@ -42,7 +42,7 @@ func (b *Bot) startHTTPServer() {
 // handleRegisterKey handles key registration from agent
 func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 	b.logger.Info("HTTP request received")
-	
+
 	if r.Method != http.MethodPost {
 		b.logger.Error("Error message", nil)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -55,7 +55,7 @@ func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	
+
 	b.logger.Info("Operation completed")
 
 	// Validate secret key
@@ -92,7 +92,7 @@ func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 // handleHealth handles health check requests
 func (b *Bot) handleHealth(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
-		"status": "healthy",
+		"status":  "healthy",
 		"service": "servereye-bot",
 	}
 
@@ -125,7 +125,7 @@ func (b *Bot) handleRedisPublish(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	
+
 	b.logger.Info("Received publish request")
 
 	// Validate channel format (should be resp:srv_*)
@@ -197,7 +197,7 @@ func (b *Bot) handleRedisSubscribe(w http.ResponseWriter, r *http.Request) {
 
 	// Wait for message or timeout
 	timeout := time.After(time.Duration(req.Timeout) * time.Second)
-	
+
 	select {
 	case message := <-subscription.Channel():
 		if message != nil {
@@ -273,4 +273,3 @@ func (b *Bot) handleUptimeRequest(w http.ResponseWriter, r *http.Request) {
 func (b *Bot) handleProcessesRequest(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not implemented yet", http.StatusNotImplemented)
 }
-

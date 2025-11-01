@@ -74,17 +74,17 @@ func (s *SystemMonitor) GetMemoryInfo() (*protocol.MemoryInfo, error) {
 
 	// Calculate used memory
 	memInfo.Used = memInfo.Total - memInfo.Available
-	
+
 	// Calculate used percentage
 	if memInfo.Total > 0 {
 		memInfo.UsedPercent = float64(memInfo.Used) / float64(memInfo.Total) * 100
 	}
 
 	s.logger.WithFields(logrus.Fields{
-		"total_mb":      memInfo.Total / 1024 / 1024,
-		"used_mb":       memInfo.Used / 1024 / 1024,
-		"available_mb":  memInfo.Available / 1024 / 1024,
-		"used_percent":  memInfo.UsedPercent,
+		"total_mb":     memInfo.Total / 1024 / 1024,
+		"used_mb":      memInfo.Used / 1024 / 1024,
+		"available_mb": memInfo.Available / 1024 / 1024,
+		"used_percent": memInfo.UsedPercent,
 	}).Debug("Memory info retrieved")
 
 	return memInfo, nil
@@ -127,7 +127,7 @@ func (s *SystemMonitor) GetDiskInfo() (*protocol.DiskInfoPayload, error) {
 		total := s.parseHumanSize(totalStr)
 		used := s.parseHumanSize(usedStr)
 		free := s.parseHumanSize(availStr)
-		
+
 		usedPercent, _ := strconv.ParseFloat(usedPercentStr, 64)
 
 		diskInfo := protocol.DiskInfo{
@@ -237,7 +237,7 @@ func (s *SystemMonitor) GetTopProcesses(limit int) (*protocol.ProcessesPayload, 
 		pid, _ := strconv.ParseInt(fields[1], 10, 32)
 		cpuPercent, _ := strconv.ParseFloat(fields[2], 64)
 		memPercent, _ := strconv.ParseFloat(fields[3], 32)
-		
+
 		// Memory in KB, convert to MB
 		memKB, _ := strconv.ParseUint(fields[5], 10, 64)
 		memMB := memKB / 1024
@@ -275,7 +275,7 @@ func (s *SystemMonitor) parseHumanSize(sizeStr string) uint64 {
 	// Get the last character (unit)
 	unit := sizeStr[len(sizeStr)-1:]
 	valueStr := sizeStr[:len(sizeStr)-1]
-	
+
 	value, err := strconv.ParseFloat(valueStr, 64)
 	if err != nil {
 		return 0

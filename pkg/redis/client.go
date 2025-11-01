@@ -67,9 +67,9 @@ func (c *Client) Publish(ctx context.Context, channel string, message []byte) er
 
 // Subscription represents a Redis subscription
 type Subscription struct {
-	pubsub *redis.PubSub
+	pubsub  *redis.PubSub
 	msgChan chan []byte
-	logger *logrus.Logger
+	logger  *logrus.Logger
 }
 
 // Close closes the subscription
@@ -80,14 +80,14 @@ func (s *Subscription) Close() error {
 			// Игнорируем панику от закрытия уже закрытого канала
 		}
 	}()
-	
+
 	select {
 	case <-s.msgChan:
 		// Канал уже закрыт
 	default:
 		close(s.msgChan)
 	}
-	
+
 	return s.pubsub.Close()
 }
 
@@ -110,9 +110,9 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, 
 
 	// Создаем объект подписки
 	subscription := &Subscription{
-		pubsub: pubsub,
+		pubsub:  pubsub,
 		msgChan: make(chan []byte, 100),
-		logger: c.logger,
+		logger:  c.logger,
 	}
 
 	// Запускаем горутину для чтения сообщений
@@ -138,7 +138,7 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, 
 					}
 					return
 				}
-				
+
 				c.logger.WithFields(logrus.Fields{
 					"channel": msg.Channel,
 					"size":    len(msg.Payload),

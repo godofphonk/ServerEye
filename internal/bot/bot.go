@@ -12,17 +12,17 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	_ "github.com/lib/pq"
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/pkg/redis"
 	"github.com/sirupsen/logrus"
-	_ "github.com/lib/pq"
 )
 
 // Bot represents the Telegram bot instance with dependency injection
 type Bot struct {
 	// Configuration
 	config *config.BotConfig
-	
+
 	// Dependencies (interfaces for better testability)
 	logger      Logger
 	telegramAPI TelegramAPI
@@ -31,14 +31,14 @@ type Bot struct {
 	agentClient AgentClient
 	validator   Validator
 	metrics     Metrics
-	
+
 	// Direct database access for internal methods
 	db *sql.DB
-	
+
 	// Context management
 	ctx    context.Context
 	cancel context.CancelFunc
-	
+
 	// Graceful shutdown
 	wg       sync.WaitGroup
 	shutdown chan struct{}
@@ -61,9 +61,9 @@ func New(opts BotOptions) (*Bot, error) {
 	if opts.Config == nil {
 		return nil, NewValidationError("config is required", nil)
 	}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	bot := &Bot{
 		config:      opts.Config,
 		logger:      opts.Logger,
@@ -77,22 +77,22 @@ func New(opts BotOptions) (*Bot, error) {
 		cancel:      cancel,
 		shutdown:    make(chan struct{}),
 	}
-	
+
 	// Set defaults if not provided
 	if bot.logger == nil {
 		logrusLogger := logrus.New()
 		logrusLogger.SetLevel(logrus.InfoLevel)
 		bot.logger = NewStructuredLogger(logrusLogger)
 	}
-	
+
 	if bot.validator == nil {
 		bot.validator = NewInputValidator()
 	}
-	
+
 	if bot.metrics == nil {
 		bot.metrics = NewInMemoryMetrics()
 	}
-	
+
 	return bot, nil
 }
 
@@ -130,7 +130,7 @@ func NewFromConfig(cfg *config.BotConfig, logger *logrus.Logger) (*Bot, error) {
 
 	// Create a temporary bot instance for adapters
 	tempBot := &Bot{}
-	
+
 	// Create adapters
 	dbAdapter := NewDatabaseAdapter(db, tempBot)
 	redisAdapter := NewRedisAdapter(redisClient)
@@ -147,16 +147,16 @@ func NewFromConfig(cfg *config.BotConfig, logger *logrus.Logger) (*Bot, error) {
 		Validator:   NewInputValidator(),
 		Metrics:     NewInMemoryMetrics(),
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update adapter references and set direct DB access
 	dbAdapter.bot = bot
 	agentAdapter.bot = bot
 	bot.db = db
-	
+
 	return bot, nil
 }
 
@@ -186,10 +186,10 @@ func (b *Bot) Start() error {
 	}
 
 	b.logger.Info("ServerEye Telegram bot started successfully")
-	
+
 	// Wait for shutdown signal
 	<-b.shutdown
-	
+
 	return nil
 }
 
@@ -269,7 +269,7 @@ func (b *Bot) Stop() error {
 
 	// Signal shutdown complete
 	close(b.shutdown)
-	
+
 	b.logger.Info("Bot stopped successfully")
 	return nil
 }
@@ -303,10 +303,10 @@ func (b *Bot) processUpdate(ctx context.Context, update tgbotapi.Update) {
 	// Recover from panics to prevent bot crash
 	defer func() {
 		if r := recover(); r != nil {
-			b.logger.Error("Panic recovered in update processing", 
+			b.logger.Error("Panic recovered in update processing",
 				fmt.Errorf("panic: %v", r),
 				StringField("update_id", fmt.Sprintf("%d", update.UpdateID)))
-			
+
 			if b.metrics != nil {
 				b.metrics.IncrementError("PANIC_RECOVERED")
 			}
@@ -328,7 +328,7 @@ func (b *Bot) processUpdate(ctx context.Context, update tgbotapi.Update) {
 // processMessage processes a message update
 func (b *Bot) processMessage(ctx context.Context, message *tgbotapi.Message) {
 	start := time.Now()
-	
+
 	// Log message details
 	b.logger.Info("Processing message",
 		Int64Field("user_id", message.From.ID),
@@ -345,12 +345,12 @@ func (b *Bot) processMessage(ctx context.Context, message *tgbotapi.Message) {
 
 	// Handle message with error handling
 	err := b.handleMessage(message)
-	
+
 	// Record metrics
 	if b.metrics != nil {
 		duration := time.Since(start).Seconds()
 		b.metrics.RecordLatency("message_processing", duration)
-		
+
 		if err != nil {
 			var botErr *BotError
 			if errors.As(err, &botErr) {
@@ -371,7 +371,7 @@ func (b *Bot) processMessage(ctx context.Context, message *tgbotapi.Message) {
 // processCallbackQuery processes a callback query update
 func (b *Bot) processCallbackQuery(ctx context.Context, query *tgbotapi.CallbackQuery) {
 	start := time.Now()
-	
+
 	// Log callback details
 	b.logger.Info("Processing callback query",
 		Int64Field("user_id", query.From.ID),
@@ -381,12 +381,12 @@ func (b *Bot) processCallbackQuery(ctx context.Context, query *tgbotapi.Callback
 
 	// Handle callback with error handling
 	err := b.handleCallbackQuery(query)
-	
+
 	// Record metrics
 	if b.metrics != nil {
 		duration := time.Since(start).Seconds()
 		b.metrics.RecordLatency("callback_processing", duration)
-		
+
 		if err != nil {
 			var botErr *BotError
 			if errors.As(err, &botErr) {

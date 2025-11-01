@@ -19,7 +19,7 @@ func (b *Bot) initDatabase() error {
 			created_at TIMESTAMP DEFAULT NOW(),
 			updated_at TIMESTAMP DEFAULT NOW()
 		)`,
-		
+
 		`CREATE TABLE IF NOT EXISTS servers (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			secret_key VARCHAR(64) UNIQUE NOT NULL,
@@ -31,7 +31,7 @@ func (b *Bot) initDatabase() error {
 			created_at TIMESTAMP DEFAULT NOW(),
 			updated_at TIMESTAMP DEFAULT NOW()
 		)`,
-		
+
 		`CREATE TABLE IF NOT EXISTS user_servers (
 			user_id BIGINT REFERENCES users(telegram_id),
 			server_id UUID REFERENCES servers(id),
@@ -39,7 +39,7 @@ func (b *Bot) initDatabase() error {
 			created_at TIMESTAMP DEFAULT NOW(),
 			PRIMARY KEY (user_id, server_id)
 		)`,
-		
+
 		`CREATE TABLE IF NOT EXISTS command_history (
 			id BIGSERIAL PRIMARY KEY,
 			user_id BIGINT REFERENCES users(telegram_id),
@@ -48,7 +48,7 @@ func (b *Bot) initDatabase() error {
 			response JSONB,
 			executed_at TIMESTAMP DEFAULT NOW()
 		)`,
-		
+
 		`CREATE TABLE IF NOT EXISTS generated_keys (
 			id BIGSERIAL PRIMARY KEY,
 			secret_key VARCHAR(64) UNIQUE NOT NULL,
@@ -61,7 +61,7 @@ func (b *Bot) initDatabase() error {
 			hostname VARCHAR(255),
 			status VARCHAR(20) DEFAULT 'generated'
 		)`,
-		
+
 		`CREATE INDEX IF NOT EXISTS idx_servers_secret_key ON servers(secret_key)`,
 		`CREATE INDEX IF NOT EXISTS idx_servers_owner_id ON servers(owner_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_servers_user_id ON user_servers(user_id)`,
@@ -116,7 +116,7 @@ func (b *Bot) connectServer(userID int64, serverKey string) error {
 	err = tx.QueryRow(`
 		SELECT id, name FROM servers WHERE secret_key = $1
 	`, serverKey).Scan(&serverID, &serverName)
-	
+
 	if err == sql.ErrNoRows {
 		// Create new server entry
 		err = tx.QueryRow(`
@@ -124,7 +124,7 @@ func (b *Bot) connectServer(userID int64, serverKey string) error {
 			VALUES ($1, $2, $3, $4, 'offline')
 			RETURNING id
 		`, serverKey, "New Server", "ServerEye monitored server", userID).Scan(&serverID)
-		
+
 		if err != nil {
 			return fmt.Errorf("failed to create server: %v", err)
 		}
@@ -138,7 +138,7 @@ func (b *Bot) connectServer(userID int64, serverKey string) error {
 		VALUES ($1, $2, 'owner')
 		ON CONFLICT (user_id, server_id) DO NOTHING
 	`, userID, serverID)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to connect user to server: %v", err)
 	}
@@ -187,7 +187,7 @@ func (b *Bot) renameServer(serverKey, newName string) error {
 		SET name = $1, updated_at = NOW()
 		WHERE secret_key = $2
 	`
-	
+
 	_, err := b.db.Exec(query, newName, serverKey)
 	return err
 }
@@ -199,7 +199,7 @@ func (b *Bot) removeServer(userID int64, serverKey string) error {
 		return err
 	}
 	defer tx.Rollback()
-	
+
 	// Remove user-server association
 	_, err = tx.Exec(`
 		DELETE FROM user_servers 
@@ -210,7 +210,7 @@ func (b *Bot) removeServer(userID int64, serverKey string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Check if server has other users
 	var userCount int
 	err = tx.QueryRow(`
@@ -221,7 +221,7 @@ func (b *Bot) removeServer(userID int64, serverKey string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// If no other users, delete server completely
 	if userCount == 0 {
 		_, err = tx.Exec(`DELETE FROM servers WHERE secret_key = $1`, serverKey)
@@ -229,7 +229,7 @@ func (b *Bot) removeServer(userID int64, serverKey string) error {
 			return err
 		}
 	}
-	
+
 	return tx.Commit()
 }
 
@@ -282,7 +282,7 @@ func (b *Bot) connectServerWithName(userID int64, serverKey, serverName string) 
 	if err != nil {
 		return err
 	}
-	
+
 	if !keyExists {
 		return fmt.Errorf("invalid server key: key not found in generated keys")
 	}
@@ -290,7 +290,7 @@ func (b *Bot) connectServerWithName(userID int64, serverKey, serverName string) 
 	// Check if server already exists
 	var serverID string
 	err = tx.QueryRow(`SELECT id FROM servers WHERE secret_key = $1`, serverKey).Scan(&serverID)
-	
+
 	if err == sql.ErrNoRows {
 		// Create new server (key is valid since it exists in generated_keys)
 		err = tx.QueryRow(`
@@ -301,7 +301,7 @@ func (b *Bot) connectServerWithName(userID int64, serverKey, serverName string) 
 		if err != nil {
 			return err
 		}
-		
+
 		// Update generated_keys status to connected
 		_, err = tx.Exec(`
 			UPDATE generated_keys 
@@ -358,12 +358,12 @@ func (b *Bot) recordGeneratedKey(secretKey string) error {
 		VALUES ($1, 'generated')
 		ON CONFLICT (secret_key) DO NOTHING
 	`
-	
+
 	_, err := b.db.Exec(query, secretKey)
 	if err != nil {
 		return fmt.Errorf("failed to record generated key: %v", err)
 	}
-	
+
 	keyPrefix := secretKey
 	if len(keyPrefix) > 12 {
 		keyPrefix = keyPrefix[:12] + "..."
@@ -380,22 +380,6 @@ type Command struct {
 	Timestamp int64                  `json:"timestamp"`
 }
 
-// getPendingCommands retrieves pending commands for a server
-func (b *Bot) getPendingCommands(serverKey string) []Command {
-	// For now, return empty array - we'll implement Redis storage later
-	return []Command{}
-}
-
-// processAgentResult processes a result from an agent
-func (b *Bot) processAgentResult(serverKey string, result map[string]interface{}) {
-	// For now, just log - we'll implement proper processing later
-	keyPrefix := serverKey
-	if len(keyPrefix) > 12 {
-		keyPrefix = keyPrefix[:12] + "..."
-	}
-	b.logger.Info("Processing agent result")
-}
-
 // updateKeyConnection updates key connection info when agent connects
 func (b *Bot) updateKeyConnection(secretKey, agentVersion, osInfo, hostname string) error {
 	query := `
@@ -410,11 +394,11 @@ func (b *Bot) updateKeyConnection(secretKey, agentVersion, osInfo, hostname stri
 			status = 'connected'
 		WHERE secret_key = $1
 	`
-	
+
 	_, err := b.db.Exec(query, secretKey, agentVersion, osInfo, hostname)
 	if err != nil {
 		return fmt.Errorf("failed to update key connection: %v", err)
 	}
-	
+
 	return nil
 }

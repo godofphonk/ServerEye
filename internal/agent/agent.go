@@ -42,7 +42,7 @@ type Agent struct {
 // New создает новый агент
 func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 	var redisClient RedisClientInterface
-	
+
 	// Выбираем тип клиента на основе конфигурации
 	if cfg.API.BaseURL != "" {
 		// Используем HTTP клиент
@@ -52,7 +52,7 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 				timeout = parsedTimeout
 			}
 		}
-		
+
 		httpClient, err := redis.NewHTTPClient(redis.HTTPConfig{
 			BaseURL: cfg.API.BaseURL,
 			Timeout: timeout,
@@ -161,7 +161,7 @@ func (a *Agent) processCommand(data []byte) {
 				"command_type": msg.Type,
 				"panic":        r,
 			}).Error("Паника при обработке команды")
-			
+
 			response = protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
 				ErrorCode:    "PANIC_ERROR",
 				ErrorMessage: fmt.Sprintf("Внутренняя ошибка при обработке команды: %v", r),
@@ -203,7 +203,7 @@ func (a *Agent) processCommand(data []byte) {
 			"command_id":    msg.ID,
 			"response_type": response.Type,
 		}).Info("Отправляем ответ")
-		
+
 		if err := a.sendResponse(response); err != nil {
 			a.logger.WithError(err).Error("Не удалось отправить ответ")
 		} else {
@@ -305,10 +305,10 @@ func (a *Agent) startHeartbeat() {
 // sendHeartbeat отправляет heartbeat сообщение
 func (a *Agent) sendHeartbeat() {
 	heartbeat := map[string]interface{}{
-		"server_key": a.config.Server.SecretKey,
+		"server_key":  a.config.Server.SecretKey,
 		"server_name": a.config.Server.Name,
-		"timestamp": time.Now(),
-		"status": "online",
+		"timestamp":   time.Now(),
+		"status":      "online",
 	}
 
 	data, err := json.Marshal(heartbeat)
@@ -326,7 +326,7 @@ func (a *Agent) sendHeartbeat() {
 // handleStartContainer обрабатывает команду запуска контейнера
 func (a *Agent) handleStartContainer(msg *protocol.Message) *protocol.Message {
 	a.logger.Info("Обработка команды start_container")
-	
+
 	// Парсим payload
 	payloadData, err := json.Marshal(msg.Payload)
 	if err != nil {
@@ -336,7 +336,7 @@ func (a *Agent) handleStartContainer(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: "Неверный формат команды",
 		})
 	}
-	
+
 	var actionPayload protocol.ContainerActionPayload
 	if err := json.Unmarshal(payloadData, &actionPayload); err != nil {
 		a.logger.WithError(err).Error("Не удалось распарсить payload")
@@ -345,7 +345,7 @@ func (a *Agent) handleStartContainer(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: "Неверный формат команды",
 		})
 	}
-	
+
 	// Выполняем команду
 	response, err := a.dockerClient.StartContainer(a.ctx, actionPayload.ContainerID)
 	if err != nil {
@@ -355,10 +355,10 @@ func (a *Agent) handleStartContainer(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: fmt.Sprintf("Ошибка при запуске контейнера: %v", err),
 		})
 	}
-	
+
 	// Добавляем имя контейнера в ответ
 	response.ContainerName = actionPayload.ContainerName
-	
+
 	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно запущен")
 	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
 }
@@ -366,7 +366,7 @@ func (a *Agent) handleStartContainer(msg *protocol.Message) *protocol.Message {
 // handleStopContainer обрабатывает команду остановки контейнера
 func (a *Agent) handleStopContainer(msg *protocol.Message) *protocol.Message {
 	a.logger.Info("Обработка команды stop_container")
-	
+
 	// Парсим payload
 	payloadData, err := json.Marshal(msg.Payload)
 	if err != nil {
@@ -376,7 +376,7 @@ func (a *Agent) handleStopContainer(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: "Неверный формат команды",
 		})
 	}
-	
+
 	var actionPayload protocol.ContainerActionPayload
 	if err := json.Unmarshal(payloadData, &actionPayload); err != nil {
 		a.logger.WithError(err).Error("Не удалось распарсить payload")
@@ -385,7 +385,7 @@ func (a *Agent) handleStopContainer(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: "Неверный формат команды",
 		})
 	}
-	
+
 	// Выполняем команду
 	response, err := a.dockerClient.StopContainer(a.ctx, actionPayload.ContainerID)
 	if err != nil {
@@ -395,10 +395,10 @@ func (a *Agent) handleStopContainer(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: fmt.Sprintf("Ошибка при остановке контейнера: %v", err),
 		})
 	}
-	
+
 	// Добавляем имя контейнера в ответ
 	response.ContainerName = actionPayload.ContainerName
-	
+
 	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно остановлен")
 	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
 }
@@ -406,7 +406,7 @@ func (a *Agent) handleStopContainer(msg *protocol.Message) *protocol.Message {
 // handleRestartContainer обрабатывает команду перезапуска контейнера
 func (a *Agent) handleRestartContainer(msg *protocol.Message) *protocol.Message {
 	a.logger.Info("Обработка команды restart_container")
-	
+
 	// Парсим payload
 	payloadData, err := json.Marshal(msg.Payload)
 	if err != nil {
@@ -416,7 +416,7 @@ func (a *Agent) handleRestartContainer(msg *protocol.Message) *protocol.Message 
 			ErrorMessage: "Неверный формат команды",
 		})
 	}
-	
+
 	var actionPayload protocol.ContainerActionPayload
 	if err := json.Unmarshal(payloadData, &actionPayload); err != nil {
 		a.logger.WithError(err).Error("Не удалось распарсить payload")
@@ -425,7 +425,7 @@ func (a *Agent) handleRestartContainer(msg *protocol.Message) *protocol.Message 
 			ErrorMessage: "Неверный формат команды",
 		})
 	}
-	
+
 	// Выполняем команду
 	response, err := a.dockerClient.RestartContainer(a.ctx, actionPayload.ContainerID)
 	if err != nil {
@@ -435,10 +435,10 @@ func (a *Agent) handleRestartContainer(msg *protocol.Message) *protocol.Message 
 			ErrorMessage: fmt.Sprintf("Ошибка при перезапуске контейнера: %v", err),
 		})
 	}
-	
+
 	// Добавляем имя контейнера в ответ
 	response.ContainerName = actionPayload.ContainerName
-	
+
 	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно перезапущен")
 	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
 }
@@ -446,7 +446,7 @@ func (a *Agent) handleRestartContainer(msg *protocol.Message) *protocol.Message 
 // handleGetMemoryInfo обрабатывает команду получения информации о памяти
 func (a *Agent) handleGetMemoryInfo(msg *protocol.Message) *protocol.Message {
 	a.logger.Debug("Обработка команды получения информации о памяти")
-	
+
 	memInfo, err := a.systemMonitor.GetMemoryInfo()
 	if err != nil {
 		a.logger.WithError(err).Error("Ошибка получения информации о памяти")
@@ -455,12 +455,12 @@ func (a *Agent) handleGetMemoryInfo(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: fmt.Sprintf("Ошибка получения информации о памяти: %v", err),
 		})
 	}
-	
+
 	a.logger.WithFields(logrus.Fields{
 		"total_gb":     float64(memInfo.Total) / 1024 / 1024 / 1024,
 		"used_percent": memInfo.UsedPercent,
 	}).Info("Информация о памяти получена")
-	
+
 	response := protocol.NewMessage(protocol.TypeMemoryInfoResponse, memInfo)
 	response.ID = msg.ID
 	return response
@@ -469,7 +469,7 @@ func (a *Agent) handleGetMemoryInfo(msg *protocol.Message) *protocol.Message {
 // handleGetDiskInfo обрабатывает команду получения информации о дисках
 func (a *Agent) handleGetDiskInfo(msg *protocol.Message) *protocol.Message {
 	a.logger.Debug("Обработка команды получения информации о дисках")
-	
+
 	diskInfo, err := a.systemMonitor.GetDiskInfo()
 	if err != nil {
 		a.logger.WithError(err).Error("Ошибка получения информации о дисках")
@@ -478,7 +478,7 @@ func (a *Agent) handleGetDiskInfo(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: fmt.Sprintf("Ошибка получения информации о дисках: %v", err),
 		})
 	}
-	
+
 	a.logger.WithField("disks_count", len(diskInfo.Disks)).Info("Информация о дисках получена")
 	response := protocol.NewMessage(protocol.TypeDiskInfoResponse, diskInfo)
 	response.ID = msg.ID
@@ -488,7 +488,7 @@ func (a *Agent) handleGetDiskInfo(msg *protocol.Message) *protocol.Message {
 // handleGetUptime обрабатывает команду получения времени работы системы
 func (a *Agent) handleGetUptime(msg *protocol.Message) *protocol.Message {
 	a.logger.Debug("Обработка команды получения времени работы")
-	
+
 	uptimeInfo, err := a.systemMonitor.GetUptime()
 	if err != nil {
 		a.logger.WithError(err).Error("Ошибка получения времени работы")
@@ -497,7 +497,7 @@ func (a *Agent) handleGetUptime(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: fmt.Sprintf("Ошибка получения времени работы: %v", err),
 		})
 	}
-	
+
 	a.logger.WithField("uptime", uptimeInfo.Formatted).Info("Время работы получено")
 	response := protocol.NewMessage(protocol.TypeUptimeResponse, uptimeInfo)
 	response.ID = msg.ID
@@ -507,7 +507,7 @@ func (a *Agent) handleGetUptime(msg *protocol.Message) *protocol.Message {
 // handleGetProcesses обрабатывает команду получения списка процессов
 func (a *Agent) handleGetProcesses(msg *protocol.Message) *protocol.Message {
 	a.logger.Debug("Обработка команды получения списка процессов")
-	
+
 	// По умолчанию показываем топ 10 процессов
 	processes, err := a.systemMonitor.GetTopProcesses(10)
 	if err != nil {
@@ -517,7 +517,7 @@ func (a *Agent) handleGetProcesses(msg *protocol.Message) *protocol.Message {
 			ErrorMessage: fmt.Sprintf("Ошибка получения списка процессов: %v", err),
 		})
 	}
-	
+
 	a.logger.WithField("processes_count", len(processes.Processes)).Info("Список процессов получен")
 	response := protocol.NewMessage(protocol.TypeProcessesResponse, processes)
 	response.ID = msg.ID

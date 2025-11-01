@@ -128,9 +128,9 @@ func (c *HTTPClient) Publish(ctx context.Context, channel string, message []byte
 // Subscribe subscribes to a Redis channel via HTTP
 func (c *HTTPClient) Subscribe(ctx context.Context, channel string) (*HTTPSubscription, error) {
 	// Removed delay - need to catch commands immediately
-	
+
 	subCtx, cancel := context.WithCancel(ctx)
-	
+
 	subscription := &HTTPSubscription{
 		channel: channel,
 		client:  c,
@@ -148,7 +148,7 @@ func (c *HTTPClient) Subscribe(ctx context.Context, channel string) (*HTTPSubscr
 		}()
 
 		c.logger.WithField("channel", channel).Info("Started HTTP subscription polling")
-		
+
 		for {
 			select {
 			case <-subCtx.Done():

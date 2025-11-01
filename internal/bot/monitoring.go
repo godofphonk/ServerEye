@@ -39,7 +39,7 @@ func (b *Bot) handleTemp(message *tgbotapi.Message) string {
 	for i, server := range servers {
 		serverKeys[i] = server.SecretKey
 	}
-	
+
 	serverKey, err := b.getServerFromCommand(message.Text, serverKeys)
 	if err != nil {
 		return err.Error()
@@ -86,7 +86,7 @@ func (b *Bot) handleMemory(message *tgbotapi.Message) string {
 	for i, server := range servers {
 		serverKeys[i] = server.SecretKey
 	}
-	
+
 	serverKey, err := b.getServerFromCommand(message.Text, serverKeys)
 	if err != nil {
 		return err.Error()
@@ -211,7 +211,7 @@ func (b *Bot) handleUptime(message *tgbotapi.Message) string {
 
 	// Format boot time
 	bootTime := time.Unix(int64(uptimeInfo.BootTime), 0)
-	
+
 	response := fmt.Sprintf(`⏰ **System Uptime**
 
 🚀 **Uptime:** %s
@@ -312,7 +312,7 @@ func (b *Bot) handleStatus(message *tgbotapi.Message) string {
 	for i, server := range servers {
 		serverKeys[i] = server.SecretKey
 	}
-	
+
 	_, err = b.getServerFromCommand(message.Text, serverKeys)
 	if err != nil {
 		return err.Error()
@@ -325,7 +325,7 @@ func (b *Bot) handleStatus(message *tgbotapi.Message) string {
 // handleContainers handles the /containers command
 func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 	b.logger.Info("Operation completed")
-	
+
 	servers, err := b.getUserServersWithInfo(message.From.ID)
 	if err != nil {
 		b.logger.Error("Error occurred", err)
@@ -333,7 +333,7 @@ func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 	}
 
 	b.logger.Info("Найдено серверов пользователя")
-	
+
 	if len(servers) == 0 {
 		return "📭 No servers connected. Use /add to connect a server."
 	}
@@ -353,13 +353,13 @@ func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 	for i, server := range servers {
 		serverKeys[i] = server.SecretKey
 	}
-	
+
 	serverKey, err := b.getServerFromCommand(message.Text, serverKeys)
 	if err != nil {
 		return err.Error()
 	}
 	b.logger.Info("Operation completed")
-	
+
 	containers, err := b.getContainers(serverKey)
 	if err != nil {
 		b.logger.Error("Error occurred", err)

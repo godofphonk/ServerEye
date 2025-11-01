@@ -70,7 +70,7 @@ func main() {
 // setupLogger configures and returns a logger instance
 func setupLogger(level string) *logrus.Logger {
 	logger := logrus.New()
-	
+
 	// Set log level
 	logLevel, err := logrus.ParseLevel(level)
 	if err != nil {

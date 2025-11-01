@@ -12,7 +12,7 @@ import (
 func TestNewClient(t *testing.T) {
 	logger := logrus.New()
 	client := NewClient(logger)
-	
+
 	assert.NotNil(t, client)
 	assert.Equal(t, logger, client.logger)
 }
@@ -20,7 +20,7 @@ func TestNewClient(t *testing.T) {
 func TestConvertToContainerInfo(t *testing.T) {
 	logger := logrus.New()
 	client := NewClient(logger)
-	
+
 	tests := []struct {
 		name     string
 		input    dockerContainer
@@ -66,11 +66,11 @@ func TestConvertToContainerInfo(t *testing.T) {
 			expected: "unknown",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := client.convertToContainerInfo(tt.input)
-			
+
 			// Check ID (should be max 12 chars)
 			expectedID := tt.input.ID
 			if len(tt.input.ID) > 12 {
@@ -81,12 +81,12 @@ func TestConvertToContainerInfo(t *testing.T) {
 			assert.Equal(t, tt.input.Image, result.Image)
 			assert.Equal(t, tt.input.Status, result.Status)
 			assert.Equal(t, tt.input.State, result.State)
-			
+
 			// Test ports parsing
 			if tt.input.Ports != "" {
 				assert.NotEmpty(t, result.Ports)
 			}
-			
+
 			// Test labels
 			assert.NotNil(t, result.Labels)
 			if tt.input.Labels != "" {
@@ -99,28 +99,28 @@ func TestConvertToContainerInfo(t *testing.T) {
 func TestParseContainers(t *testing.T) {
 	logger := logrus.New()
 	client := NewClient(logger)
-	
+
 	// Test with valid JSON
 	validJSON := `{"Id":"abc123","Names":"test-container","Image":"nginx","Status":"Up","State":"running","Ports":"80/tcp","Labels":"key=value"}
 {"Id":"def456","Names":"another-container","Image":"redis","Status":"Up","State":"running","Ports":"6379/tcp","Labels":""}`
-	
+
 	containers, err := client.parseContainers([]byte(validJSON))
 	require.NoError(t, err)
 	assert.Len(t, containers, 2)
-	
+
 	assert.Equal(t, "test-container", containers[0].Name)
 	assert.Equal(t, "another-container", containers[1].Name)
-	
+
 	// Test with empty input
 	emptyContainers, err := client.parseContainers([]byte(""))
 	require.NoError(t, err)
 	assert.Len(t, emptyContainers, 0)
-	
+
 	// Test with invalid JSON (should skip invalid lines)
 	invalidJSON := `{"Id":"abc123","Names":"test-container","Image":"nginx","Status":"Up","State":"running","Ports":"80/tcp","Labels":"key=value"}
 invalid json line
 {"Id":"def456","Names":"another-container","Image":"redis","Status":"Up","State":"running","Ports":"6379/tcp","Labels":""}`
-	
+
 	partialContainers, err := client.parseContainers([]byte(invalidJSON))
 	require.NoError(t, err)
 	assert.Len(t, partialContainers, 2) // Should parse valid lines and skip invalid
@@ -129,11 +129,11 @@ invalid json line
 func TestCheckDockerAvailable(t *testing.T) {
 	logger := logrus.New()
 	client := NewClient(logger)
-	
+
 	// This test will only pass if Docker is available on the system
 	// In CI environment, Docker should be available
 	err := client.checkDockerAvailable()
-	
+
 	// We don't assert here because Docker might not be available in all test environments
 	// Just ensure the method doesn't panic
 	t.Logf("Docker availability check result: %v", err)
@@ -145,20 +145,20 @@ func TestGetContainers_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
-	
+
 	logger := logrus.New()
 	client := NewClient(logger)
-	
+
 	ctx := context.Background()
-	
+
 	// This test requires Docker to be available
 	err := client.checkDockerAvailable()
 	if err != nil {
 		t.Skipf("Docker not available, skipping integration test: %v", err)
 	}
-	
+
 	payload, err := client.GetContainers(ctx)
-	
+
 	// We don't assert specific results because container state is dynamic
 	// Just ensure the method works without errors
 	if err != nil {

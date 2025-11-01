@@ -61,7 +61,7 @@ func (c *CPUMetrics) readTemperatureFromFile(filepath string) (float64, error) {
 
 	// Convert from millidegrees to degrees Celsius
 	tempC := tempMilliC / 1000.0
-	
+
 	// Validate temperature range (-50 to 150 degrees)
 	if tempC < -50 || tempC > 150 {
 		return 0, fmt.Errorf("unreasonable temperature value: %.2f°C", tempC)

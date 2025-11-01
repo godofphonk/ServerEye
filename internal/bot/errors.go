@@ -53,11 +53,11 @@ func (e *BotError) Is(target error) bool {
 	if target == nil {
 		return false
 	}
-	
+
 	if botErr, ok := target.(*BotError); ok {
 		return e.Code == botErr.Code
 	}
-	
+
 	return errors.Is(e.Cause, target)
 }
 
@@ -79,15 +79,15 @@ func (e *BotError) WithContext(key string, value interface{}) *BotError {
 
 // Error codes
 const (
-	ErrCodeValidation     = "VALIDATION_ERROR"
-	ErrCodeDatabase       = "DATABASE_ERROR"
-	ErrCodeRedis          = "REDIS_ERROR"
-	ErrCodeAgent          = "AGENT_ERROR"
-	ErrCodeTelegram       = "TELEGRAM_ERROR"
-	ErrCodeUnauthorized   = "UNAUTHORIZED_ERROR"
-	ErrCodeNotFound       = "NOT_FOUND_ERROR"
-	ErrCodeTimeout        = "TIMEOUT_ERROR"
-	ErrCodeInternal       = "INTERNAL_ERROR"
+	ErrCodeValidation   = "VALIDATION_ERROR"
+	ErrCodeDatabase     = "DATABASE_ERROR"
+	ErrCodeRedis        = "REDIS_ERROR"
+	ErrCodeAgent        = "AGENT_ERROR"
+	ErrCodeTelegram     = "TELEGRAM_ERROR"
+	ErrCodeUnauthorized = "UNAUTHORIZED_ERROR"
+	ErrCodeNotFound     = "NOT_FOUND_ERROR"
+	ErrCodeTimeout      = "TIMEOUT_ERROR"
+	ErrCodeInternal     = "INTERNAL_ERROR"
 )
 
 // Helper functions to create common errors
@@ -144,7 +144,7 @@ func ErrorToUserMessage(err error) string {
 			return "An unexpected error occurred. Please try again later."
 		}
 	}
-	
+
 	// Handle standard errors
 	switch {
 	case errors.Is(err, ErrInvalidServerKey):

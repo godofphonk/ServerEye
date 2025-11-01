@@ -201,7 +201,7 @@ func (b *Bot) executeUptimeCommand(servers []ServerInfo, serverNum string) strin
 	}
 
 	bootTime := time.Unix(int64(uptimeInfo.BootTime), 0)
-	
+
 	return fmt.Sprintf(`⏰ **%s** System Uptime
 
 🚀 **Uptime:** %s

@@ -12,7 +12,7 @@ import (
 // StartContainer starts a Docker container
 func (c *Client) StartContainer(ctx context.Context, containerID string) (*protocol.ContainerActionResponse, error) {
 	c.logger.WithField("container_id", containerID).Info("Starting Docker container")
-	
+
 	// Check Docker availability first
 	if err := c.CheckDockerAvailability(ctx); err != nil {
 		return &protocol.ContainerActionResponse{
@@ -22,28 +22,28 @@ func (c *Client) StartContainer(ctx context.Context, containerID string) (*proto
 			Message:     err.Error(),
 		}, nil
 	}
-	
+
 	cmd := exec.CommandContext(ctx, "docker", "start", containerID)
 	output, err := cmd.CombinedOutput()
-	
+
 	response := &protocol.ContainerActionResponse{
 		ContainerID: containerID,
 		Action:      "start",
 		Success:     err == nil,
 		Message:     string(output),
 	}
-	
+
 	if err != nil {
 		c.logger.WithError(err).Error("Failed to start container")
 		response.Message = fmt.Sprintf("Failed to start container: %v", err)
 		return response, nil
 	}
-	
+
 	// Get updated container state
 	if state, stateErr := c.getContainerState(ctx, containerID); stateErr == nil {
 		response.NewState = state
 	}
-	
+
 	c.logger.Info("Container started successfully")
 	return response, nil
 }
@@ -51,7 +51,7 @@ func (c *Client) StartContainer(ctx context.Context, containerID string) (*proto
 // StopContainer stops a Docker container
 func (c *Client) StopContainer(ctx context.Context, containerID string) (*protocol.ContainerActionResponse, error) {
 	c.logger.WithField("container_id", containerID).Info("Stopping Docker container")
-	
+
 	// Check Docker availability first
 	if err := c.CheckDockerAvailability(ctx); err != nil {
 		return &protocol.ContainerActionResponse{
@@ -61,28 +61,28 @@ func (c *Client) StopContainer(ctx context.Context, containerID string) (*protoc
 			Message:     err.Error(),
 		}, nil
 	}
-	
+
 	cmd := exec.CommandContext(ctx, "docker", "stop", containerID)
 	output, err := cmd.CombinedOutput()
-	
+
 	response := &protocol.ContainerActionResponse{
 		ContainerID: containerID,
 		Action:      "stop",
 		Success:     err == nil,
 		Message:     string(output),
 	}
-	
+
 	if err != nil {
 		c.logger.WithError(err).Error("Failed to stop container")
 		response.Message = fmt.Sprintf("Failed to stop container: %v", err)
 		return response, nil
 	}
-	
+
 	// Get updated container state
 	if state, stateErr := c.getContainerState(ctx, containerID); stateErr == nil {
 		response.NewState = state
 	}
-	
+
 	c.logger.Info("Container stopped successfully")
 	return response, nil
 }
@@ -90,7 +90,7 @@ func (c *Client) StopContainer(ctx context.Context, containerID string) (*protoc
 // RestartContainer restarts a Docker container
 func (c *Client) RestartContainer(ctx context.Context, containerID string) (*protocol.ContainerActionResponse, error) {
 	c.logger.WithField("container_id", containerID).Info("Restarting Docker container")
-	
+
 	// Check Docker availability first
 	if err := c.CheckDockerAvailability(ctx); err != nil {
 		return &protocol.ContainerActionResponse{
@@ -100,28 +100,28 @@ func (c *Client) RestartContainer(ctx context.Context, containerID string) (*pro
 			Message:     err.Error(),
 		}, nil
 	}
-	
+
 	cmd := exec.CommandContext(ctx, "docker", "restart", containerID)
 	output, err := cmd.CombinedOutput()
-	
+
 	response := &protocol.ContainerActionResponse{
 		ContainerID: containerID,
 		Action:      "restart",
 		Success:     err == nil,
 		Message:     string(output),
 	}
-	
+
 	if err != nil {
 		c.logger.WithError(err).Error("Failed to restart container")
 		response.Message = fmt.Sprintf("Failed to restart container: %v", err)
 		return response, nil
 	}
-	
+
 	// Get updated container state
 	if state, stateErr := c.getContainerState(ctx, containerID); stateErr == nil {
 		response.NewState = state
 	}
-	
+
 	c.logger.Info("Container restarted successfully")
 	return response, nil
 }

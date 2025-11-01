@@ -25,8 +25,8 @@ var (
 
 // InputValidator implements the Validator interface
 type InputValidator struct {
-	serverKeyRegex    *regexp.Regexp
-	containerIDRegex  *regexp.Regexp
+	serverKeyRegex      *regexp.Regexp
+	containerIDRegex    *regexp.Regexp
 	protectedContainers []string
 }
 
@@ -51,15 +51,15 @@ func (v *InputValidator) ValidateServerKey(key string) error {
 	if key == "" {
 		return ErrInvalidServerKey
 	}
-	
+
 	if !strings.HasPrefix(key, "srv_") {
 		return ErrInvalidServerKey
 	}
-	
+
 	if !v.serverKeyRegex.MatchString(key) {
 		return ErrInvalidServerKey
 	}
-	
+
 	return nil
 }
 
@@ -68,16 +68,16 @@ func (v *InputValidator) ValidateServerName(name string) error {
 	if name == "" {
 		return ErrInvalidServerName
 	}
-	
+
 	if len(name) > 50 {
 		return ErrServerNameTooLong
 	}
-	
+
 	// Check for potentially dangerous characters
 	if strings.ContainsAny(name, "<>\"'&;") {
 		return ErrInvalidServerName
 	}
-	
+
 	return nil
 }
 
@@ -86,15 +86,15 @@ func (v *InputValidator) ValidateContainerID(id string) error {
 	if len(id) < 3 {
 		return ErrContainerIDTooShort
 	}
-	
+
 	if len(id) > 64 {
 		return ErrContainerIDTooLong
 	}
-	
+
 	if !v.containerIDRegex.MatchString(id) {
 		return ErrInvalidContainerID
 	}
-	
+
 	// Check if container is protected
 	idLower := strings.ToLower(id)
 	for _, protected := range v.protectedContainers {
@@ -102,7 +102,7 @@ func (v *InputValidator) ValidateContainerID(id string) error {
 			return ErrProtectedContainer
 		}
 	}
-	
+
 	return nil
 }
 
@@ -111,9 +111,9 @@ func (v *InputValidator) SanitizeInput(input string) string {
 	// Remove null bytes and control characters
 	input = strings.ReplaceAll(input, "\x00", "")
 	input = regexp.MustCompile(`[\x00-\x1f\x7f]`).ReplaceAllString(input, "")
-	
+
 	// Trim whitespace
 	input = strings.TrimSpace(input)
-	
+
 	return input
 }

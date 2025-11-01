@@ -99,7 +99,7 @@ func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, erro
 	// Subscribe to response channel first
 	respChannel := redis.GetResponseChannel(serverKey)
 	b.logger.Info("Подписались на канал Redis")
-	
+
 	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
@@ -127,7 +127,7 @@ func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, erro
 		select {
 		case respData := <-subscription.Channel():
 			b.logger.Debug("Получен ответ от агента")
-			
+
 			resp, err := protocol.FromJSON(respData)
 			if err != nil {
 				b.logger.Error("Failed to parse response", err)
@@ -191,11 +191,11 @@ func (b *Bot) formatContainers(containers *protocol.ContainersPayload) string {
 		result.WriteString(fmt.Sprintf("%s **%s**\n", statusEmoji, container.Name))
 		result.WriteString(fmt.Sprintf("📷 Image: `%s`\n", container.Image))
 		result.WriteString(fmt.Sprintf("🔄 Status: %s\n", container.Status))
-		
+
 		if len(container.Ports) > 0 {
 			result.WriteString(fmt.Sprintf("🔌 Ports: %s\n", strings.Join(container.Ports, ", ")))
 		}
-		
+
 		result.WriteString("\n")
 	}
 
@@ -206,10 +206,10 @@ func (b *Bot) formatContainers(containers *protocol.ContainersPayload) string {
 func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 	// Removed mutex - it was blocking response reception
 	b.logger.Info("🔵 [MEMORY] Starting getMemoryInfo")
-	
+
 	cmd := protocol.NewMessage(protocol.TypeGetMemoryInfo, nil)
 	b.logger.Info("🔵 [MEMORY] Command ID: " + cmd.ID)
-	
+
 	data, err := cmd.ToJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize command: %v", err)
@@ -217,7 +217,7 @@ func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 
 	respChannel := redis.GetResponseChannel(serverKey)
 	b.logger.Info("🔵 [MEMORY] Subscribing to response channel: " + respChannel)
-	
+
 	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to response: %v", err)
@@ -234,11 +234,11 @@ func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 
 	cmdChannel := redis.GetCommandChannel(serverKey)
 	b.logger.Info("🔵 [MEMORY] Publishing command to: " + cmdChannel)
-	
+
 	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
 		return nil, fmt.Errorf("failed to send command: %v", err)
 	}
-	
+
 	b.logger.Info("🔵 [MEMORY] Command published successfully, waiting for response...")
 
 	timeout := time.After(10 * time.Second)
@@ -251,7 +251,7 @@ func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 				b.logger.Error("🔴 [MEMORY] Failed to parse JSON", err)
 				continue
 			}
-			
+
 			b.logger.Info("🔵 [MEMORY] Parsed response - ID: " + resp.ID + ", Type: " + string(resp.Type))
 			b.logger.Info("🔵 [MEMORY] Expected ID: " + cmd.ID)
 
@@ -259,7 +259,7 @@ func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 				b.logger.Info("🟡 [MEMORY] ID mismatch, skipping...")
 				continue
 			}
-			
+
 			b.logger.Info("🟢 [MEMORY] ID matched! Processing response...")
 
 			if resp.Type == protocol.TypeErrorResponse {
@@ -280,7 +280,7 @@ func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 				return nil, fmt.Errorf("invalid memory data in response")
 			}
 
-			b.logger.Error("🔴 [MEMORY] Unexpected response type: " + string(resp.Type), nil)
+			b.logger.Error("🔴 [MEMORY] Unexpected response type: "+string(resp.Type), nil)
 			return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
 
 		case <-timeout:
@@ -293,7 +293,7 @@ func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
 // getDiskInfo requests disk information from agent
 func (b *Bot) getDiskInfo(serverKey string) (*protocol.DiskInfoPayload, error) {
 	// Removed mutex - it was blocking response reception
-	
+
 	cmd := protocol.NewMessage(protocol.TypeGetDiskInfo, nil)
 	data, err := cmd.ToJSON()
 	if err != nil {
@@ -357,7 +357,7 @@ func (b *Bot) getDiskInfo(serverKey string) (*protocol.DiskInfoPayload, error) {
 // getUptime requests uptime information from agent
 func (b *Bot) getUptime(serverKey string) (*protocol.UptimeInfo, error) {
 	// Removed mutex - it was blocking response reception
-	
+
 	cmd := protocol.NewMessage(protocol.TypeGetUptime, nil)
 	data, err := cmd.ToJSON()
 	if err != nil {
@@ -421,7 +421,7 @@ func (b *Bot) getUptime(serverKey string) (*protocol.UptimeInfo, error) {
 // getProcesses requests processes information from agent
 func (b *Bot) getProcesses(serverKey string) (*protocol.ProcessesPayload, error) {
 	// Removed mutex - it was blocking response reception
-	
+
 	cmd := protocol.NewMessage(protocol.TypeGetProcesses, nil)
 	data, err := cmd.ToJSON()
 	if err != nil {

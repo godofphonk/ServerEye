@@ -22,15 +22,15 @@ import (
 const (
 	defaultConfigPath = "/etc/servereye/config.yaml"
 	defaultLogLevel   = "info"
-	defaultBotURL     = "http://192.168.0.105:8090"  // ServerEye bot URL
+	defaultBotURL     = "http://192.168.0.105:8090" // ServerEye bot URL
 )
 
 // KeyRegistrationRequest represents a request to register a generated key
 type KeyRegistrationRequest struct {
-	SecretKey     string `json:"secret_key"`
-	AgentVersion  string `json:"agent_version,omitempty"`
-	OSInfo        string `json:"os_info,omitempty"`
-	Hostname      string `json:"hostname,omitempty"`
+	SecretKey    string `json:"secret_key"`
+	AgentVersion string `json:"agent_version,omitempty"`
+	OSInfo       string `json:"os_info,omitempty"`
+	Hostname     string `json:"hostname,omitempty"`
 }
 
 func main() {
@@ -92,7 +92,7 @@ func main() {
 // setupLogger configures and returns a logger instance
 func setupLogger(level string) *logrus.Logger {
 	logger := logrus.New()
-	
+
 	// Set log level
 	logLevel, err := logrus.ParseLevel(level)
 	if err != nil {
@@ -122,7 +122,7 @@ func handleInstall() error {
 	// Try to use system config directory, fallback to user home
 	configDir := "/etc/servereye"
 	logPath := "/var/log/servereye/agent.log"
-	
+
 	// Test if we can write to system directories
 	testFile := configDir + "/test"
 	if err := os.MkdirAll(configDir, 0755); err != nil || os.WriteFile(testFile, []byte("test"), 0644) != nil {
@@ -171,7 +171,7 @@ logging:
 	} else {
 		logDir = configDir + "/logs"
 	}
-	
+
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return fmt.Errorf("failed to create log directory: %v", err)
 	}
@@ -210,7 +210,7 @@ func generateSecretKey() (string, error) {
 // registerKeyWithBot registers the generated key with the bot via HTTP API
 func registerKeyWithBot(secretKey string) error {
 	hostname, _ := os.Hostname()
-	
+
 	req := KeyRegistrationRequest{
 		SecretKey:    secretKey,
 		AgentVersion: "1.0.0",
@@ -225,7 +225,7 @@ func registerKeyWithBot(secretKey string) error {
 
 	// Try to register with bot (non-blocking)
 	fmt.Printf("🔗 Connecting to bot at: %s\n", defaultBotURL+"/api/register-key")
-	
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(defaultBotURL+"/api/register-key", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {

@@ -12,7 +12,7 @@ func TestCPUMetrics_GetTemperature(t *testing.T) {
 	// Test with mock temperature file
 	tempDir := t.TempDir()
 	tempFile := filepath.Join(tempDir, "temp")
-	
+
 	// Write mock temperature data (45.5°C in millidegrees)
 	err := os.WriteFile(tempFile, []byte("45500\n"), 0644)
 	if err != nil {
@@ -76,7 +76,7 @@ func TestCPUMetrics_readTemperatureFromFile_NonExistentFile(t *testing.T) {
 
 func TestCPUMetrics_GetSensorInfo(t *testing.T) {
 	cpu := NewCPUMetrics()
-	
+
 	info := cpu.GetSensorInfo()
 	if info == "" {
 		t.Error("Expected sensor info, got empty string")
@@ -85,7 +85,7 @@ func TestCPUMetrics_GetSensorInfo(t *testing.T) {
 
 func BenchmarkCPUMetrics_GetTemperature(b *testing.B) {
 	cpu := NewCPUMetrics()
-	
+
 	// Create a mock temperature file for benchmarking
 	tempDir := b.TempDir()
 	tempFile := filepath.Join(tempDir, "temp")

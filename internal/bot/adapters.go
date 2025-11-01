@@ -57,7 +57,7 @@ func (l *LogrusAdapter) Warn(msg string) {
 
 // DatabaseAdapter adapts sql.DB to our Database interface
 type DatabaseAdapter struct {
-	db *sql.DB
+	db  *sql.DB
 	bot *Bot // Reference to bot for existing methods
 }
 

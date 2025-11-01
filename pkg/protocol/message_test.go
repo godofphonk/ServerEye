@@ -13,9 +13,9 @@ func TestNewMessage(t *testing.T) {
 	payload := map[string]interface{}{
 		"test": "data",
 	}
-	
+
 	msg := NewMessage(TypeGetCPUTemp, payload)
-	
+
 	assert.NotEmpty(t, msg.ID)
 	assert.Equal(t, TypeGetCPUTemp, msg.Type)
 	assert.Equal(t, "1.0", msg.Version)
@@ -29,18 +29,18 @@ func TestMessage_ToJSON(t *testing.T) {
 		Unit:        "celsius",
 		Sensor:      "/sys/class/thermal/thermal_zone0/temp",
 	}
-	
+
 	msg := NewMessage(TypeCPUTempResponse, payload)
-	
+
 	data, err := msg.ToJSON()
 	require.NoError(t, err)
 	assert.NotEmpty(t, data)
-	
+
 	// Verify it's valid JSON
 	var result map[string]interface{}
 	err = json.Unmarshal(data, &result)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, string(TypeCPUTempResponse), result["type"])
 	assert.Equal(t, "1.0", result["version"])
 	assert.NotEmpty(t, result["id"])
@@ -50,13 +50,13 @@ func TestMessage_ToJSON(t *testing.T) {
 
 func TestFromJSON(t *testing.T) {
 	original := NewMessage(TypeGetContainers, nil)
-	
+
 	data, err := original.ToJSON()
 	require.NoError(t, err)
-	
+
 	parsed, err := FromJSON(data)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, original.ID, parsed.ID)
 	assert.Equal(t, original.Type, parsed.Type)
 	assert.Equal(t, original.Version, parsed.Version)
@@ -81,7 +81,7 @@ func TestMessageTypes(t *testing.T) {
 		TypePong,
 		TypeErrorResponse,
 	}
-	
+
 	for _, msgType := range types {
 		assert.NotEmpty(t, string(msgType), "Message type should not be empty")
 	}
@@ -94,17 +94,17 @@ func TestPayloadStructs(t *testing.T) {
 			Unit:        "celsius",
 			Sensor:      "/sys/class/thermal/thermal_zone0/temp",
 		}
-		
+
 		data, err := json.Marshal(payload)
 		require.NoError(t, err)
-		
+
 		var unmarshaled CPUTempPayload
 		err = json.Unmarshal(data, &unmarshaled)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, payload, unmarshaled)
 	})
-	
+
 	t.Run("ContainerInfo", func(t *testing.T) {
 		container := ContainerInfo{
 			ID:     "abc123456789",
@@ -115,17 +115,17 @@ func TestPayloadStructs(t *testing.T) {
 			Ports:  []string{"80/tcp", "443/tcp"},
 			Labels: map[string]string{"env": "production"},
 		}
-		
+
 		data, err := json.Marshal(container)
 		require.NoError(t, err)
-		
+
 		var unmarshaled ContainerInfo
 		err = json.Unmarshal(data, &unmarshaled)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, container, unmarshaled)
 	})
-	
+
 	t.Run("ContainersPayload", func(t *testing.T) {
 		payload := ContainersPayload{
 			Containers: []ContainerInfo{
@@ -144,30 +144,30 @@ func TestPayloadStructs(t *testing.T) {
 			},
 			Total: 2,
 		}
-		
+
 		data, err := json.Marshal(payload)
 		require.NoError(t, err)
-		
+
 		var unmarshaled ContainersPayload
 		err = json.Unmarshal(data, &unmarshaled)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, payload, unmarshaled)
 	})
-	
+
 	t.Run("ErrorPayload", func(t *testing.T) {
 		payload := ErrorPayload{
 			ErrorCode:    ErrorSensorNotFound,
 			ErrorMessage: "Temperature sensor not found",
 		}
-		
+
 		data, err := json.Marshal(payload)
 		require.NoError(t, err)
-		
+
 		var unmarshaled ErrorPayload
 		err = json.Unmarshal(data, &unmarshaled)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, payload, unmarshaled)
 	})
 }
@@ -179,7 +179,7 @@ func TestErrorCodes(t *testing.T) {
 		ErrorCommandTimeout,
 		ErrorInvalidCommand,
 	}
-	
+
 	for _, code := range errorCodes {
 		assert.NotEmpty(t, code, "Error code should not be empty")
 	}
@@ -232,26 +232,26 @@ func TestMessage_JSONRoundTrip(t *testing.T) {
 			payload: nil,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create message
 			original := NewMessage(tc.msgType, tc.payload)
-			
+
 			// Convert to JSON
 			data, err := original.ToJSON()
 			require.NoError(t, err)
-			
+
 			// Parse back from JSON
 			parsed, err := FromJSON(data)
 			require.NoError(t, err)
-			
+
 			// Verify basic fields
 			assert.Equal(t, original.ID, parsed.ID)
 			assert.Equal(t, original.Type, parsed.Type)
 			assert.Equal(t, original.Version, parsed.Version)
 			assert.WithinDuration(t, original.Timestamp, parsed.Timestamp, time.Second)
-			
+
 			// Verify payload (this is a basic check since payload is interface{})
 			if tc.payload != nil {
 				assert.NotNil(t, parsed.Payload)
