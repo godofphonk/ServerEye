@@ -418,12 +418,6 @@ User → /temp → Bot
 - Telegram username (optional, for display)
 - Server hostnames (user-provided)
 
-**What we DON'T store:**
-- Phone numbers
-- Email addresses
-- Real names (unless in username)
-- Payment information
-
 **What we log:**
 - Command execution (without arguments)
 - Error messages (sanitized)
@@ -571,60 +565,17 @@ EOF
 chmod +x update-agent.sh
 ```
 
-**Best Practices:**
-
-1. ✅ Test updates on dev/staging server first
-2. ✅ Update one server at a time (canary deployment)
-3. ✅ Keep backups before updating
-4. ✅ Monitor logs after update
-5. ✅ Have rollback plan ready
-6. ✅ Update during maintenance window
-
-### Automated Updates (Future)
-
-**Planned features:**
-- Version checking from bot
-- One-click updates via Telegram
-- Automatic rollback on failure
-- Update notifications
-- Gradual rollout (canary/blue-green)
-
 ## Reporting Vulnerabilities
 
 If you discover a security vulnerability:
 
 1. **DO NOT** create a public GitHub issue
-2. Email: [your-security-email@example.com]
+2. Email: [cacaca86@mail.ru]
 3. Include:
    - Description of vulnerability
    - Steps to reproduce
    - Potential impact
    - Suggested fix (optional)
-
-**We commit to:**
-- Acknowledge within 48 hours
-- Provide timeline for fix
-- Credit reporter (if desired)
-- Responsible disclosure
-
-## Security Checklist
-
-Before deploying to production:
-
-- [ ] Reviewed installation scripts
-- [ ] Changed default credentials
-- [ ] Enabled TLS/HTTPS everywhere
-- [ ] Configured firewalls
-- [ ] Set up monitoring and alerting
-- [ ] Implemented backup strategy
-- [ ] Restricted file permissions
-- [ ] Enabled audit logging
-- [ ] Tested disaster recovery
-- [ ] Documented security procedures
-- [ ] Trained team on security practices
-- [ ] Established incident response plan
-
----
 
 **See also:**
 - [Architecture](ARCHITECTURE.md)
