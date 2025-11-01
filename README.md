@@ -1,5 +1,6 @@
 # 🔍 ServerEye - Server Monitoring via Telegram Bot
 
+[![Website](https://img.shields.io/badge/Website-servereye.dev-blue?style=flat-square&logo=google-chrome)](https://servereye.dev)
 [![CI Status](https://github.com/godofphonk/ServerEye/workflows/CI/badge.svg)](https://github.com/godofphonk/ServerEye/actions)
 [![Release](https://img.shields.io/github/v/release/godofphonk/ServerEye?style=flat-square)](https://github.com/godofphonk/ServerEye/releases/latest)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)](https://golang.org/)
@@ -8,6 +9,8 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 **ServerEye** is a production-ready server monitoring system that lets you monitor your servers and manage Docker containers through a Telegram bot. Built with Go and modern microservices architecture.
+
+🌐 **Website:** [servereye.dev](https://servereye.dev)
 
 ## ✨ Key Features
 
