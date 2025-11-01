@@ -20,19 +20,18 @@
 
 ### Installation 
 
-**1. Install Agent on Your Server (Automatic):**
+**1.Install Agent on Your Server (Automatic):**
 ```bash
 wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
 ```
 
 > 🔒 **Security:** Script automatically downloads latest release from GitHub and verifies checksums. [Review script](scripts/install-agent.sh)
 
-**OR Download Binary Manually:**
+### **OR Download Binary Manually:**
 
 Get the latest binaries from [GitHub Releases](https://github.com/godofphonk/ServerEye/releases/latest):
 - 🐧 Linux (amd64): `servereye-agent-linux-amd64`
-- 🐧 Linux (arm64): `servereye-agent-linux-arm64` 
-- 🪟 Windows: `servereye-agent-windows-amd64.exe`
+- 🐧 Linux (arm64): `servereye-agent-linux-arm64`
 
 ```bash
 # Example manual install:
