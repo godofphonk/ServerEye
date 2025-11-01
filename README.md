@@ -1,6 +1,7 @@
 # 🔍 ServerEye - Server Monitoring via Telegram Bot
 
 [![CI Status](https://github.com/godofphonk/ServerEye/workflows/CI/badge.svg)](https://github.com/godofphonk/ServerEye/actions)
+[![Release](https://img.shields.io/github/v/release/godofphonk/ServerEye?style=flat-square)](https://github.com/godofphonk/ServerEye/releases/latest)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=flat-square&logo=telegram)](https://telegram.org/)
@@ -20,12 +21,26 @@
 
 ### Installation 
 
-**1. Install Agent on Your Server:**
+**1. Install Agent on Your Server (Automatic):**
 ```bash
 wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
 ```
 
-> 🔒 **Security:** Script verifies SHA256 checksums. [Review it first?](scripts/install-agent.sh)
+> 🔒 **Security:** Script automatically downloads latest release from GitHub and verifies checksums. [Review script](scripts/install-agent.sh)
+
+**OR Download Binary Manually:**
+
+Get the latest binaries from [GitHub Releases](https://github.com/godofphonk/ServerEye/releases/latest):
+- 🐧 Linux (amd64): `servereye-agent-linux-amd64`
+- 🐧 Linux (arm64): `servereye-agent-linux-arm64` 
+- 🪟 Windows: `servereye-agent-windows-amd64.exe`
+
+```bash
+# Example manual install:
+wget https://github.com/godofphonk/ServerEye/releases/latest/download/servereye-agent-linux-amd64
+chmod +x servereye-agent-linux-amd64
+sudo mv servereye-agent-linux-amd64 /usr/local/bin/servereye-agent
+```
 
 **2. Connect to Telegram:**
 
