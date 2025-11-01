@@ -188,22 +188,26 @@
                 </div>
                 <div class="tab-content">
                     <div class="tab-pane active" id="linux">
-                        <pre><code># One-line installation:
+                        <pre><code># 🚀 Automatic installation (recommended):
 wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
 
-# Alternative (if wget not available):
-curl -sSL https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
+# 📦 Or download binary manually:
+wget https://github.com/godofphonk/ServerEye/releases/latest/download/servereye-agent-linux-amd64
+chmod +x servereye-agent-linux-amd64
+sudo mv servereye-agent-linux-amd64 /usr/local/bin/servereye-agent
 
+# 🔒 Script automatically downloads latest release and verifies checksums
 # That's it! 🎉</code></pre>
                     </div>
                     <div class="tab-pane" id="windows">
-                        <pre><code># 1. Download ServerEye (Run PowerShell as Administrator)
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-windows-amd64.exe" -OutFile "servereye.exe"
+                        <pre><code># 📦 Download latest release from GitHub:
+# https://github.com/godofphonk/ServerEye/releases/latest
 
-# 2. Install
-.\servereye.exe --install
+# 1. Download servereye-agent-windows-amd64.exe
+# 2. Run PowerShell as Administrator:
+.\servereye-agent-windows-amd64.exe --install
 
-# 3. Copy the server key it shows and send to your Telegram bot
+# 3. Copy the server key and send to @ServerEyeBot in Telegram
 
 # That's it! 🎉</code></pre>
                     </div>
