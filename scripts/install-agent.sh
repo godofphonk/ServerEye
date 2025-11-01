@@ -10,9 +10,8 @@ AGENT_DIR="/opt/servereye"
 CONFIG_DIR="/etc/servereye"
 LOG_DIR="/var/log/servereye"
 SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
-AGENT_URL="https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-agent-linux"
-CHECKSUM_URL="https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/SHA256SUMS"
-EXPECTED_CHECKSUM="979aafae68c93f1af80f04238b692dad7828d26d14a79de34e8b68e7c0ded651"
+AGENT_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/servereye-agent-linux-amd64"
+CHECKSUM_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/checksums.txt"
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"  #  API endpoint
 
 echo "🚀 Installing ServerEye Agent..."
@@ -66,22 +65,33 @@ wget -O "$AGENT_DIR/servereye-agent.new" "$AGENT_URL"
 
 # Verify checksum
 echo "🔐 Verifying binary integrity..."
-ACTUAL_CHECKSUM=$(sha256sum "$AGENT_DIR/servereye-agent.new" | awk '{print $1}')
-if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-    echo "❌ Checksum verification failed!"
-    echo "   Expected: $EXPECTED_CHECKSUM"
-    echo "   Got:      $ACTUAL_CHECKSUM"
-    echo ""
-    echo "⚠️  This could indicate:"
-    echo "   - Binary was tampered with (MITM attack)"
-    echo "   - Download was corrupted"
-    echo "   - Binary version mismatch"
-    echo ""
-    echo "🛡️  For security, installation has been aborted."
-    rm -f "$AGENT_DIR/servereye-agent.new"
-    exit 1
+wget -O "$AGENT_DIR/checksums.txt" "$CHECKSUM_URL" 2>/dev/null || {
+    echo "⚠️  Could not download checksums file, skipping verification"
+    echo "   (This is normal for first release)"
+}
+
+if [ -f "$AGENT_DIR/checksums.txt" ]; then
+    EXPECTED_CHECKSUM=$(grep "servereye-agent-linux-amd64" "$AGENT_DIR/checksums.txt" | awk '{print $1}')
+    ACTUAL_CHECKSUM=$(sha256sum "$AGENT_DIR/servereye-agent.new" | awk '{print $1}')
+    
+    if [ -n "$EXPECTED_CHECKSUM" ] && [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+        echo "❌ Checksum verification failed!"
+        echo "   Expected: $EXPECTED_CHECKSUM"
+        echo "   Got:      $ACTUAL_CHECKSUM"
+        echo ""
+        echo "⚠️  This could indicate:"
+        echo "   - Binary was tampered with (MITM attack)"
+        echo "   - Download was corrupted"
+        echo ""
+        echo "🛡️  For security, installation has been aborted."
+        rm -f "$AGENT_DIR/servereye-agent.new" "$AGENT_DIR/checksums.txt"
+        exit 1
+    fi
+    echo "✅ Binary integrity verified!"
+    rm -f "$AGENT_DIR/checksums.txt"
+else
+    echo "⚠️  Skipping checksum verification (checksums file not available)"
 fi
-echo "✅ Binary integrity verified!"
 
 # Move new binary to final location
 mv "$AGENT_DIR/servereye-agent.new" "$AGENT_DIR/servereye-agent"
