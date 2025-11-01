@@ -1,0 +1,79 @@
+# Имя workflow - будет показываться на GitHub
+name: CI
+
+# Когда запускать этот workflow?
+on:
+  push:
+    branches: [ master, main ]  # При push в master или main
+  pull_request:
+    branches: [ master, main ]  # При создании Pull Request
+
+# Какие задачи (jobs) выполнять?
+jobs:
+  # Job 1: Сборка и тестирование
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest  # На какой ОС запускать (GitHub предоставляет бесплатно)
+    
+    steps:
+      # Шаг 1: Скачать код из репозитория
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Шаг 2: Установить Go
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'  # Версия Go из твоего проекта
+      
+      # Шаг 3: Кэшировать зависимости (чтобы быстрее работало)
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      
+      # Шаг 4: Скачать зависимости
+      - name: Download dependencies
+        run: go mod download
+      
+      # Шаг 5: Проверить что код компилируется
+      - name: Build bot
+        run: go build -v ./cmd/bot
+      
+      - name: Build agent
+        run: go build -v ./cmd/agent
+      
+      # Шаг 6: Запустить тесты (если есть)
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      
+      # Шаг 7: Загрузить coverage report (показывает какая часть кода покрыта тестами)
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.txt
+          fail_ci_if_error: false  # Не провалить CI если codecov не работает
+  
+  # Job 2: Проверка качества кода (Linting)
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      
+      # Запускаем golangci-lint - проверяет код на ошибки и стиль
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          args: --timeout=5m  # Таймаут 5 минут
