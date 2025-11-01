@@ -1,3 +1,18 @@
+# ServerEye Docker Compose Configuration
+# 
+# Security Configuration:
+# - All services are isolated in internal network
+# - Redis requires password authentication
+# - PostgreSQL requires password authentication  
+# - Ports are NOT exposed to host (except bot API port 8090)
+# - Use .env file for sensitive credentials (see .env.example)
+#
+# Setup:
+# 1. Copy .env.example to .env
+# 2. Generate strong passwords: openssl rand -base64 32
+# 3. Fill in TELEGRAM_TOKEN, DB_PASSWORD, REDIS_PASSWORD
+# 4. Run: docker-compose up -d
+#
 version: '3.8'
 
 services:
@@ -7,7 +22,7 @@ services:
       dockerfile: Dockerfile.bot
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - DATABASE_URL=postgresql://servereye:${DB_PASSWORD}@postgres:5432/servereye?sslmode=disable
       - ENVIRONMENT=production
     ports:
@@ -23,16 +38,15 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     restart: unless-stopped
     networks:
       - servereye-network
-    ports:
-      - "6379:6379"  # Expose for agent connection
+    # Ports are NOT exposed - only accessible within internal network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -49,8 +63,10 @@ services:
     restart: unless-stopped
     networks:
       - servereye-network
-    ports:
-      - "5432:5432"  # Expose for debugging
+    # Ports are NOT exposed - only accessible within internal network
+    # Uncomment for local debugging only:
+    # ports:
+    #   - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U servereye -d servereye"]
       interval: 10s

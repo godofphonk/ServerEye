@@ -97,26 +97,49 @@ go mod download
 
 ### 3. Set Up Infrastructure
 
-**Using Docker Compose:**
+**Using Docker Compose (Recommended):**
 
 ```bash
 cd deployments
-docker-compose up -d postgres redis
+
+# Create .env file from example
+cp ../.env.example ../.env
+
+# Generate strong passwords
+openssl rand -base64 32  # Use for DB_PASSWORD
+openssl rand -base64 32  # Use for REDIS_PASSWORD
+
+# Edit .env file and fill in:
+# - TELEGRAM_TOKEN (from @BotFather)
+# - DB_PASSWORD (generated above)
+# - REDIS_PASSWORD (generated above)
+
+# Start services
+docker-compose up -d
 ```
 
-**Manual Setup:**
+> 🔒 **Security:** Docker Compose automatically configures secure passwords and internal networking.
+
+**Manual Setup (Development Only):**
 
 ```bash
-# PostgreSQL
+# Generate strong passwords
+DB_PASS=$(openssl rand -base64 32)
+REDIS_PASS=$(openssl rand -base64 32)
+
+# PostgreSQL with password
 docker run -d --name servereye-postgres \
   -e POSTGRES_DB=servereye \
   -e POSTGRES_USER=servereye \
-  -e POSTGRES_PASSWORD=password \
-  -p 5432:5432 postgres:14
+  -e POSTGRES_PASSWORD="$DB_PASS" \
+  -p 127.0.0.1:5432:5432 postgres:15-alpine
 
-# Redis
+# Redis with password
 docker run -d --name servereye-redis \
-  -p 6379:6379 redis:7-alpine
+  redis:7-alpine redis-server --requirepass "$REDIS_PASS"
+
+echo "DB_PASSWORD=$DB_PASS"
+echo "REDIS_PASSWORD=$REDIS_PASS"
 ```
 
 ### 4. Configure Environment
@@ -125,8 +148,8 @@ docker run -d --name servereye-redis \
 
 ```bash
 export TELEGRAM_TOKEN="your_bot_token_here"
-export REDIS_URL="redis://localhost:6379"
-export DATABASE_URL="postgresql://servereye:password@localhost:5432/servereye?sslmode=disable"
+export REDIS_URL="redis://:your_redis_password@localhost:6379"
+export DATABASE_URL="postgresql://servereye:your_db_password@localhost:5432/servereye?sslmode=disable"
 ```
 
 **Agent configuration:**
