@@ -15,7 +15,6 @@
 - 🐳 **Docker Management** - Start, stop, restart containers via Telegram
 - 🔒 **Secure Architecture** - HTTPS, Cloudflare tunnels, key-based authentication
 - 🌐 **Multi-server Support** - Monitor unlimited servers from one bot
-- 🏗️ **Production Ready** - Enterprise-level code, structured logging, error handling
 
 ## 🚀 Quick Start
 
