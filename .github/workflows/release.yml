@@ -32,10 +32,6 @@ jobs:
           echo "Building bot for Linux..."
           GOOS=linux GOARCH=amd64 go build -o servereye-bot-linux-amd64 -ldflags="-s -w" ./cmd/bot
           
-          echo "Building bot for macOS..."
-          GOOS=darwin GOARCH=amd64 go build -o servereye-bot-darwin-amd64 -ldflags="-s -w" ./cmd/bot
-          GOOS=darwin GOARCH=arm64 go build -o servereye-bot-darwin-arm64 -ldflags="-s -w" ./cmd/bot
-          
           echo "Building bot for Windows..."
           GOOS=windows GOARCH=amd64 go build -o servereye-bot-windows-amd64.exe -ldflags="-s -w" ./cmd/bot
           
@@ -43,10 +39,6 @@ jobs:
           echo "Building agent for Linux..."
           GOOS=linux GOARCH=amd64 go build -o servereye-agent-linux-amd64 -ldflags="-s -w" ./cmd/agent
           GOOS=linux GOARCH=arm64 go build -o servereye-agent-linux-arm64 -ldflags="-s -w" ./cmd/agent
-          
-          echo "Building agent for macOS..."
-          GOOS=darwin GOARCH=amd64 go build -o servereye-agent-darwin-amd64 -ldflags="-s -w" ./cmd/agent
-          GOOS=darwin GOARCH=arm64 go build -o servereye-agent-darwin-arm64 -ldflags="-s -w" ./cmd/agent
           
           echo "Building agent for Windows..."
           GOOS=windows GOARCH=amd64 go build -o servereye-agent-windows-amd64.exe -ldflags="-s -w" ./cmd/agent
@@ -66,17 +58,13 @@ jobs:
             ### 📦 Downloads
             
             **Bot (Telegram Bot Server):**
-            - Linux (amd64): `servereye-bot-linux-amd64`
-            - macOS (Intel): `servereye-bot-darwin-amd64`
-            - macOS (M1/M2): `servereye-bot-darwin-arm64`
-            - Windows: `servereye-bot-windows-amd64.exe`
+            - 🐧 Linux (amd64): `servereye-bot-linux-amd64`
+            - 🪟 Windows (amd64): `servereye-bot-windows-amd64.exe`
             
             **Agent (Server Monitoring Agent):**
-            - Linux (amd64): `servereye-agent-linux-amd64`
-            - Linux (arm64): `servereye-agent-linux-arm64`
-            - macOS (Intel): `servereye-agent-darwin-amd64`
-            - macOS (M1/M2): `servereye-agent-darwin-arm64`
-            - Windows: `servereye-agent-windows-amd64.exe`
+            - 🐧 Linux (amd64): `servereye-agent-linux-amd64`
+            - 🐧 Linux (arm64): `servereye-agent-linux-arm64` - для Raspberry Pi, AWS Graviton
+            - 🪟 Windows (amd64): `servereye-agent-windows-amd64.exe`
             
             ### 📝 Installation
             
