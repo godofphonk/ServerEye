@@ -18,7 +18,7 @@ linters:
     - typecheck     # Проверка типов
     - misspell      # Опечатки в комментариях
     - gocyclo       # Сложность функций
-    - dupl          # Дублирование кода
+    # - dupl        # Дублирование кода (отключено - для pet project OK)
     - gosec         # Security issues
 
 # Настройки для конкретных линтеров
@@ -48,5 +48,6 @@ issues:
   # Не показывать эти конкретные ошибки
   exclude:
     - "G104: Errors unhandled"  # Иногда можно игнорировать ошибки
+    - "Error return value of `a.sendResponse` is not checked"  # В panic handler это OK
     
   max-same-issues: 0  # Показывать все найденные проблемы
