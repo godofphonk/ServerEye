@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Запускается при создании тега вида v1.0.0, v1.2.3 и т.д.
+
+permissions:
+  contents: write  # Нужно для создания релиза
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        run: |
+          # Bot binaries
+          echo "Building bot for Linux..."
+          GOOS=linux GOARCH=amd64 go build -o servereye-bot-linux-amd64 -ldflags="-s -w" ./cmd/bot
+          
+          echo "Building bot for macOS..."
+          GOOS=darwin GOARCH=amd64 go build -o servereye-bot-darwin-amd64 -ldflags="-s -w" ./cmd/bot
+          GOOS=darwin GOARCH=arm64 go build -o servereye-bot-darwin-arm64 -ldflags="-s -w" ./cmd/bot
+          
+          echo "Building bot for Windows..."
+          GOOS=windows GOARCH=amd64 go build -o servereye-bot-windows-amd64.exe -ldflags="-s -w" ./cmd/bot
+          
+          # Agent binaries
+          echo "Building agent for Linux..."
+          GOOS=linux GOARCH=amd64 go build -o servereye-agent-linux-amd64 -ldflags="-s -w" ./cmd/agent
+          GOOS=linux GOARCH=arm64 go build -o servereye-agent-linux-arm64 -ldflags="-s -w" ./cmd/agent
+          
+          echo "Building agent for macOS..."
+          GOOS=darwin GOARCH=amd64 go build -o servereye-agent-darwin-amd64 -ldflags="-s -w" ./cmd/agent
+          GOOS=darwin GOARCH=arm64 go build -o servereye-agent-darwin-arm64 -ldflags="-s -w" ./cmd/agent
+          
+          echo "Building agent for Windows..."
+          GOOS=windows GOARCH=amd64 go build -o servereye-agent-windows-amd64.exe -ldflags="-s -w" ./cmd/agent
+
+      - name: Generate checksums
+        run: |
+          sha256sum servereye-* > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## 🎉 ServerEye ${{ steps.version.outputs.VERSION }}
+            
+            ### 📦 Downloads
+            
+            **Bot (Telegram Bot Server):**
+            - Linux (amd64): `servereye-bot-linux-amd64`
+            - macOS (Intel): `servereye-bot-darwin-amd64`
+            - macOS (M1/M2): `servereye-bot-darwin-arm64`
+            - Windows: `servereye-bot-windows-amd64.exe`
+            
+            **Agent (Server Monitoring Agent):**
+            - Linux (amd64): `servereye-agent-linux-amd64`
+            - Linux (arm64): `servereye-agent-linux-arm64`
+            - macOS (Intel): `servereye-agent-darwin-amd64`
+            - macOS (M1/M2): `servereye-agent-darwin-arm64`
+            - Windows: `servereye-agent-windows-amd64.exe`
+            
+            ### 📝 Installation
+            
+            **Linux/macOS:**
+            ```bash
+            # Download and make executable
+            wget https://github.com/godofphonk/ServerEye/releases/download/${{ steps.version.outputs.VERSION }}/servereye-agent-linux-amd64
+            chmod +x servereye-agent-linux-amd64
+            sudo mv servereye-agent-linux-amd64 /usr/local/bin/servereye-agent
+            ```
+            
+            **Or use one-line install:**
+            ```bash
+            wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
+            ```
+            
+            ### ✅ Verification
+            
+            Verify checksums:
+            ```bash
+            sha256sum -c checksums.txt
+            ```
+            
+            ### 🔗 Links
+            - [Documentation](https://github.com/godofphonk/ServerEye#readme)
+            - [Installation Guide](https://github.com/godofphonk/ServerEye/blob/master/docs/INSTALLATION.md)
+            - [Security Audit](https://github.com/godofphonk/ServerEye/blob/master/docs/SECURITY.md)
+          files: |
+            servereye-bot-*
+            servereye-agent-*
+            checksums.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
