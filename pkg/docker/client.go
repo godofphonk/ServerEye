@@ -25,21 +25,13 @@ func NewClient(logger *logrus.Logger) *Client {
 
 // dockerContainer represents Docker container JSON output
 type dockerContainer struct {
-	ID     string       `json:"Id"`
-	Names  string       `json:"Names"`
-	Image  string       `json:"Image"`
-	Status string       `json:"Status"`
-	State  string       `json:"State"`
-	Ports  string       `json:"Ports"`
-	Labels string       `json:"Labels"`
-}
-
-// dockerPort represents Docker port mapping
-type dockerPort struct {
-	PrivatePort int    `json:"PrivatePort"`
-	PublicPort  int    `json:"PublicPort,omitempty"`
-	Type        string `json:"Type"`
-	IP          string `json:"IP,omitempty"`
+	ID     string `json:"Id"`
+	Names  string `json:"Names"`
+	Image  string `json:"Image"`
+	Status string `json:"Status"`
+	State  string `json:"State"`
+	Ports  string `json:"Ports"`
+	Labels string `json:"Labels"`
 }
 
 // GetContainers retrieves information about Docker containers
@@ -130,7 +122,7 @@ func (c *Client) convertToContainerInfo(dc dockerContainer) protocol.ContainerIn
 	if len(dc.ID) > 12 {
 		shortID = dc.ID[:12]
 	}
-	
+
 	return protocol.ContainerInfo{
 		ID:     shortID,
 		Name:   name,

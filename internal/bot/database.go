@@ -180,48 +180,6 @@ func (b *Bot) getUserServers(userID int64) ([]string, error) {
 	return servers, nil
 }
 
-// updateServerStatus updates the last seen timestamp for a server
-func (b *Bot) updateServerStatus(serverKey string, status string) error {
-	query := `
-		UPDATE servers 
-		SET status = $1, last_seen = NOW(), updated_at = NOW()
-		WHERE secret_key = $2
-	`
-
-	_, err := b.db.Exec(query, status, serverKey)
-	if err != nil {
-		return fmt.Errorf("failed to update server status: %v", err)
-	}
-
-	return nil
-}
-
-// logCommand logs a command execution
-func (b *Bot) logCommand(userID int64, serverKey, command string, response interface{}) error {
-	// Get server ID
-	var serverID string
-	err := b.db.QueryRow(`
-		SELECT id FROM servers WHERE secret_key = $1
-	`, serverKey).Scan(&serverID)
-	
-	if err != nil {
-		return fmt.Errorf("failed to get server ID: %v", err)
-	}
-
-	// Log command
-	query := `
-		INSERT INTO command_history (user_id, server_id, command, response)
-		VALUES ($1, $2, $3, $4)
-	`
-
-	_, err = b.db.Exec(query, userID, serverID, command, response)
-	if err != nil {
-		return fmt.Errorf("failed to log command: %v", err)
-	}
-
-	return nil
-}
-
 // renameServer updates server name in database
 func (b *Bot) renameServer(serverKey, newName string) error {
 	query := `

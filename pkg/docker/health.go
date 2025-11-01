@@ -10,29 +10,29 @@ import (
 // CheckDockerAvailability checks if Docker is running and accessible
 func (c *Client) CheckDockerAvailability(ctx context.Context) error {
 	c.logger.Debug("Checking Docker availability")
-	
+
 	// Create a context with timeout for the health check
 	healthCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	
+
 	// Try to run 'docker version' command
 	cmd := exec.CommandContext(healthCtx, "docker", "version", "--format", "{{.Server.Version}}")
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		outputStr := string(output)
-		if strings.Contains(outputStr, "cannot connect") || 
-		   strings.Contains(outputStr, "connection refused") ||
-		   strings.Contains(outputStr, "system cannot find the file") ||
-		   strings.Contains(outputStr, "pipe") {
+		if strings.Contains(outputStr, "cannot connect") ||
+			strings.Contains(outputStr, "connection refused") ||
+			strings.Contains(outputStr, "system cannot find the file") ||
+			strings.Contains(outputStr, "pipe") {
 			c.logger.Warn("Docker daemon is not running")
 			return NewDockerUnavailableError("Docker daemon is not running. Please start Docker Desktop.")
 		}
-		
+
 		c.logger.WithError(err).Error("Docker health check failed")
 		return NewDockerUnavailableError("Docker is not available: " + err.Error())
 	}
-	
+
 	c.logger.WithField("server_version", strings.TrimSpace(string(output))).Debug("Docker is available")
 	return nil
 }

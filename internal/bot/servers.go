@@ -141,18 +141,6 @@ func (b *Bot) handleAddServer(message *tgbotapi.Message) string {
 	return fmt.Sprintf("✅ Server '%s' connected successfully!\n🟢 Status: Online\n\nUse /temp to get CPU temperature.", serverName)
 }
 
-// handleServerKey handles server key registration (deprecated)
-func (b *Bot) handleServerKey(message *tgbotapi.Message) string {
-	serverKey := strings.TrimSpace(message.Text)
-
-	if err := b.connectServer(message.From.ID, serverKey); err != nil {
-		b.logger.Error("Error occurred", err)
-		return "❌ Failed to connect server. Please check your key."
-	}
-
-	return "✅ Server connected successfully!\n🟢 Status: Online\n\nUse /temp to get CPU temperature."
-}
-
 // handleDebug shows debug information about user and servers
 func (b *Bot) handleDebug(message *tgbotapi.Message) string {
 	userID := message.From.ID

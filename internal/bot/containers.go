@@ -268,26 +268,3 @@ func (b *Bot) validateContainerAction(containerID, action string) error {
 	
 	return nil
 }
-
-// isSystemContainer checks if container is a system container that shouldn't be managed
-func (b *Bot) isSystemContainer(containerName string) bool {
-	systemContainers := []string{
-		"servereye-bot",
-		"deployments-servereye-bot",
-		"redis",
-		"deployments-redis",
-		"postgres",
-		"deployments-postgres",
-		"postgresql",
-		"database",
-	}
-	
-	containerLower := strings.ToLower(containerName)
-	for _, system := range systemContainers {
-		if strings.Contains(containerLower, system) {
-			return true
-		}
-	}
-	
-	return false
-}
