@@ -25,9 +25,9 @@ const (
 	TypePing             MessageType = "ping"
 
 	// Responses from agent to bot
-	TypeCPUTempResponse       MessageType = "cpu_temp_response"
-	TypeSystemInfoResponse    MessageType = "system_info_response"
-	TypeContainersResponse    MessageType = "containers_response"
+	TypeCPUTempResponse         MessageType = "cpu_temp_response"
+	TypeSystemInfoResponse      MessageType = "system_info_response"
+	TypeContainersResponse      MessageType = "containers_response"
 	TypeContainerActionResponse MessageType = "container_action_response"
 	TypeMemoryInfoResponse      MessageType = "memory_info_response"
 	TypeDiskInfoResponse        MessageType = "disk_info_response"
@@ -165,14 +165,14 @@ type UptimeInfo struct {
 
 // ProcessInfo represents process information
 type ProcessInfo struct {
-	PID         int32   `json:"pid"`
-	Name        string  `json:"name"`
-	CPUPercent  float64 `json:"cpu_percent"`
-	MemoryMB    uint64  `json:"memory_mb"`
+	PID           int32   `json:"pid"`
+	Name          string  `json:"name"`
+	CPUPercent    float64 `json:"cpu_percent"`
+	MemoryMB      uint64  `json:"memory_mb"`
 	MemoryPercent float32 `json:"memory_percent"`
-	Status      string  `json:"status"`
-	Username    string  `json:"username"`
-	CreateTime  int64   `json:"create_time"`
+	Status        string  `json:"status"`
+	Username      string  `json:"username"`
+	CreateTime    int64   `json:"create_time"`
 }
 
 // ProcessesPayload represents top processes information
@@ -183,11 +183,11 @@ type ProcessesPayload struct {
 
 // Error codes
 const (
-	ErrorSensorNotFound     = "SENSOR_NOT_FOUND"
-	ErrorPermissionDenied   = "PERMISSION_DENIED"
-	ErrorCommandTimeout     = "COMMAND_TIMEOUT"
-	ErrorInvalidCommand     = "INVALID_COMMAND"
-	ErrorContainerNotFound  = "CONTAINER_NOT_FOUND"
-	ErrorContainerAction    = "CONTAINER_ACTION_FAILED"
-	ErrorDockerUnavailable  = "DOCKER_UNAVAILABLE"
+	ErrorSensorNotFound    = "SENSOR_NOT_FOUND"
+	ErrorPermissionDenied  = "PERMISSION_DENIED"
+	ErrorCommandTimeout    = "COMMAND_TIMEOUT"
+	ErrorInvalidCommand    = "INVALID_COMMAND"
+	ErrorContainerNotFound = "CONTAINER_NOT_FOUND"
+	ErrorContainerAction   = "CONTAINER_ACTION_FAILED"
+	ErrorDockerUnavailable = "DOCKER_UNAVAILABLE"
 )
