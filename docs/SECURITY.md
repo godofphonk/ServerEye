@@ -207,19 +207,66 @@ sudo systemctl restart servereye-agent
 
 ### Telegram Bot Token
 
-**Storage:**
-- ✅ Environment variables only
-- ✅ Never in code or config files
-- ✅ Docker secrets in production
+**How to obtain:**
+1. Open Telegram and search for `@BotFather`
+2. Send `/newbot` command
+3. Follow the instructions to create your bot
+4. Save the token securely - **you'll only see it once**
 
-**Example:**
+**Storage (Development):**
 ```bash
-# Bad - hardcoded
-token := "123456:ABC-DEF..."
+# .env file 
+TELEGRAM_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 
-# Good - environment variable
-token := os.Getenv("TELEGRAM_TOKEN")
+# Load from .env
+export $(cat .env | xargs)
+
+# Or export directly
+export TELEGRAM_TOKEN="your_token_here"
 ```
+
+**Storage (Production):**
+```bash
+# Option 1: Docker Compose with .env
+# deployments/.env (gitignored)
+TELEGRAM_TOKEN=your_token_here
+
+# Option 2: Docker Secrets (recommended)
+echo "your_token_here" | docker secret create telegram_token -
+docker service update --secret-add telegram_token mybot
+
+# Option 3: Kubernetes Secrets
+kubectl create secret generic telegram-token \
+  --from-literal=token='your_token_here'
+```
+
+**Code Implementation:**
+```go
+// ✅ CORRECT - Load from environment
+token := os.Getenv("TELEGRAM_TOKEN")
+if token == "" {
+    return errors.New("TELEGRAM_TOKEN not set")
+}
+
+// ❌ WRONG - Hardcoded token
+token := "123456:ABC-DEF..."  // NEVER do this!
+```
+
+**Security Checklist:**
+- [ ] Token loaded from environment variables
+- [ ] No token in source code
+- [ ] No token in config files
+- [ ] `.env` file in `.gitignore`
+- [ ] Token not logged in application logs
+- [ ] Token regenerated if leaked
+
+**If Token is Leaked:**
+1. Open `@BotFather` in Telegram
+2. Send `/mybots` → select your bot
+3. Go to **Bot Settings** → **Regenerate Token**
+4. Update your environment variables
+5. Restart your application
+6. Investigate how the leak occurred
 
 ### Database Credentials
 
