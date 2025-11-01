@@ -28,20 +28,12 @@ jobs:
 
       - name: Build binaries
         run: |
-          # Bot binaries
-          echo "Building bot for Linux..."
-          GOOS=linux GOARCH=amd64 go build -o servereye-bot-linux-amd64 -ldflags="-s -w" ./cmd/bot
-          
-          echo "Building bot for Windows..."
-          GOOS=windows GOARCH=amd64 go build -o servereye-bot-windows-amd64.exe -ldflags="-s -w" ./cmd/bot
-          
           # Agent binaries
-          echo "Building agent for Linux..."
+          echo "Building agent for Linux (amd64)..."
           GOOS=linux GOARCH=amd64 go build -o servereye-agent-linux-amd64 -ldflags="-s -w" ./cmd/agent
-          GOOS=linux GOARCH=arm64 go build -o servereye-agent-linux-arm64 -ldflags="-s -w" ./cmd/agent
           
-          echo "Building agent for Windows..."
-          GOOS=windows GOARCH=amd64 go build -o servereye-agent-windows-amd64.exe -ldflags="-s -w" ./cmd/agent
+          echo "Building agent for Linux (arm64)..."
+          GOOS=linux GOARCH=arm64 go build -o servereye-agent-linux-arm64 -ldflags="-s -w" ./cmd/agent
 
       - name: Generate checksums
         run: |
@@ -54,29 +46,47 @@ jobs:
           name: Release ${{ steps.version.outputs.VERSION }}
           body: |
             ## 🎉 ServerEye ${{ steps.version.outputs.VERSION }}
+            
             ### 📝 Changes
-            ...
             
-            ### 📝 Installation
+            changes here
             
-            **Linux/macOS:**
+            ---
+            
+            ### 📝 Installation (Linux)
+            
+            #### Automatic (Recommended)
+            
             ```bash
-            # One-line installation
             wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
             ```
             
+            ### 📝 Manual Download
+            
             ```bash
-            # Download and make executable
             wget https://github.com/godofphonk/ServerEye/releases/download/${{ steps.version.outputs.VERSION }}/servereye-agent-linux-amd64
             chmod +x servereye-agent-linux-amd64
             sudo mv servereye-agent-linux-amd64 /usr/local/bin/servereye-agent
             ```
             
+            ### ✅ Verification
+            
+            Verify file integrity:
+            
+            ```bash
+            wget https://github.com/godofphonk/ServerEye/releases/latest/download/checksums.txt
+            sha256sum -c checksums.txt
+            ```
+            
+            Expected: `servereye-agent-linux-amd64: OK`
+            
+            ---
+            
             ### 🔗 Links
+            
             - [Documentation](https://github.com/godofphonk/ServerEye#readme)
             - [Security Audit](https://github.com/godofphonk/ServerEye/blob/master/docs/SECURITY.md)
           files: |
-            servereye-bot-*
             servereye-agent-*
             checksums.txt
           draft: false
