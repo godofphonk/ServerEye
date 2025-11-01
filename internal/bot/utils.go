@@ -18,6 +18,11 @@ func (b *Bot) sendMessage(chatID int64, text string) {
 
 // getServerFromCommand parses server number from command and returns server key
 func (b *Bot) getServerFromCommand(command string, servers []string) (string, error) {
+	// Check if servers list is empty
+	if len(servers) == 0 {
+		return "", fmt.Errorf("❌ No servers found. Please add a server first using /add command.")
+	}
+
 	parts := strings.Fields(command)
 
 	// If no server number specified, use first server

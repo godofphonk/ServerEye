@@ -128,30 +128,40 @@ func (m *InMemoryMetrics) GetStats() map[string]interface{} {
 
 	// Command statistics
 	totalCommands := int64(0)
-	for _, count := range m.commandCounts {
-		totalCommands += count
+	commandCounts := make(map[string]int64, len(m.commandCounts))
+	for k, v := range m.commandCounts {
+		totalCommands += v
+		commandCounts[k] = v
 	}
 	stats["total_commands"] = totalCommands
-	stats["command_counts"] = m.GetCommandCounts()
+	stats["command_counts"] = commandCounts
 
 	// Error statistics
 	totalErrors := int64(0)
-	for _, count := range m.errorCounts {
-		totalErrors += count
+	errorCounts := make(map[string]int64, len(m.errorCounts))
+	for k, v := range m.errorCounts {
+		totalErrors += v
+		errorCounts[k] = v
 	}
 	stats["total_errors"] = totalErrors
-	stats["error_counts"] = m.GetErrorCounts()
+	stats["error_counts"] = errorCounts
 
 	// Latency statistics
 	avgLatencies := make(map[string]float64)
-	for operation := range m.latencies {
-		avgLatencies[operation] = m.GetAverageLatency(operation)
+	for operation, latencies := range m.latencies {
+		if len(latencies) > 0 {
+			var sum float64
+			for _, latency := range latencies {
+				sum += latency
+			}
+			avgLatencies[operation] = sum / float64(len(latencies))
+		}
 	}
 	stats["average_latencies"] = avgLatencies
 
 	// General statistics
 	stats["active_users"] = m.activeUsers
-	stats["uptime_seconds"] = m.GetUptime().Seconds()
+	stats["uptime_seconds"] = time.Since(m.startTime).Seconds()
 
 	return stats
 }
