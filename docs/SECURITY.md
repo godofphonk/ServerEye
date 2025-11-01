@@ -182,6 +182,19 @@ sudo visudo
 - ✅ 32 characters hexadecimal (128-bit entropy)
 - ✅ Prefixed with `srv_` for identification
 - ✅ Never transmitted during installation
+- ✅ Cryptographically secure random number generator
+
+**Security Properties:**
+- **Key Space:** 2^128 = 3.4×10^38 possible keys
+- **Brute Force:** Computationally infeasible
+- **Collision Probability:** Negligible (< 10^-36)
+- **Algorithm:** OpenSSL CSPRNG (Cryptographically Secure Pseudo-Random Number Generator)
+
+**Key Format:**
+```
+srv_[32 hex characters]
+Example: srv_a1b2c3d4e5f6789012345678901234567890abcd
+```
 
 **Storage:**
 ```bash
@@ -189,6 +202,11 @@ sudo visudo
 /etc/servereye/config.yaml  # chmod 640
                             # owner: root:servereye
 ```
+
+**Lifetime:**
+- ⚠️ **No expiration** - keys are valid indefinitely
+- ✅ Manually rotatable (generate new key, update config)
+- 📝 Recommendation: Rotate keys every 6-12 months for production
 
 **Rotation:**
 ```bash
@@ -469,6 +487,107 @@ User → /temp → Bot
 
 - ⚠️ Docker commands constructed from user input
 - **Mitigation:** Whitelist validation, no shell execution
+
+## Agent Updates & Rollback
+
+### Safe Update Process
+
+**Option 1: Manual Update (Recommended)**
+
+```bash
+# 1. Download new binary
+cd /tmp
+wget https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/servereye-agent-linux
+
+# 2. Verify checksum
+wget https://raw.githubusercontent.com/godofphonk/ServerEye/master/downloads/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+
+# 3. Backup current version
+sudo cp /opt/servereye/servereye-agent /opt/servereye/servereye-agent.backup
+
+# 4. Stop agent
+sudo systemctl stop servereye-agent
+
+# 5. Replace binary
+sudo cp servereye-agent-linux /opt/servereye/servereye-agent
+sudo chmod +x /opt/servereye/servereye-agent
+
+# 6. Test new version
+/opt/servereye/servereye-agent -version
+
+# 7. Start agent
+sudo systemctl start servereye-agent
+
+# 8. Verify it's working
+sudo systemctl status servereye-agent
+sudo journalctl -u servereye-agent -n 20
+```
+
+**Option 2: Re-run Install Script**
+
+```bash
+# This will overwrite the agent but keep your config
+wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash
+```
+
+### Rollback Process
+
+**If update fails:**
+
+```bash
+# 1. Stop broken version
+sudo systemctl stop servereye-agent
+
+# 2. Restore backup
+sudo cp /opt/servereye/servereye-agent.backup /opt/servereye/servereye-agent
+
+# 3. Start old version
+sudo systemctl start servereye-agent
+
+# 4. Verify rollback
+sudo systemctl status servereye-agent
+```
+
+### Multi-Server Update Strategy
+
+**For managing multiple servers:**
+
+```bash
+# Create update script
+cat > update-agent.sh << 'EOF'
+#!/bin/bash
+SERVERS="server1 server2 server3"
+for server in $SERVERS; do
+    echo "Updating $server..."
+    ssh $server 'bash -s' < /path/to/local-update-script.sh
+    if [ $? -eq 0 ]; then
+        echo "✅ $server updated successfully"
+    else
+        echo "❌ $server update failed"
+    fi
+done
+EOF
+chmod +x update-agent.sh
+```
+
+**Best Practices:**
+
+1. ✅ Test updates on dev/staging server first
+2. ✅ Update one server at a time (canary deployment)
+3. ✅ Keep backups before updating
+4. ✅ Monitor logs after update
+5. ✅ Have rollback plan ready
+6. ✅ Update during maintenance window
+
+### Automated Updates (Future)
+
+**Planned features:**
+- Version checking from bot
+- One-click updates via Telegram
+- Automatic rollback on failure
+- Update notifications
+- Gradual rollout (canary/blue-green)
 
 ## Reporting Vulnerabilities
 
