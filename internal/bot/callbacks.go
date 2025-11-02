@@ -17,6 +17,11 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 		b.logger.Error("Error occurred", err)
 	}
 
+	// Check if it's a container action callback (format: "container_action_containerID")
+	if strings.HasPrefix(query.Data, "container_") {
+		return b.handleContainerActionCallback(query)
+	}
+
 	// Parse callback data (format: "command_serverNumber")
 	parts := strings.Split(query.Data, "_")
 	if len(parts) != 2 {
@@ -277,4 +282,56 @@ func (b *Bot) executeStatusCommand(servers []ServerInfo, serverNum string) strin
 
 	serverName := servers[num-1].Name
 	return fmt.Sprintf("🟢 **%s** Status: Online\n⏱️ Uptime: 15 days 8 hours\n💾 Last activity: just now", serverName)
+}
+
+// handleContainerActionCallback handles container action button clicks
+func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error {
+	// Parse callback data (format: "container_action_containerID")
+	parts := strings.SplitN(query.Data, "_", 3)
+	if len(parts) != 3 {
+		b.sendMessage(query.Message.Chat.ID, "❌ Invalid callback format")
+		return fmt.Errorf("invalid container callback format: %s", query.Data)
+	}
+
+	action := parts[1]      // start, stop, restart
+	containerID := parts[2] // container ID or name
+
+	// Get user's servers
+	servers, err := b.getUserServers(query.From.ID)
+	if err != nil {
+		b.logger.Error("Error occurred", err)
+		b.sendMessage(query.Message.Chat.ID, "❌ Error getting your servers")
+		return err
+	}
+
+	if len(servers) == 0 {
+		b.sendMessage(query.Message.Chat.ID, "❌ No servers found")
+		return fmt.Errorf("no servers found")
+	}
+
+	// Use first server (можно улучшить для multi-server support)
+	serverKey := servers[0]
+
+	// Show processing message
+	editMsg := tgbotapi.NewEditMessageText(
+		query.Message.Chat.ID,
+		query.Message.MessageID,
+		fmt.Sprintf("⏳ %s container `%s`...", strings.Title(action), containerID),
+	)
+	editMsg.ParseMode = "Markdown"
+	b.telegramAPI.Send(editMsg)
+
+	// Execute action
+	response := b.handleContainerAction(query.From.ID, containerID, action)
+
+	// Update message with result
+	editMsg = tgbotapi.NewEditMessageText(
+		query.Message.Chat.ID,
+		query.Message.MessageID,
+		response,
+	)
+	editMsg.ParseMode = "Markdown"
+	b.telegramAPI.Send(editMsg)
+
+	return nil
 }

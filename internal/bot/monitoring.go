@@ -371,5 +371,8 @@ func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 	}
 
 	b.logger.Info("Список контейнеров успешно получен")
-	return b.formatContainers(containers)
+
+	// Send containers list with inline buttons
+	b.sendContainersWithButtons(message.Chat.ID, serverKey, containers)
+	return ""
 }

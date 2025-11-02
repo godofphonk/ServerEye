@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/servereye/servereye/pkg/protocol"
 )
 
 // sendMessage sends a message to a chat
@@ -73,5 +74,74 @@ func (b *Bot) sendServerSelectionButtons(chatID int64, command, text string, ser
 
 	if _, err := b.telegramAPI.Send(msg); err != nil {
 		b.logger.Error("Error occurred", err)
+	}
+}
+
+// sendContainersWithButtons sends containers list with action buttons
+func (b *Bot) sendContainersWithButtons(chatID int64, serverKey string, containers *protocol.ContainersPayload) {
+	if containers.Total == 0 {
+		b.sendMessage(chatID, "📦 No Docker containers found on the server.")
+		return
+	}
+
+	text := fmt.Sprintf("🐳 **Docker Containers (%d total):**\n\n", containers.Total)
+
+	for i, container := range containers.Containers {
+		if i >= 10 { // Limit to 10 containers
+			text += fmt.Sprintf("... and %d more containers\n", containers.Total-10)
+			break
+		}
+
+		// Status emoji
+		statusEmoji := "🔴" // Red for stopped
+		if strings.Contains(strings.ToLower(container.State), "running") {
+			statusEmoji = "🟢" // Green for running
+		} else if strings.Contains(strings.ToLower(container.State), "paused") {
+			statusEmoji = "🟡" // Yellow for paused
+		}
+
+		text += fmt.Sprintf("%s **%s**\n", statusEmoji, container.Name)
+		text += fmt.Sprintf("📷 Image: `%s`\n", container.Image)
+		text += fmt.Sprintf("🔄 Status: %s\n", container.Status)
+
+		if len(container.Ports) > 0 {
+			text += fmt.Sprintf("🔌 Ports: %s\n", strings.Join(container.Ports, ", "))
+		}
+
+		// Add action buttons for each container
+		var buttons []tgbotapi.InlineKeyboardButton
+
+		containerID := container.ID[:12] // Short ID
+		if container.Name != "" {
+			containerID = container.Name
+		}
+
+		// Show appropriate buttons based on container state
+		if strings.Contains(strings.ToLower(container.State), "running") {
+			// Running: show Stop and Restart
+			buttons = append(buttons,
+				tgbotapi.NewInlineKeyboardButtonData("⏹️ Stop", fmt.Sprintf("container_stop_%s", containerID)),
+				tgbotapi.NewInlineKeyboardButtonData("🔄 Restart", fmt.Sprintf("container_restart_%s", containerID)),
+			)
+		} else {
+			// Stopped: show Start
+			buttons = append(buttons,
+				tgbotapi.NewInlineKeyboardButtonData("▶️ Start", fmt.Sprintf("container_start_%s", containerID)),
+			)
+		}
+
+		text += "\n"
+
+		// Send message for this container with buttons
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons)
+		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ParseMode = "Markdown"
+		msg.ReplyMarkup = keyboard
+
+		if _, err := b.telegramAPI.Send(msg); err != nil {
+			b.logger.Error("Error occurred", err)
+		}
+
+		text = "" // Reset for next container
 	}
 }

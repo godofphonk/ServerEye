@@ -34,15 +34,6 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	case strings.HasPrefix(message.Text, "/containers"):
 		b.logger.Info("Info message")
 		response = b.handleContainers(message)
-	case strings.HasPrefix(message.Text, "/start_container"):
-		b.logger.Info("Info message")
-		response = b.handleStartContainer(message)
-	case strings.HasPrefix(message.Text, "/stop_container"):
-		b.logger.Info("Info message")
-		response = b.handleStopContainer(message)
-	case strings.HasPrefix(message.Text, "/restart_container"):
-		b.logger.Info("Info message")
-		response = b.handleRestartContainer(message)
 	case strings.HasPrefix(message.Text, "/status"):
 		b.logger.Info("Info message")
 		response = b.handleStatus(message)
@@ -101,10 +92,7 @@ Available commands:
 /disk - Get disk usage
 /uptime - Get system uptime
 /processes - Get top processes
-/containers - List Docker containers
-/start_container <id> - Start container
-/stop_container <id> - Stop container
-/restart_container <id> - Restart container
+/containers - Manage Docker containers
 /status - Get server status
 /servers - List your servers
 /help - Show this help`
@@ -122,10 +110,7 @@ func (b *Bot) handleHelp(message *tgbotapi.Message) string {
 /processes - List running processes
 
 🐳 **Docker Management:**
-/containers - List Docker containers
-/start_container <id> - Start a container
-/stop_container <id> - Stop a container
-/restart_container <id> - Restart a container
+/containers - Manage Docker containers (with start/stop/restart buttons)
 
 ⚙️ **Server Management:**
 /servers - List your servers
