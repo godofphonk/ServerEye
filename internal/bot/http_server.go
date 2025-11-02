@@ -26,6 +26,7 @@ func (b *Bot) startHTTPServer() {
 	b.logger.Info("Info message")
 	http.HandleFunc("/api/register-key", b.handleRegisterKey)
 	http.HandleFunc("/api/health", b.handleHealth)
+	http.HandleFunc("/api/heartbeat", b.handleHeartbeat)
 	http.HandleFunc("/api/redis/publish", b.handleRedisPublish)
 	http.HandleFunc("/api/redis/subscribe", b.handleRedisSubscribe)
 	http.HandleFunc("/api/monitoring/memory", b.handleMemoryRequest)
@@ -103,6 +104,34 @@ func (b *Bot) handleHealth(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"status":  "healthy",
 		"service": "servereye-bot",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// HeartbeatRequest represents an agent heartbeat
+type HeartbeatRequest struct {
+	ServerKey string `json:"server_key"`
+}
+
+// handleHeartbeat handles heartbeat requests from agents
+func (b *Bot) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req HeartbeatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Simply acknowledge the heartbeat
+	response := map[string]interface{}{
+		"status":     "ok",
+		"server_key": req.ServerKey,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
