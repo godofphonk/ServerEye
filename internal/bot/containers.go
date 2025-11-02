@@ -11,48 +11,6 @@ import (
 	"github.com/servereye/servereye/pkg/protocol"
 )
 
-// handleStartContainer handles the /start_container command
-func (b *Bot) handleStartContainer(message *tgbotapi.Message) string {
-	b.logger.Info("Operation completed")
-
-	// Парсим команду
-	parts := strings.Fields(message.Text)
-	if len(parts) < 2 {
-		return "❌ Usage: /start_container <container_id_or_name>\n\nExample: /start_container nginx"
-	}
-
-	containerID := parts[1]
-	return b.handleContainerAction(message.From.ID, containerID, "start")
-}
-
-// handleStopContainer handles the /stop_container command
-func (b *Bot) handleStopContainer(message *tgbotapi.Message) string {
-	b.logger.Info("Operation completed")
-
-	// Парсим команду
-	parts := strings.Fields(message.Text)
-	if len(parts) < 2 {
-		return "❌ Usage: /stop_container <container_id_or_name>\n\nExample: /stop_container nginx"
-	}
-
-	containerID := parts[1]
-	return b.handleContainerAction(message.From.ID, containerID, "stop")
-}
-
-// handleRestartContainer handles the /restart_container command
-func (b *Bot) handleRestartContainer(message *tgbotapi.Message) string {
-	b.logger.Info("Operation completed")
-
-	// Парсим команду
-	parts := strings.Fields(message.Text)
-	if len(parts) < 2 {
-		return "❌ Usage: /restart_container <container_id_or_name>\n\nExample: /restart_container nginx"
-	}
-
-	containerID := parts[1]
-	return b.handleContainerAction(message.From.ID, containerID, "restart")
-}
-
 // handleContainerAction handles container management actions
 func (b *Bot) handleContainerAction(userID int64, containerID, action string) string {
 	// Валидация входных данных

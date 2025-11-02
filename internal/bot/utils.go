@@ -88,7 +88,11 @@ func (b *Bot) sendContainersWithButtons(chatID int64, serverKey string, containe
 
 	for i, container := range containers.Containers {
 		if i >= 10 { // Limit to 10 containers
-			text += fmt.Sprintf("... and %d more containers\n", containers.Total-10)
+			// Send final message with remaining count
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("... and %d more containers", containers.Total-10))
+			if _, err := b.telegramAPI.Send(msg); err != nil {
+				b.logger.Error("Error occurred", err)
+			}
 			break
 		}
 

@@ -309,14 +309,22 @@ func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error
 		return fmt.Errorf("no servers found")
 	}
 
+	// Capitalize action name
+	actionName := action
+	if len(action) > 0 {
+		actionName = strings.ToUpper(action[:1]) + action[1:]
+	}
+
 	// Show processing message
 	editMsg := tgbotapi.NewEditMessageText(
 		query.Message.Chat.ID,
 		query.Message.MessageID,
-		fmt.Sprintf("⏳ %s container `%s`...", strings.Title(action), containerID),
+		fmt.Sprintf("⏳ %s container `%s`...", actionName, containerID),
 	)
 	editMsg.ParseMode = "Markdown"
-	b.telegramAPI.Send(editMsg)
+	if _, err := b.telegramAPI.Send(editMsg); err != nil {
+		b.logger.Error("Error occurred", err)
+	}
 
 	// Execute action
 	response := b.handleContainerAction(query.From.ID, containerID, action)
@@ -328,7 +336,9 @@ func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error
 		response,
 	)
 	editMsg.ParseMode = "Markdown"
-	b.telegramAPI.Send(editMsg)
+	if _, err := b.telegramAPI.Send(editMsg); err != nil {
+		b.logger.Error("Error occurred", err)
+	}
 
 	return nil
 }
