@@ -223,7 +223,7 @@ func TestBoolField(t *testing.T) {
 func TestErrorField(t *testing.T) {
 	testErr := errors.New("something went wrong")
 	field := ErrorField(testErr)
-	
+
 	if field.Key != "error" {
 		t.Errorf("Key = %v, want 'error'", field.Key)
 	}

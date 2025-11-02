@@ -185,39 +185,39 @@ func TestGetTopProcesses_ValidateLimit(t *testing.T) {
 func TestMemoryInfoCalculations(t *testing.T) {
 	// Test the calculation logic for memory percentages
 	tests := []struct {
-		name          string
-		total         uint64
-		available     uint64
-		expectedUsed  uint64
-		expectedPerc  float64
+		name         string
+		total        uint64
+		available    uint64
+		expectedUsed uint64
+		expectedPerc float64
 	}{
 		{
-			name:          "50% usage",
-			total:         1024 * 1024 * 1024, // 1GB
-			available:     512 * 1024 * 1024,  // 512MB
-			expectedUsed:  512 * 1024 * 1024,
-			expectedPerc:  50.0,
+			name:         "50% usage",
+			total:        1024 * 1024 * 1024, // 1GB
+			available:    512 * 1024 * 1024,  // 512MB
+			expectedUsed: 512 * 1024 * 1024,
+			expectedPerc: 50.0,
 		},
 		{
-			name:          "90% usage",
-			total:         1000,
-			available:     100,
-			expectedUsed:  900,
-			expectedPerc:  90.0,
+			name:         "90% usage",
+			total:        1000,
+			available:    100,
+			expectedUsed: 900,
+			expectedPerc: 90.0,
 		},
 		{
-			name:          "0% usage",
-			total:         1000,
-			available:     1000,
-			expectedUsed:  0,
-			expectedPerc:  0.0,
+			name:         "0% usage",
+			total:        1000,
+			available:    1000,
+			expectedUsed: 0,
+			expectedPerc: 0.0,
 		},
 		{
-			name:          "100% usage",
-			total:         1000,
-			available:     0,
-			expectedUsed:  1000,
-			expectedPerc:  100.0,
+			name:         "100% usage",
+			total:        1000,
+			available:    0,
+			expectedUsed: 1000,
+			expectedPerc: 100.0,
 		},
 	}
 
@@ -251,28 +251,28 @@ func TestUptimeFormatting(t *testing.T) {
 	}{
 		{
 			name:            "less than 1 hour",
-			uptimeSeconds:   3000,     // 50 minutes
+			uptimeSeconds:   3000, // 50 minutes
 			expectedDays:    0,
 			expectedHours:   0,
 			expectedMinutes: 50,
 		},
 		{
 			name:            "less than 1 day",
-			uptimeSeconds:   7200,     // 2 hours
+			uptimeSeconds:   7200, // 2 hours
 			expectedDays:    0,
 			expectedHours:   2,
 			expectedMinutes: 0,
 		},
 		{
 			name:            "multiple days",
-			uptimeSeconds:   259200,   // 3 days
+			uptimeSeconds:   259200, // 3 days
 			expectedDays:    3,
 			expectedHours:   0,
 			expectedMinutes: 0,
 		},
 		{
 			name:            "complex uptime",
-			uptimeSeconds:   90061,    // 1 day, 1 hour, 1 minute, 1 second
+			uptimeSeconds:   90061, // 1 day, 1 hour, 1 minute, 1 second
 			expectedDays:    1,
 			expectedHours:   1,
 			expectedMinutes: 1,

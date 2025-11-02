@@ -90,12 +90,12 @@ func TestGetServerFromCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotServer, err := bot.getServerFromCommand(tt.command, tt.servers)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getServerFromCommand() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if gotServer != tt.wantServer {
 				t.Errorf("getServerFromCommand() = %v, want %v", gotServer, tt.wantServer)
 			}
@@ -109,11 +109,11 @@ func TestGetServerFromCommand_EdgeCases(t *testing.T) {
 	t.Run("three servers - select middle", func(t *testing.T) {
 		servers := []string{"srv_111", "srv_222", "srv_333"}
 		got, err := bot.getServerFromCommand("/temp 2", servers)
-		
+
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		
+
 		if got != "srv_222" {
 			t.Errorf("got %v, want srv_222", got)
 		}
@@ -122,11 +122,11 @@ func TestGetServerFromCommand_EdgeCases(t *testing.T) {
 	t.Run("boundary - exactly max servers", func(t *testing.T) {
 		servers := []string{"srv_1", "srv_2", "srv_3"}
 		got, err := bot.getServerFromCommand("/temp 3", servers)
-		
+
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		
+
 		if got != "srv_3" {
 			t.Errorf("got %v, want srv_3", got)
 		}
@@ -135,7 +135,7 @@ func TestGetServerFromCommand_EdgeCases(t *testing.T) {
 	t.Run("boundary - one past max", func(t *testing.T) {
 		servers := []string{"srv_1", "srv_2", "srv_3"}
 		_, err := bot.getServerFromCommand("/temp 4", servers)
-		
+
 		if err == nil {
 			t.Error("expected error for server number out of range")
 		}
