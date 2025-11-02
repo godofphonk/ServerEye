@@ -5,7 +5,7 @@
 [![Release](https://img.shields.io/github/v/release/godofphonk/ServerEye?style=flat-square)](https://github.com/godofphonk/ServerEye/releases/latest)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
-[![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=flat-square&logo=telegram)](https://telegram.org/)
+[![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=flat-square&logo=telegram)](https://t.me/ServerYeyBot)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 **ServerEye** is a production-ready server monitoring system that lets you monitor your servers and manage Docker containers through a Telegram bot. Built with Go and modern microservices architecture.
