@@ -185,6 +185,8 @@ func (a *Agent) processCommand(data []byte) {
 		response = a.handleRestartContainer(msg)
 	case protocol.TypeRemoveContainer:
 		response = a.handleRemoveContainer(msg)
+	case protocol.TypeCreateContainer:
+		response = a.handleCreateContainer(msg)
 	case protocol.TypeGetMemoryInfo:
 		response = a.handleGetMemoryInfo(msg)
 	case protocol.TypeGetDiskInfo:
@@ -206,7 +208,8 @@ func (a *Agent) processCommand(data []byte) {
 			"response_type": response.Type,
 		}).Info("Отправляем ответ")
 
-		if err := a.sendResponse(response); err != nil {
+		// Отправляем в уникальный канал с ID команды
+		if err := a.sendResponseToCommand(response, msg.ID); err != nil {
 			a.logger.WithError(err).Error("Не удалось отправить ответ")
 		} else {
 			a.logger.WithField("command_id", msg.ID).Info("Ответ успешно отправлен")
@@ -278,7 +281,7 @@ func (a *Agent) handleUnknownCommand(msg *protocol.Message) *protocol.Message {
 	return response
 }
 
-// sendResponse отправляет ответ в канал ответов
+// sendResponse отправляет ответ в канал ответов (устаревшая версия)
 func (a *Agent) sendResponse(msg *protocol.Message) error {
 	data, err := msg.ToJSON()
 	if err != nil {
@@ -286,6 +289,21 @@ func (a *Agent) sendResponse(msg *protocol.Message) error {
 	}
 
 	respChannel := redis.GetResponseChannel(a.config.Server.SecretKey)
+	return a.redisClient.Publish(a.ctx, respChannel, data)
+}
+
+// sendResponseToCommand отправляет ответ в УНИКАЛЬНЫЙ канал с ID команды
+func (a *Agent) sendResponseToCommand(msg *protocol.Message, commandID string) error {
+	data, err := msg.ToJSON()
+	if err != nil {
+		return fmt.Errorf("не удалось сериализовать ответ: %v", err)
+	}
+
+	// Формируем уникальный канал: resp:srv_XXX:commandID
+	respChannel := fmt.Sprintf("resp:%s:%s", a.config.Server.SecretKey, commandID)
+	
+	a.logger.WithField("response_channel", respChannel).Debug("Отправка ответа в уникальный канал")
+	
 	return a.redisClient.Publish(a.ctx, respChannel, data)
 }
 
@@ -482,6 +500,43 @@ func (a *Agent) handleRemoveContainer(msg *protocol.Message) *protocol.Message {
 	response.ContainerName = actionPayload.ContainerName
 
 	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно удален")
+	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
+}
+
+// handleCreateContainer обрабатывает команду создания контейнера
+func (a *Agent) handleCreateContainer(msg *protocol.Message) *protocol.Message {
+	a.logger.Info("Обработка команды create_container")
+
+	// Парсим payload
+	payloadData, err := json.Marshal(msg.Payload)
+	if err != nil {
+		a.logger.WithError(err).Error("Не удалось сериализовать payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+
+	var createPayload protocol.CreateContainerPayload
+	if err := json.Unmarshal(payloadData, &createPayload); err != nil {
+		a.logger.WithError(err).Error("Не удалось распарсить payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+
+	// Выполняем команду
+	response, err := a.dockerClient.CreateContainer(a.ctx, &createPayload)
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка при создании контейнера")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorContainerAction,
+			ErrorMessage: fmt.Sprintf("Ошибка при создании контейнера: %v", err),
+		})
+	}
+
+	a.logger.WithField("container_name", createPayload.Name).Info("Контейнер успешно создан")
 	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
 }
 

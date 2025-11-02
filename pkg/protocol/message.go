@@ -19,6 +19,7 @@ const (
 	TypeStopContainer    MessageType = "stop_container"
 	TypeRestartContainer MessageType = "restart_container"
 	TypeRemoveContainer  MessageType = "remove_container"
+	TypeCreateContainer  MessageType = "create_container"
 	TypeGetMemoryInfo    MessageType = "get_memory_info"
 	TypeGetDiskInfo      MessageType = "get_disk_info"
 	TypeGetUptime        MessageType = "get_uptime"
@@ -129,6 +130,15 @@ type ContainerActionResponse struct {
 	Success       bool   `json:"success"`
 	Message       string `json:"message"`
 	NewState      string `json:"new_state,omitempty"`
+}
+
+// CreateContainerPayload represents container creation request
+type CreateContainerPayload struct {
+	Image       string            `json:"image"`        // Docker image (e.g., "nginx:latest")
+	Name        string            `json:"name"`         // Container name
+	Ports       map[string]string `json:"ports"`        // Port mappings (e.g., "80/tcp": "8080")
+	Environment map[string]string `json:"environment"`  // Environment variables
+	Volumes     map[string]string `json:"volumes"`      // Volume mappings
 }
 
 // MemoryInfo represents system memory information

@@ -17,6 +17,25 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 		b.logger.Error("Error occurred", err)
 	}
 
+	// Check for cancel action
+	if query.Data == "container_cancel" {
+		// Just acknowledge and return to main menu
+		editMsg := tgbotapi.NewEditMessageText(
+			query.Message.Chat.ID,
+			query.Message.MessageID,
+			"❌ Action cancelled",
+		)
+		if _, err := b.telegramAPI.Send(editMsg); err != nil {
+			b.logger.Error("Error occurred", err)
+		}
+		return nil
+	}
+
+	// Check if it's a create template selection (format: "create_template_<name>")
+	if strings.HasPrefix(query.Data, "create_template_") {
+		return b.handleTemplateSelection(query)
+	}
+
 	// Check if it's a container action selection (format: "container_action_<action>")
 	if strings.HasPrefix(query.Data, "container_action_") {
 		return b.handleContainerActionSelection(query)
@@ -314,17 +333,26 @@ func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error
 		return fmt.Errorf("no servers found")
 	}
 
-	// Capitalize action name
-	actionName := action
-	if len(action) > 0 {
-		actionName = strings.ToUpper(action[:1]) + action[1:]
+	// Get action-specific messages with expected wait times
+	var processingMsg string
+	switch action {
+	case "start":
+		processingMsg = "▶️ **Starting container** `%s`\n\n⏳ Please wait, this usually takes **5-10 seconds**\n\n_The bot is working, not frozen_"
+	case "stop":
+		processingMsg = "⏹️ **Stopping container** `%s`\n\n⏳ Please wait, this may take **up to 90 seconds**\n\n_The bot is working, not frozen_"
+	case "restart":
+		processingMsg = "🔄 **Restarting container** `%s`\n\n⏳ Please wait, this may take **up to 90 seconds**\n\n_The bot is working, not frozen_"
+	case "remove":
+		processingMsg = "🗑️ **Deleting container** `%s`\n\n⏳ Please wait, this may take **up to 90 seconds**\n\n_The bot is working, not frozen_"
+	default:
+		processingMsg = "⏳ Processing container `%s`...\n\n_Please wait..._"
 	}
 
 	// Show processing message
 	editMsg := tgbotapi.NewEditMessageText(
 		query.Message.Chat.ID,
 		query.Message.MessageID,
-		fmt.Sprintf("⏳ %s container `%s`...", actionName, containerID),
+		fmt.Sprintf(processingMsg, containerID),
 	)
 	editMsg.ParseMode = "Markdown"
 	if _, err := b.telegramAPI.Send(editMsg); err != nil {
@@ -394,14 +422,12 @@ func (b *Bot) handleContainerActionSelection(query *tgbotapi.CallbackQuery) erro
 	case "remove":
 		actionText = "🗑️ Select container to DELETE:"
 	case "create":
-		// TODO: будем делать дальше
-		b.sendMessage(query.Message.Chat.ID, "🚧 Create container feature coming soon!")
-		return nil
+		return b.handleContainerCreateTemplates(query)
 	default:
 		return fmt.Errorf("unknown action: %s", action)
 	}
 
-	// Build buttons for each container
+	// Filter and build buttons for each container based on action
 	var buttons [][]tgbotapi.InlineKeyboardButton
 	for _, container := range containers.Containers {
 		containerID := container.Name
@@ -409,9 +435,22 @@ func (b *Bot) handleContainerActionSelection(query *tgbotapi.CallbackQuery) erro
 			containerID = container.ID[:12]
 		}
 
+		isRunning := strings.Contains(strings.ToLower(container.State), "running")
+		
+		// Filter containers based on action
+		if action == "start" && isRunning {
+			continue // Don't show running containers for start action
+		}
+		if (action == "stop" || action == "restart") && !isRunning {
+			continue // Don't show stopped containers for stop/restart actions
+		}
+		if action == "remove" && isRunning {
+			continue // Don't show running containers for remove action
+		}
+
 		// Status emoji
 		statusEmoji := "🔴"
-		if strings.Contains(strings.ToLower(container.State), "running") {
+		if isRunning {
 			statusEmoji = "🟢"
 		}
 
@@ -420,6 +459,28 @@ func (b *Bot) handleContainerActionSelection(query *tgbotapi.CallbackQuery) erro
 
 		button := tgbotapi.NewInlineKeyboardButtonData(buttonText, callbackData)
 		buttons = append(buttons, []tgbotapi.InlineKeyboardButton{button})
+	}
+
+	// Check if no containers match the filter
+	if len(buttons) == 0 {
+		var message string
+		switch action {
+		case "start":
+			message = "✅ All containers are already running"
+		case "stop", "restart":
+			message = "⏹️ No running containers found"
+		case "remove":
+			message = "✅ No stopped containers to delete"
+		}
+		editMsg := tgbotapi.NewEditMessageText(
+			query.Message.Chat.ID,
+			query.Message.MessageID,
+			message,
+		)
+		if _, err := b.telegramAPI.Send(editMsg); err != nil {
+			b.logger.Error("Error occurred", err)
+		}
+		return nil
 	}
 
 	// Add cancel button
@@ -435,6 +496,110 @@ func (b *Bot) handleContainerActionSelection(query *tgbotapi.CallbackQuery) erro
 	)
 	editMsg.ReplyMarkup = &keyboard
 
+	if _, err := b.telegramAPI.Send(editMsg); err != nil {
+		b.logger.Error("Error occurred", err)
+	}
+
+	return nil
+}
+
+// handleContainerCreateTemplates shows template selection for creating containers
+func (b *Bot) handleContainerCreateTemplates(query *tgbotapi.CallbackQuery) error {
+	text := "📦 **Select container template:**\n\nChoose a pre-configured template to quickly deploy a container:"
+
+	buttons := [][]tgbotapi.InlineKeyboardButton{
+		{
+			tgbotapi.NewInlineKeyboardButtonData("🌐 Nginx", "create_template_nginx"),
+			tgbotapi.NewInlineKeyboardButtonData("🐘 PostgreSQL", "create_template_postgres"),
+		},
+		{
+			tgbotapi.NewInlineKeyboardButtonData("🔴 Redis", "create_template_redis"),
+			tgbotapi.NewInlineKeyboardButtonData("🟢 MongoDB", "create_template_mongo"),
+		},
+		{
+			tgbotapi.NewInlineKeyboardButtonData("🐰 RabbitMQ", "create_template_rabbitmq"),
+			tgbotapi.NewInlineKeyboardButtonData("🐳 MySQL", "create_template_mysql"),
+		},
+		{
+			tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "container_cancel"),
+		},
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+	editMsg := tgbotapi.NewEditMessageText(
+		query.Message.Chat.ID,
+		query.Message.MessageID,
+		text,
+	)
+	editMsg.ParseMode = "Markdown"
+	editMsg.ReplyMarkup = &keyboard
+
+	if _, err := b.telegramAPI.Send(editMsg); err != nil {
+		b.logger.Error("Error occurred", err)
+	}
+
+	return nil
+}
+
+// handleTemplateSelection handles template selection and creates container
+func (b *Bot) handleTemplateSelection(query *tgbotapi.CallbackQuery) error {
+	// Parse template name
+	template := strings.TrimPrefix(query.Data, "create_template_")
+
+	// Get user's servers
+	servers, err := b.getUserServers(query.From.ID)
+	if err != nil {
+		b.logger.Error("Error occurred", err)
+		b.sendMessage(query.Message.Chat.ID, "❌ Error getting your servers")
+		return err
+	}
+
+	if len(servers) == 0 {
+		b.sendMessage(query.Message.Chat.ID, "❌ No servers found")
+		return fmt.Errorf("no servers found")
+	}
+
+	serverKey := servers[0]
+
+	// Show processing message with expected time
+	var templateName string
+	switch template {
+	case "nginx":
+		templateName = "Nginx"
+	case "postgres":
+		templateName = "PostgreSQL"
+	case "redis":
+		templateName = "Redis"
+	case "mongo":
+		templateName = "MongoDB"
+	case "rabbitmq":
+		templateName = "RabbitMQ"
+	case "mysql":
+		templateName = "MySQL"
+	default:
+		templateName = template
+	}
+	
+	editMsg := tgbotapi.NewEditMessageText(
+		query.Message.Chat.ID,
+		query.Message.MessageID,
+		fmt.Sprintf("📦 **Creating %s container...**\n\n⏳ Please wait, this may take **up to 2 minutes**\n\n_Docker is pulling the image and creating the container..._\n\n_The bot is working, not frozen..._", templateName),
+	)
+	editMsg.ParseMode = "Markdown"
+	if _, err := b.telegramAPI.Send(editMsg); err != nil {
+		b.logger.Error("Error occurred", err)
+	}
+
+	// Create container based on template
+	response := b.createContainerFromTemplate(query.From.ID, serverKey, template)
+
+	// Update message with result
+	editMsg = tgbotapi.NewEditMessageText(
+		query.Message.Chat.ID,
+		query.Message.MessageID,
+		response,
+	)
+	editMsg.ParseMode = "Markdown"
 	if _, err := b.telegramAPI.Send(editMsg); err != nil {
 		b.logger.Error("Error occurred", err)
 	}

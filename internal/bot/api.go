@@ -89,15 +89,11 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 
 // getContainers requests Docker containers list from agent
 func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, error) {
-	// Create command message
+	// Create command message first to get ID
 	cmd := protocol.NewMessage(protocol.TypeGetContainers, nil)
-	data, err := cmd.ToJSON()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize command: %v", err)
-	}
 
-	// Subscribe to response channel first
-	respChannel := redis.GetResponseChannel(serverKey)
+	// Subscribe to UNIQUE response channel with command ID
+	respChannel := fmt.Sprintf("resp:%s:%s", serverKey, cmd.ID)
 	b.logger.Info("Подписались на канал Redis")
 
 	subscription, err := b.redisClient.Subscribe(b.ctx, respChannel)
@@ -111,10 +107,15 @@ func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, erro
 	}()
 
 	// Small delay to ensure subscription is active
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
 	// Send command to agent
 	cmdChannel := redis.GetCommandChannel(serverKey)
+	data, err := cmd.ToJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize command: %v", err)
+	}
+
 	if err := b.redisClient.Publish(b.ctx, cmdChannel, data); err != nil {
 		return nil, fmt.Errorf("failed to send command: %v", err)
 	}
