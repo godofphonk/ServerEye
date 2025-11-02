@@ -252,20 +252,22 @@ func (b *Bot) validateContainerAction(containerID, action string) error {
 		return fmt.Errorf("Invalid action '%s'. Allowed: start, stop, restart, remove", action)
 	}
 
-	// Проверяем черный список контейнеров
-	blacklist := []string{
-		"servereye-bot",
-		"redis",
-		"postgres",
-		"postgresql",
-		"database",
-		"db",
-	}
+	// Проверяем черный список контейнеров для stop/restart (не для remove)
+	if action != "remove" {
+		blacklist := []string{
+			"servereye-bot",
+			"redis",
+			"postgres",
+			"postgresql",
+			"database",
+			"db",
+		}
 
-	containerLower := strings.ToLower(containerID)
-	for _, blocked := range blacklist {
-		if strings.Contains(containerLower, blocked) {
-			return fmt.Errorf("Container '%s' is protected and cannot be managed", containerID)
+		containerLower := strings.ToLower(containerID)
+		for _, blocked := range blacklist {
+			if strings.Contains(containerLower, blocked) {
+				return fmt.Errorf("Container '%s' is protected and cannot be stopped/restarted", containerID)
+			}
 		}
 	}
 
