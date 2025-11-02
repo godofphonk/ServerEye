@@ -66,8 +66,11 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		response = "❓ Unknown command. Use /help to see available commands."
 	}
 
-	b.logger.Info("Отправка ответа пользователю")
-	b.sendMessage(message.Chat.ID, response)
+	// Only send response if it's not empty (some commands send messages directly with buttons)
+	if response != "" {
+		b.logger.Info("Отправка ответа пользователю")
+		b.sendMessage(message.Chat.ID, response)
+	}
 	return nil
 }
 
