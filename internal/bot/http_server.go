@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // KeyRegistrationRequest represents a request to register a generated key
@@ -29,6 +31,13 @@ func (b *Bot) startHTTPServer() {
 	http.HandleFunc("/api/heartbeat", b.handleHeartbeat)
 	http.HandleFunc("/api/redis/publish", b.handleRedisPublish)
 	http.HandleFunc("/api/redis/subscribe", b.handleRedisSubscribe)
+	
+	// Redis Streams endpoints (new)
+	http.HandleFunc("/api/streams/xadd", b.handleStreamAdd)
+	http.HandleFunc("/api/streams/xread", b.handleStreamRead)
+	http.HandleFunc("/api/streams/xreadgroup", b.handleStreamReadGroup)
+	http.HandleFunc("/api/streams/xack", b.handleStreamAck)
+	
 	http.HandleFunc("/api/monitoring/memory", b.handleMemoryRequest)
 	http.HandleFunc("/api/monitoring/disk", b.handleDiskRequest)
 	http.HandleFunc("/api/monitoring/uptime", b.handleUptimeRequest)
@@ -310,4 +319,160 @@ func (b *Bot) handleUptimeRequest(w http.ResponseWriter, r *http.Request) {
 
 func (b *Bot) handleProcessesRequest(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not implemented yet", http.StatusNotImplemented)
+}
+
+// handleStreamAdd handles XADD requests (add message to stream)
+func (b *Bot) handleStreamAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Stream string            `json:"stream"`
+		Values map[string]string `json:"values"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	id, err := b.redisClient.(*redis.Client).XAdd(r.Context(), &redis.XAddArgs{
+		Stream: req.Stream,
+		Values: req.Values,
+	}).Result()
+
+	if err != nil {
+		b.logger.Error("XADD failed", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"id": id})
+}
+
+// handleStreamRead handles XREAD requests (read messages)
+func (b *Bot) handleStreamRead(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Stream string `json:"stream"`
+		LastID string `json:"last_id"`
+		Count  int64  `json:"count"`
+		Block  int64  `json:"block_ms"` // milliseconds
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.LastID == "" {
+		req.LastID = "0"
+	}
+	if req.Count <= 0 {
+		req.Count = 10
+	}
+
+	streams, err := b.redisClient.(*redis.Client).XRead(r.Context(), &redis.XReadArgs{
+		Streams: []string{req.Stream, req.LastID},
+		Count:   req.Count,
+		Block:   time.Duration(req.Block) * time.Millisecond,
+	}).Result()
+
+	if err != nil {
+		if err == redis.Nil {
+			// No messages
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"messages": []interface{}{}})
+			return
+		}
+		b.logger.Error("XREAD failed", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"streams": streams})
+}
+
+// handleStreamReadGroup handles XREADGROUP requests (consumer group read)
+func (b *Bot) handleStreamReadGroup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Stream   string `json:"stream"`
+		Group    string `json:"group"`
+		Consumer string `json:"consumer"`
+		Count    int64  `json:"count"`
+		Block    int64  `json:"block_ms"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Count <= 0 {
+		req.Count = 10
+	}
+
+	streams, err := b.redisClient.(*redis.Client).XReadGroup(r.Context(), &redis.XReadGroupArgs{
+		Group:    req.Group,
+		Consumer: req.Consumer,
+		Streams:  []string{req.Stream, ">"},
+		Count:    req.Count,
+		Block:    time.Duration(req.Block) * time.Millisecond,
+	}).Result()
+
+	if err != nil {
+		if err == redis.Nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"messages": []interface{}{}})
+			return
+		}
+		b.logger.Error("XREADGROUP failed", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"streams": streams})
+}
+
+// handleStreamAck handles XACK requests (acknowledge message)
+func (b *Bot) handleStreamAck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Stream string `json:"stream"`
+		Group  string `json:"group"`
+		ID     string `json:"id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	err := b.redisClient.(*redis.Client).XAck(r.Context(), req.Stream, req.Group, req.ID).Err()
+	if err != nil {
+		b.logger.Error("XACK failed", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
