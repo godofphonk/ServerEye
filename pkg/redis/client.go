@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -67,28 +68,17 @@ func (c *Client) Publish(ctx context.Context, channel string, message []byte) er
 
 // Subscription represents a Redis subscription
 type Subscription struct {
-	pubsub  *redis.PubSub
-	msgChan chan []byte
-	logger  *logrus.Logger
+	pubsub    *redis.PubSub
+	msgChan   chan []byte
+	logger    *logrus.Logger
+	closeOnce sync.Once
 }
 
 // Close closes the subscription
 func (s *Subscription) Close() error {
-	// Безопасно закрываем канал
-	defer func() {
-		if r := recover(); r != nil {
-			// Игнорируем панику от закрытия уже закрытого канала
-			_ = r // Explicitly mark as intentionally ignored
-		}
-	}()
-
-	select {
-	case <-s.msgChan:
-		// Канал уже закрыт
-	default:
+	s.closeOnce.Do(func() {
 		close(s.msgChan)
-	}
-
+	})
 	return s.pubsub.Close()
 }
 
