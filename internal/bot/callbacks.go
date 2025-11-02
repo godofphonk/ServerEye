@@ -309,9 +309,6 @@ func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error
 		return fmt.Errorf("no servers found")
 	}
 
-	// Use first server (можно улучшить для multi-server support)
-	serverKey := servers[0]
-
 	// Show processing message
 	editMsg := tgbotapi.NewEditMessageText(
 		query.Message.Chat.ID,
