@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -60,11 +61,12 @@ type HTTPResponse struct {
 
 // HTTPSubscription implements subscription over HTTP
 type HTTPSubscription struct {
-	channel string
-	client  *HTTPClient
-	msgChan chan []byte
-	ctx     context.Context
-	cancel  context.CancelFunc
+	channel  string
+	client   *HTTPClient
+	msgChan  chan []byte
+	ctx      context.Context
+	cancel   context.CancelFunc
+	closeOnce sync.Once
 }
 
 // Channel returns the message channel
@@ -75,7 +77,9 @@ func (s *HTTPSubscription) Channel() <-chan []byte {
 // Close closes the subscription
 func (s *HTTPSubscription) Close() error {
 	s.cancel()
-	close(s.msgChan)
+	s.closeOnce.Do(func() {
+		close(s.msgChan)
+	})
 	return nil
 }
 
