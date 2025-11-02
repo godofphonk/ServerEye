@@ -11,6 +11,7 @@ import (
 	"github.com/servereye/servereye/pkg/metrics"
 	"github.com/servereye/servereye/pkg/protocol"
 	"github.com/servereye/servereye/pkg/redis"
+	"github.com/servereye/servereye/pkg/redis/streams"
 	"github.com/sirupsen/logrus"
 )
 
@@ -32,11 +33,13 @@ type Agent struct {
 	config        *config.AgentConfig
 	logger        *logrus.Logger
 	redisClient   RedisClientInterface
+	streamsClient streams.StreamClient // NEW: for Streams support
 	cpuMetrics    *metrics.CPUMetrics
 	systemMonitor *metrics.SystemMonitor
 	dockerClient  *docker.Client
 	ctx           context.Context
 	cancel        context.CancelFunc
+	useStreams    bool // Flag to use Streams instead of Pub/Sub
 }
 
 // New создает новый агент
@@ -78,10 +81,21 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Initialize Streams client if using HTTP API
+	var streamsClient streams.StreamClient
+	var useStreams bool
+	if cfg.API.BaseURL != "" {
+		streamsClient = streams.NewHTTPStreamClient(cfg.API.BaseURL, logger)
+		useStreams = true
+		logger.Info("Streams support enabled via HTTP API")
+	}
+
 	return &Agent{
 		config:        cfg,
 		logger:        logger,
 		redisClient:   redisClient,
+		streamsClient: streamsClient,
+		useStreams:    useStreams,
 		cpuMetrics:    metrics.NewCPUMetrics(),
 		systemMonitor: metrics.NewSystemMonitor(logger),
 		dockerClient:  docker.NewClient(logger),
@@ -97,17 +111,21 @@ func (a *Agent) Start() error {
 		"secret_key":  a.config.Server.SecretKey,
 	}).Info("Запуск агента ServerEye")
 
-	// Подписываемся на канал команд
-	cmdChannel := redis.GetCommandChannel(a.config.Server.SecretKey)
-	msgChan, err := a.redisClient.Subscribe(a.ctx, cmdChannel)
-	if err != nil {
-		return fmt.Errorf("не удалось подписаться на канал команд: %v", err)
+	// Use Streams if available
+	if a.useStreams && a.streamsClient != nil {
+		a.logger.Info("Starting with Streams mode")
+		go a.handleCommandsViaStreams()
+	} else {
+		// Fallback to Pub/Sub
+		a.logger.Info("Starting with Pub/Sub mode")
+		cmdChannel := redis.GetCommandChannel(a.config.Server.SecretKey)
+		msgChan, err := a.redisClient.Subscribe(a.ctx, cmdChannel)
+		if err != nil {
+			return fmt.Errorf("не удалось подписаться на канал команд: %v", err)
+		}
+		a.logger.WithField("channel", cmdChannel).Info("Подписались на канал команд")
+		go a.handleCommands(msgChan.Channel())
 	}
-
-	a.logger.WithField("channel", cmdChannel).Info("Подписались на канал команд")
-
-	// Запускаем обработку команд
-	go a.handleCommands(msgChan.Channel())
 
 	// Запускаем heartbeat
 	go a.startHeartbeat()
@@ -292,18 +310,38 @@ func (a *Agent) sendResponse(msg *protocol.Message) error {
 	return a.redisClient.Publish(a.ctx, respChannel, data)
 }
 
-// sendResponseToCommand отправляет ответ в УНИКАЛЬНЫЙ канал с ID команды
+// sendResponseToCommand отправляет ответ в Stream или Pub/Sub
 func (a *Agent) sendResponseToCommand(msg *protocol.Message, commandID string) error {
 	data, err := msg.ToJSON()
 	if err != nil {
 		return fmt.Errorf("не удалось сериализовать ответ: %v", err)
 	}
 
-	// Формируем уникальный канал: resp:srv_XXX:commandID
+	// Use Streams if available
+	if a.useStreams && a.streamsClient != nil {
+		respStream := fmt.Sprintf("stream:resp:%s", a.config.Server.SecretKey)
+		
+		values := map[string]string{
+			"type":       string(msg.Type),
+			"id":         msg.ID,
+			"command_id": commandID,
+			"payload":    string(data),
+			"timestamp":  time.Now().Format(time.RFC3339),
+		}
+		
+		_, err := a.streamsClient.AddMessage(a.ctx, respStream, values)
+		if err != nil {
+			a.logger.WithError(err).Error("Failed to send via Streams")
+			return err
+		}
+		
+		a.logger.WithField("stream", respStream).Debug("Response sent via Streams")
+		return nil
+	}
+
+	// Fallback to Pub/Sub
 	respChannel := fmt.Sprintf("resp:%s:%s", a.config.Server.SecretKey, commandID)
-	
 	a.logger.WithField("response_channel", respChannel).Debug("Отправка ответа в уникальный канал")
-	
 	return a.redisClient.Publish(a.ctx, respChannel, data)
 }
 
@@ -674,6 +712,62 @@ func (d *DirectClientAdapter) Publish(ctx context.Context, channel string, messa
 
 func (d *DirectClientAdapter) Close() error {
 	return d.client.Close()
+}
+
+// handleCommandsViaStreams reads commands from Streams
+func (a *Agent) handleCommandsViaStreams() {
+	a.logger.Info("Streams command handler started")
+	cmdStream := fmt.Sprintf("stream:cmd:%s", a.config.Server.SecretKey)
+	
+	lastID := "0" // Start from beginning, then use "$" for new messages
+	firstRead := true
+	
+	for {
+		select {
+		case <-a.ctx.Done():
+			a.logger.Info("Streams handler stopped")
+			return
+		default:
+			// Read from stream
+			id := lastID
+			if !firstRead {
+				id = "$" // Only new messages after first read
+			}
+			
+			messages, err := a.streamsClient.ReadMessages(a.ctx, cmdStream, id, 10, 5*time.Second)
+			if err != nil {
+				if err.Error() != "XREAD failed: context deadline exceeded" {
+					a.logger.WithError(err).Error("Failed to read from stream")
+				}
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			
+			firstRead = false
+			
+			// Process messages
+			for _, msg := range messages {
+				lastID = msg.ID
+				
+				// Parse command
+				payloadJSON := msg.Values["payload"]
+				command, err := protocol.FromJSON([]byte(payloadJSON))
+				if err != nil {
+					a.logger.WithError(err).Error("Failed to parse command")
+					continue
+				}
+				
+				a.logger.WithFields(logrus.Fields{
+					"command_id":   command.ID,
+					"command_type": command.Type,
+				}).Info("Получена команда via Streams")
+				
+				// Process command (processCommand expects []byte)
+				cmdData, _ := command.ToJSON()
+				a.processCommand(cmdData)
+			}
+		}
+	}
 }
 
 // DirectSubscriptionAdapter адаптер для прямой Redis подписки

@@ -66,87 +66,45 @@ func (b *Bot) handleContainerAction(userID int64, containerID, action string) st
 	return b.formatContainerActionResponse(response)
 }
 
-// sendContainerAction sends container action command to agent
+// sendContainerAction sends container action command to agent via Streams
 func (b *Bot) sendContainerAction(serverKey string, messageType protocol.MessageType, payload protocol.ContainerActionPayload) (*protocol.ContainerActionResponse, error) {
-	// Создаем команду сначала чтобы получить ID
 	message := protocol.NewMessage(messageType, payload)
 
-	// Подписываемся на УНИКАЛЬНЫЙ канал ответов с ID команды
-	responseChannel := fmt.Sprintf("resp:%s:%s", serverKey, message.ID)
-	subscription, err := b.redisClient.Subscribe(b.ctx, responseChannel)
-	if err != nil {
-		return nil, fmt.Errorf("failed to subscribe to response channel: %w", err)
-	}
-	defer subscription.Close()
-
-	b.logger.Info("Operation completed")
-
-	// Небольшая задержка для стабилизации подписки (уменьшена с 1s до 100ms)
-	time.Sleep(100 * time.Millisecond)
-
-	// Отправляем команду
-	commandChannel := fmt.Sprintf("cmd:%s", serverKey)
-
-	messageData, err := message.ToJSON()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize message: %w", err)
-	}
-
-	if err := b.redisClient.Publish(b.ctx, commandChannel, messageData); err != nil {
-		return nil, fmt.Errorf("failed to send command: %w", err)
-	}
-
-	b.logger.Info("Команда отправлена агенту")
-
-	// Ожидаем ответ (увеличенный timeout для медленных операций + Docker pull time)
+	// Определяем timeout
 	timeout := 60 * time.Second
 	if payload.Action == "stop" || payload.Action == "restart" || payload.Action == "remove" {
-		timeout = 90 * time.Second // Stop, restart и remove могут быть очень долгими
+		timeout = 90 * time.Second
 	}
+
 	ctx, cancel := context.WithTimeout(b.ctx, timeout)
 	defer cancel()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("timeout waiting for agent response")
-		case msgBytes := <-subscription.Channel():
-			var response protocol.Message
-			if err := json.Unmarshal(msgBytes, &response); err != nil {
-				b.logger.Error("Error occurred", err)
-				continue
-			}
-
-			if response.ID != message.ID {
-				continue // Не наш ответ
-			}
-
-			if response.Type == protocol.TypeErrorResponse {
-				// Парсим ошибку
-				if errorData, ok := response.Payload.(map[string]interface{}); ok {
-					errorMsg := "unknown error"
-					if msg, exists := errorData["error_message"]; exists {
-						errorMsg = fmt.Sprintf("%v", msg)
-					}
-					return nil, fmt.Errorf("agent error: %s", errorMsg)
-				}
-				return nil, fmt.Errorf("agent returned error")
-			}
-
-			if response.Type == protocol.TypeContainerActionResponse {
-				// Парсим ответ
-				if payload, ok := response.Payload.(map[string]interface{}); ok {
-					actionData, _ := json.Marshal(payload)
-					var actionResponse protocol.ContainerActionResponse
-					if err := json.Unmarshal(actionData, &actionResponse); err == nil {
-						b.logger.Info("Operation completed")
-						return &actionResponse, nil
-					}
-				}
-				return nil, fmt.Errorf("invalid container action response format")
-			}
-		}
+	resp, err := b.sendCommandViaStreams(ctx, serverKey, message, timeout)
+	if err != nil {
+		return nil, err
 	}
+
+	if resp.Type == protocol.TypeErrorResponse {
+		if errorData, ok := resp.Payload.(map[string]interface{}); ok {
+			errorMsg := "unknown error"
+			if msg, exists := errorData["error_message"]; exists {
+				errorMsg = fmt.Sprintf("%v", msg)
+			}
+			return nil, fmt.Errorf("agent error: %s", errorMsg)
+		}
+		return nil, fmt.Errorf("agent returned error")
+	}
+
+	if resp.Type == protocol.TypeContainerActionResponse {
+		var actionResp protocol.ContainerActionResponse
+		payloadData, _ := json.Marshal(resp.Payload)
+		if err := json.Unmarshal(payloadData, &actionResp); err == nil {
+			return &actionResp, nil
+		}
+		return nil, fmt.Errorf("invalid container action response format")
+	}
+
+	return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
 }
 
 // formatContainerActionResponse formats container action response for display
@@ -270,12 +228,21 @@ func (b *Bot) createContainerFromTemplate(userID int64, serverKey, template stri
 	// Use first server
 	serverKey = servers[0]
 
-	// Send create container command
-	response, err := b.sendCreateContainerCommand(serverKey, payload)
+	// Send create container command via Streams
+	cmd := protocol.NewMessage(protocol.TypeCreateContainer, payload)
+	ctx, cancel := context.WithTimeout(b.ctx, 120*time.Second)
+	defer cancel()
+	
+	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 120*time.Second)
 	if err != nil {
 		b.logger.Error("Error occurred", err)
 		return fmt.Sprintf("❌ Failed to create container: %v", err)
 	}
+	
+	// Parse response
+	var response protocol.ContainerActionResponse
+	respData, _ := json.Marshal(resp.Payload)
+	json.Unmarshal(respData, &response)
 
 	// Format response
 	if response.Success {
@@ -344,66 +311,3 @@ func (b *Bot) getTemplateConfig(template string) (*protocol.CreateContainerPaylo
 	return config, nil
 }
 
-// sendCreateContainerCommand sends create container command to agent
-func (b *Bot) sendCreateContainerCommand(serverKey string, payload *protocol.CreateContainerPayload) (*protocol.ContainerActionResponse, error) {
-	// Создаем команду сначала чтобы получить ID
-	message := protocol.NewMessage(protocol.TypeCreateContainer, payload)
-
-	// Подписываемся на УНИКАЛЬНЫЙ канал ответов с ID команды
-	responseChannel := fmt.Sprintf("resp:%s:%s", serverKey, message.ID)
-	subscription, err := b.redisClient.Subscribe(b.ctx, responseChannel)
-	if err != nil {
-		return nil, fmt.Errorf("failed to subscribe: %w", err)
-	}
-	defer subscription.Close()
-
-	// Небольшая задержка для стабилизации подписки (уменьшена до 100ms)
-	time.Sleep(100 * time.Millisecond)
-
-	// Send command
-	commandChannel := fmt.Sprintf("cmd:%s", serverKey)
-
-	messageData, err := message.ToJSON()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize: %w", err)
-	}
-
-	if err := b.redisClient.Publish(b.ctx, commandChannel, messageData); err != nil {
-		return nil, fmt.Errorf("failed to send: %w", err)
-	}
-
-	b.logger.Info("Create command sent to agent")
-
-	// Wait for response (increased timeout for Docker pull + container creation)
-	ctx, cancel := context.WithTimeout(b.ctx, 120*time.Second)
-	defer cancel()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("timeout waiting for response")
-		case respData := <-subscription.Channel():
-			resp, err := protocol.FromJSON(respData)
-			if err != nil {
-				continue
-			}
-
-			// Parse response
-			if resp.Type == protocol.TypeContainerActionResponse {
-				payloadData, _ := json.Marshal(resp.Payload)
-				var actionResponse protocol.ContainerActionResponse
-				if err := json.Unmarshal(payloadData, &actionResponse); err == nil {
-					return &actionResponse, nil
-				}
-			}
-
-			if resp.Type == protocol.TypeErrorResponse {
-				payloadData, _ := json.Marshal(resp.Payload)
-				var errorPayload protocol.ErrorPayload
-				if err := json.Unmarshal(payloadData, &errorPayload); err == nil {
-					return nil, fmt.Errorf("%s", errorPayload.ErrorMessage)
-				}
-			}
-		}
-	}
-}

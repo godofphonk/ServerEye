@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	pkgredis "github.com/servereye/servereye/pkg/redis"
 )
 
 // KeyRegistrationRequest represents a request to register a generated key
@@ -321,6 +322,14 @@ func (b *Bot) handleProcessesRequest(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not implemented yet", http.StatusNotImplemented)
 }
 
+// getRawRedisClient returns the underlying redis.Client for Streams operations
+func (b *Bot) getRawRedisClient() (*redis.Client, bool) {
+	if rawClient, ok := b.redisRawClient.(*pkgredis.Client); ok {
+		return rawClient.GetRawClient(), true
+	}
+	return nil, false
+}
+
 // handleStreamAdd handles XADD requests (add message to stream)
 func (b *Bot) handleStreamAdd(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -338,7 +347,13 @@ func (b *Bot) handleStreamAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := b.redisClient.(*redis.Client).XAdd(r.Context(), &redis.XAddArgs{
+	rdb, ok := b.getRawRedisClient()
+	if !ok {
+		http.Error(w, "Redis client not available", http.StatusInternalServerError)
+		return
+	}
+	
+	id, err := rdb.XAdd(r.Context(), &redis.XAddArgs{
 		Stream: req.Stream,
 		Values: req.Values,
 	}).Result()
@@ -379,7 +394,13 @@ func (b *Bot) handleStreamRead(w http.ResponseWriter, r *http.Request) {
 		req.Count = 10
 	}
 
-	streams, err := b.redisClient.(*redis.Client).XRead(r.Context(), &redis.XReadArgs{
+	rdb, ok := b.getRawRedisClient()
+	if !ok {
+		http.Error(w, "Redis client not available", http.StatusInternalServerError)
+		return
+	}
+
+	streams, err := rdb.XRead(r.Context(), &redis.XReadArgs{
 		Streams: []string{req.Stream, req.LastID},
 		Count:   req.Count,
 		Block:   time.Duration(req.Block) * time.Millisecond,
@@ -425,7 +446,13 @@ func (b *Bot) handleStreamReadGroup(w http.ResponseWriter, r *http.Request) {
 		req.Count = 10
 	}
 
-	streams, err := b.redisClient.(*redis.Client).XReadGroup(r.Context(), &redis.XReadGroupArgs{
+	rdb, ok := b.getRawRedisClient()
+	if !ok {
+		http.Error(w, "Redis client not available", http.StatusInternalServerError)
+		return
+	}
+
+	streams, err := rdb.XReadGroup(r.Context(), &redis.XReadGroupArgs{
 		Group:    req.Group,
 		Consumer: req.Consumer,
 		Streams:  []string{req.Stream, ">"},
@@ -466,7 +493,13 @@ func (b *Bot) handleStreamAck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := b.redisClient.(*redis.Client).XAck(r.Context(), req.Stream, req.Group, req.ID).Err()
+	rdb, ok := b.getRawRedisClient()
+	if !ok {
+		http.Error(w, "Redis client not available", http.StatusInternalServerError)
+		return
+	}
+
+	err := rdb.XAck(r.Context(), req.Stream, req.Group, req.ID).Err()
 	if err != nil {
 		b.logger.Error("XACK failed", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

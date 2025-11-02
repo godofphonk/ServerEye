@@ -337,13 +337,13 @@ func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error
 	var processingMsg string
 	switch action {
 	case "start":
-		processingMsg = "▶️ **Starting container** `%s`\n\n⏳ Please wait, this usually takes **5-10 seconds**\n\n_The bot is working, not frozen_"
+		processingMsg = "▶️ **Starting** `%s`..."
 	case "stop":
-		processingMsg = "⏹️ **Stopping container** `%s`\n\n⏳ Please wait, this may take **up to 90 seconds**\n\n_The bot is working, not frozen_"
+		processingMsg = "⏹️ **Stopping** `%s`..."
 	case "restart":
-		processingMsg = "🔄 **Restarting container** `%s`\n\n⏳ Please wait, this may take **up to 90 seconds**\n\n_The bot is working, not frozen_"
+		processingMsg = "🔄 **Restarting** `%s`..."
 	case "remove":
-		processingMsg = "🗑️ **Deleting container** `%s`\n\n⏳ Please wait, this may take **up to 90 seconds**\n\n_The bot is working, not frozen_"
+		processingMsg = "🗑️ **Deleting** `%s`..."
 	default:
 		processingMsg = "⏳ Processing container `%s`...\n\n_Please wait..._"
 	}
@@ -583,7 +583,7 @@ func (b *Bot) handleTemplateSelection(query *tgbotapi.CallbackQuery) error {
 	editMsg := tgbotapi.NewEditMessageText(
 		query.Message.Chat.ID,
 		query.Message.MessageID,
-		fmt.Sprintf("📦 **Creating %s container...**\n\n⏳ Please wait, this may take **up to 2 minutes**\n\n_Docker is pulling the image and creating the container..._\n\n_The bot is working, not frozen..._", templateName),
+		fmt.Sprintf("📦 **Creating %s**...", templateName),
 	)
 	editMsg.ParseMode = "Markdown"
 	if _, err := b.telegramAPI.Send(editMsg); err != nil {

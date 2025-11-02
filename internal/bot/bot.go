@@ -15,6 +15,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/pkg/redis"
+	"github.com/servereye/servereye/pkg/redis/streams"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,6 +35,12 @@ type Bot struct {
 
 	// Direct database access for internal methods
 	db *sql.DB
+	
+	// Concrete Redis client for Streams (not in interface yet)
+	redisRawClient interface{}
+	
+	// Streams client for new architecture
+	streamsClient interface{}
 
 	// Context management
 	ctx    context.Context
@@ -156,6 +163,26 @@ func NewFromConfig(cfg *config.BotConfig, logger *logrus.Logger) (*Bot, error) {
 	dbAdapter.bot = bot
 	agentAdapter.bot = bot
 	bot.db = db
+	bot.redisRawClient = redisClient // Store raw client for Streams
+	
+	// Initialize Streams client
+	streamsConfig := &streams.Config{
+		Addr:            cfg.Redis.Address,
+		Password:        cfg.Redis.Password,
+		DB:              cfg.Redis.DB,
+		MaxRetries:      3,
+		BlockDuration:   5 * time.Second,
+		BatchSize:       10,
+		StreamMaxLength: 1000,
+	}
+	
+	streamsClient, err := streams.NewClient(streamsConfig, logger)
+	if err != nil {
+		logger.WithError(err).Warn("Failed to create Streams client, will use Pub/Sub")
+	} else {
+		bot.streamsClient = streamsClient
+		logger.Info("Redis Streams client initialized")
+	}
 
 	return bot, nil
 }

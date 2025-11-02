@@ -150,6 +150,11 @@ func (c *Client) Close() error {
 	return c.rdb.Close()
 }
 
+// GetRawClient returns underlying redis.Client for Streams operations
+func (c *Client) GetRawClient() *redis.Client {
+	return c.rdb
+}
+
 // GetCommandChannel возвращает имя канала для команд
 func GetCommandChannel(serverKey string) string {
 	return fmt.Sprintf("cmd:%s", serverKey)
