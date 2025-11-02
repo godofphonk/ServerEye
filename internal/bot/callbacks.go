@@ -17,7 +17,12 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 		b.logger.Error("Error occurred", err)
 	}
 
-	// Check if it's a container action callback (format: "container_action_containerID")
+	// Check if it's a container action selection (format: "container_action_<action>")
+	if strings.HasPrefix(query.Data, "container_action_") {
+		return b.handleContainerActionSelection(query)
+	}
+
+	// Check if it's a container action callback (format: "container_<action>_<containerID>")
 	if strings.HasPrefix(query.Data, "container_") {
 		return b.handleContainerActionCallback(query)
 	}
@@ -336,6 +341,100 @@ func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error
 		response,
 	)
 	editMsg.ParseMode = "Markdown"
+	if _, err := b.telegramAPI.Send(editMsg); err != nil {
+		b.logger.Error("Error occurred", err)
+	}
+
+	return nil
+}
+
+// handleContainerActionSelection shows list of containers to select for action
+func (b *Bot) handleContainerActionSelection(query *tgbotapi.CallbackQuery) error {
+	// Parse action from callback data (format: "container_action_<action>")
+	action := strings.TrimPrefix(query.Data, "container_action_")
+
+	// Get user's servers
+	servers, err := b.getUserServers(query.From.ID)
+	if err != nil {
+		b.logger.Error("Error occurred", err)
+		b.sendMessage(query.Message.Chat.ID, "❌ Error getting your servers")
+		return err
+	}
+
+	if len(servers) == 0 {
+		b.sendMessage(query.Message.Chat.ID, "❌ No servers found")
+		return fmt.Errorf("no servers found")
+	}
+
+	// Use first server (TODO: multi-server support)
+	serverKey := servers[0]
+
+	// Get containers list
+	containers, err := b.getContainers(serverKey)
+	if err != nil {
+		b.logger.Error("Error occurred", err)
+		b.sendMessage(query.Message.Chat.ID, fmt.Sprintf("❌ Failed to get containers: %v", err))
+		return err
+	}
+
+	if containers.Total == 0 {
+		b.sendMessage(query.Message.Chat.ID, "📦 No containers found")
+		return nil
+	}
+
+	// Build action-specific message
+	var actionText string
+	switch action {
+	case "start":
+		actionText = "▶️ Select container to START:"
+	case "stop":
+		actionText = "⏹️ Select container to STOP:"
+	case "restart":
+		actionText = "🔄 Select container to RESTART:"
+	case "remove":
+		actionText = "🗑️ Select container to DELETE:"
+	case "create":
+		// TODO: будем делать дальше
+		b.sendMessage(query.Message.Chat.ID, "🚧 Create container feature coming soon!")
+		return nil
+	default:
+		return fmt.Errorf("unknown action: %s", action)
+	}
+
+	// Build buttons for each container
+	var buttons [][]tgbotapi.InlineKeyboardButton
+	for _, container := range containers.Containers {
+		containerID := container.Name
+		if containerID == "" {
+			containerID = container.ID[:12]
+		}
+
+		// Status emoji
+		statusEmoji := "🔴"
+		if strings.Contains(strings.ToLower(container.State), "running") {
+			statusEmoji = "🟢"
+		}
+
+		buttonText := fmt.Sprintf("%s %s", statusEmoji, container.Name)
+		callbackData := fmt.Sprintf("container_%s_%s", action, containerID)
+
+		button := tgbotapi.NewInlineKeyboardButtonData(buttonText, callbackData)
+		buttons = append(buttons, []tgbotapi.InlineKeyboardButton{button})
+	}
+
+	// Add cancel button
+	buttons = append(buttons, []tgbotapi.InlineKeyboardButton{
+		tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "container_cancel"),
+	})
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+	editMsg := tgbotapi.NewEditMessageText(
+		query.Message.Chat.ID,
+		query.Message.MessageID,
+		actionText,
+	)
+	editMsg.ReplyMarkup = &keyboard
+
 	if _, err := b.telegramAPI.Send(editMsg); err != nil {
 		b.logger.Error("Error occurred", err)
 	}

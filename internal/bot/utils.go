@@ -77,22 +77,20 @@ func (b *Bot) sendServerSelectionButtons(chatID int64, command, text string, ser
 	}
 }
 
-// sendContainersWithButtons sends containers list with action buttons
-func (b *Bot) sendContainersWithButtons(chatID int64, serverKey string, containers *protocol.ContainersPayload) {
+// sendContainersWithActionButtons sends containers list with action buttons at bottom
+func (b *Bot) sendContainersWithActionButtons(chatID int64, serverKey string, containers *protocol.ContainersPayload) {
 	if containers.Total == 0 {
 		b.sendMessage(chatID, "📦 No Docker containers found on the server.")
 		return
 	}
 
-	text := fmt.Sprintf("🐳 **Docker Containers (%d total):**\n\n", containers.Total)
+	// Build text with all containers
+	var text strings.Builder
+	text.WriteString(fmt.Sprintf("🐳 **Docker Containers (%d total):**\n\n", containers.Total))
 
 	for i, container := range containers.Containers {
 		if i >= 10 { // Limit to 10 containers
-			// Send final message with remaining count
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("... and %d more containers", containers.Total-10))
-			if _, err := b.telegramAPI.Send(msg); err != nil {
-				b.logger.Error("Error occurred", err)
-			}
+			text.WriteString(fmt.Sprintf("... and %d more containers\n", containers.Total-10))
 			break
 		}
 
@@ -104,49 +102,38 @@ func (b *Bot) sendContainersWithButtons(chatID int64, serverKey string, containe
 			statusEmoji = "🟡" // Yellow for paused
 		}
 
-		text += fmt.Sprintf("%s **%s**\n", statusEmoji, container.Name)
-		text += fmt.Sprintf("📷 Image: `%s`\n", container.Image)
-		text += fmt.Sprintf("🔄 Status: %s\n", container.Status)
+		text.WriteString(fmt.Sprintf("%s **%s**\n", statusEmoji, container.Name))
+		text.WriteString(fmt.Sprintf("📷 Image: `%s`\n", container.Image))
+		text.WriteString(fmt.Sprintf("🔄 Status: %s\n", container.Status))
 
 		if len(container.Ports) > 0 {
-			text += fmt.Sprintf("🔌 Ports: %s\n", strings.Join(container.Ports, ", "))
+			text.WriteString(fmt.Sprintf("🔌 Ports: %s\n", strings.Join(container.Ports, ", ")))
 		}
 
-		// Add action buttons for each container
-		var buttons []tgbotapi.InlineKeyboardButton
+		text.WriteString("\n")
+	}
 
-		containerID := container.ID[:12] // Short ID
-		if container.Name != "" {
-			containerID = container.Name
-		}
+	// Add 5 action buttons at bottom
+	buttons := [][]tgbotapi.InlineKeyboardButton{
+		{
+			tgbotapi.NewInlineKeyboardButtonData("▶️ Start", "container_action_start"),
+			tgbotapi.NewInlineKeyboardButtonData("⏹️ Stop", "container_action_stop"),
+		},
+		{
+			tgbotapi.NewInlineKeyboardButtonData("🔄 Restart", "container_action_restart"),
+			tgbotapi.NewInlineKeyboardButtonData("🗑️ Delete", "container_action_remove"),
+		},
+		{
+			tgbotapi.NewInlineKeyboardButtonData("➕ Create", "container_action_create"),
+		},
+	}
 
-		// Show appropriate buttons based on container state
-		if strings.Contains(strings.ToLower(container.State), "running") {
-			// Running: show Stop and Restart
-			buttons = append(buttons,
-				tgbotapi.NewInlineKeyboardButtonData("⏹️ Stop", fmt.Sprintf("container_stop_%s", containerID)),
-				tgbotapi.NewInlineKeyboardButtonData("🔄 Restart", fmt.Sprintf("container_restart_%s", containerID)),
-			)
-		} else {
-			// Stopped: show Start and Delete
-			buttons = append(buttons,
-				tgbotapi.NewInlineKeyboardButtonData("▶️ Start", fmt.Sprintf("container_start_%s", containerID)),
-				tgbotapi.NewInlineKeyboardButtonData("🗑️ Delete", fmt.Sprintf("container_remove_%s", containerID)),
-			)
-		}
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+	msg := tgbotapi.NewMessage(chatID, text.String())
+	msg.ParseMode = "Markdown"
+	msg.ReplyMarkup = keyboard
 
-		text += "\n"
-
-		// Send message for this container with buttons
-		keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons)
-		msg := tgbotapi.NewMessage(chatID, text)
-		msg.ParseMode = "Markdown"
-		msg.ReplyMarkup = keyboard
-
-		if _, err := b.telegramAPI.Send(msg); err != nil {
-			b.logger.Error("Error occurred", err)
-		}
-
-		text = "" // Reset for next container
+	if _, err := b.telegramAPI.Send(msg); err != nil {
+		b.logger.Error("Error occurred", err)
 	}
 }
