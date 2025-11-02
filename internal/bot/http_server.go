@@ -166,8 +166,8 @@ func (b *Bot) handleRedisPublish(w http.ResponseWriter, r *http.Request) {
 
 	b.logger.Info("Received publish request")
 
-	// Validate channel format (should be resp:srv_*)
-	if !strings.HasPrefix(req.Channel, "resp:srv_") {
+	// Validate channel format (should be resp:srv_* or heartbeat:srv_*)
+	if !strings.HasPrefix(req.Channel, "resp:srv_") && !strings.HasPrefix(req.Channel, "heartbeat:srv_") {
 		http.Error(w, "Invalid channel format", http.StatusBadRequest)
 		return
 	}
