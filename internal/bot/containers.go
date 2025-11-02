@@ -245,10 +245,11 @@ func (b *Bot) validateContainerAction(containerID, action string) error {
 		"start":   true,
 		"stop":    true,
 		"restart": true,
+		"remove":  true,
 	}
 
 	if !validActions[action] {
-		return fmt.Errorf("Invalid action '%s'. Allowed: start, stop, restart", action)
+		return fmt.Errorf("Invalid action '%s'. Allowed: start, stop, restart, remove", action)
 	}
 
 	// Проверяем черный список контейнеров
