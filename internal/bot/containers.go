@@ -86,6 +86,8 @@ func (b *Bot) handleContainerAction(userID int64, containerID, action string) st
 		messageType = protocol.TypeStopContainer
 	case "restart":
 		messageType = protocol.TypeRestartContainer
+	case "remove":
+		messageType = protocol.TypeRemoveContainer
 	default:
 		return fmt.Sprintf("❌ Invalid action: %s", action)
 	}

@@ -124,9 +124,10 @@ func (b *Bot) sendContainersWithButtons(chatID int64, serverKey string, containe
 				tgbotapi.NewInlineKeyboardButtonData("🔄 Restart", fmt.Sprintf("container_restart_%s", containerID)),
 			)
 		} else {
-			// Stopped: show Start
+			// Stopped: show Start and Delete
 			buttons = append(buttons,
 				tgbotapi.NewInlineKeyboardButtonData("▶️ Start", fmt.Sprintf("container_start_%s", containerID)),
+				tgbotapi.NewInlineKeyboardButtonData("🗑️ Delete", fmt.Sprintf("container_remove_%s", containerID)),
 			)
 		}
 

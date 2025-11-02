@@ -18,6 +18,7 @@ const (
 	TypeStartContainer   MessageType = "start_container"
 	TypeStopContainer    MessageType = "stop_container"
 	TypeRestartContainer MessageType = "restart_container"
+	TypeRemoveContainer  MessageType = "remove_container"
 	TypeGetMemoryInfo    MessageType = "get_memory_info"
 	TypeGetDiskInfo      MessageType = "get_disk_info"
 	TypeGetUptime        MessageType = "get_uptime"

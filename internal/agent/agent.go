@@ -183,6 +183,8 @@ func (a *Agent) processCommand(data []byte) {
 		response = a.handleStopContainer(msg)
 	case protocol.TypeRestartContainer:
 		response = a.handleRestartContainer(msg)
+	case protocol.TypeRemoveContainer:
+		response = a.handleRemoveContainer(msg)
 	case protocol.TypeGetMemoryInfo:
 		response = a.handleGetMemoryInfo(msg)
 	case protocol.TypeGetDiskInfo:
@@ -440,6 +442,46 @@ func (a *Agent) handleRestartContainer(msg *protocol.Message) *protocol.Message 
 	response.ContainerName = actionPayload.ContainerName
 
 	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно перезапущен")
+	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
+}
+
+// handleRemoveContainer обрабатывает команду удаления контейнера
+func (a *Agent) handleRemoveContainer(msg *protocol.Message) *protocol.Message {
+	a.logger.Info("Обработка команды remove_container")
+
+	// Парсим payload
+	payloadData, err := json.Marshal(msg.Payload)
+	if err != nil {
+		a.logger.WithError(err).Error("Не удалось сериализовать payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+
+	var actionPayload protocol.ContainerActionPayload
+	if err := json.Unmarshal(payloadData, &actionPayload); err != nil {
+		a.logger.WithError(err).Error("Не удалось распарсить payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Неверный формат команды",
+		})
+	}
+
+	// Выполняем команду
+	response, err := a.dockerClient.RemoveContainer(a.ctx, actionPayload.ContainerID)
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка при удалении контейнера")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorContainerAction,
+			ErrorMessage: fmt.Sprintf("Ошибка при удалении контейнера: %v", err),
+		})
+	}
+
+	// Добавляем имя контейнера в ответ
+	response.ContainerName = actionPayload.ContainerName
+
+	a.logger.WithField("container_id", actionPayload.ContainerID).Info("Контейнер успешно удален")
 	return protocol.NewMessage(protocol.TypeContainerActionResponse, response)
 }
 

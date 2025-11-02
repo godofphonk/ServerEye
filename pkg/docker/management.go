@@ -126,6 +126,42 @@ func (c *Client) RestartContainer(ctx context.Context, containerID string) (*pro
 	return response, nil
 }
 
+// RemoveContainer removes a Docker container
+func (c *Client) RemoveContainer(ctx context.Context, containerID string) (*protocol.ContainerActionResponse, error) {
+	c.logger.WithField("container_id", containerID).Info("Removing Docker container")
+
+	// Check Docker availability first
+	if err := c.CheckDockerAvailability(ctx); err != nil {
+		return &protocol.ContainerActionResponse{
+			ContainerID: containerID,
+			Action:      "remove",
+			Success:     false,
+			Message:     err.Error(),
+		}, nil
+	}
+
+	// Use -f flag to force removal
+	cmd := exec.CommandContext(ctx, "docker", "rm", "-f", containerID)
+	output, err := cmd.CombinedOutput()
+
+	response := &protocol.ContainerActionResponse{
+		ContainerID: containerID,
+		Action:      "remove",
+		Success:     err == nil,
+		Message:     string(output),
+	}
+
+	if err != nil {
+		c.logger.WithError(err).Error("Failed to remove container")
+		response.Message = fmt.Sprintf("Failed to remove container: %v", err)
+		return response, nil
+	}
+
+	response.NewState = "removed"
+	c.logger.Info("Container removed successfully")
+	return response, nil
+}
+
 // getContainerState gets the current state of a container
 func (c *Client) getContainerState(ctx context.Context, containerID string) (string, error) {
 	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Status}}", containerID)
