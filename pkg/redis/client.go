@@ -112,6 +112,9 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, 
 			if r := recover(); r != nil {
 				c.logger.WithField("panic", r).Error("Panic in Redis subscription goroutine")
 			}
+			subscription.closeOnce.Do(func() {
+				close(subscription.msgChan)
+			})
 			pubsub.Close()
 		}()
 
@@ -120,13 +123,6 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, 
 			select {
 			case msg := <-ch:
 				if msg == nil {
-					// Безопасно закрываем канал
-					select {
-					case <-subscription.msgChan:
-						// Канал уже закрыт
-					default:
-						close(subscription.msgChan)
-					}
 					return
 				}
 
@@ -138,11 +134,9 @@ func (c *Client) Subscribe(ctx context.Context, channel string) (*Subscription, 
 				select {
 				case subscription.msgChan <- []byte(msg.Payload):
 				case <-ctx.Done():
-					close(subscription.msgChan)
 					return
 				}
 			case <-ctx.Done():
-				close(subscription.msgChan)
 				return
 			}
 		}
