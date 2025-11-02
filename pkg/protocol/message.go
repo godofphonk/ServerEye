@@ -134,11 +134,11 @@ type ContainerActionResponse struct {
 
 // CreateContainerPayload represents container creation request
 type CreateContainerPayload struct {
-	Image       string            `json:"image"`        // Docker image (e.g., "nginx:latest")
-	Name        string            `json:"name"`         // Container name
-	Ports       map[string]string `json:"ports"`        // Port mappings (e.g., "80/tcp": "8080")
-	Environment map[string]string `json:"environment"`  // Environment variables
-	Volumes     map[string]string `json:"volumes"`      // Volume mappings
+	Image       string            `json:"image"`       // Docker image (e.g., "nginx:latest")
+	Name        string            `json:"name"`        // Container name
+	Ports       map[string]string `json:"ports"`       // Port mappings (e.g., "80/tcp": "8080")
+	Environment map[string]string `json:"environment"` // Environment variables
+	Volumes     map[string]string `json:"volumes"`     // Volume mappings
 }
 
 // MemoryInfo represents system memory information

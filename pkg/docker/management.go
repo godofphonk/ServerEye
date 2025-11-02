@@ -211,7 +211,7 @@ func (c *Client) CreateContainer(ctx context.Context, payload *protocol.CreateCo
 	if err != nil {
 		c.logger.WithError(err).Error("Failed to create container")
 		outputStr := string(output)
-		
+
 		// Check for common errors and provide helpful messages
 		if strings.Contains(outputStr, "address already in use") {
 			// Extract port from error message

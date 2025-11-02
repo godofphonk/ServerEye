@@ -87,7 +87,7 @@ func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
 	}
 }
 
-// getContainers requests Docker containers list from agent  
+// getContainers requests Docker containers list from agent
 func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, error) {
 	// Try Streams first if available
 	if b.streamsClient != nil {
@@ -97,7 +97,7 @@ func (b *Bot) getContainers(serverKey string) (*protocol.ContainersPayload, erro
 		}
 		b.logger.Error("Streams failed, using Pub/Sub", err)
 	}
-	
+
 	// Fallback to Pub/Sub
 	return b.getContainersViaPubSub(serverKey)
 }

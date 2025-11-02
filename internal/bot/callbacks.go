@@ -377,6 +377,8 @@ func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error
 }
 
 // handleContainerActionSelection shows list of containers to select for action
+//
+//nolint:gocyclo // Complex but clear logic for container action UI
 func (b *Bot) handleContainerActionSelection(query *tgbotapi.CallbackQuery) error {
 	// Parse action from callback data (format: "container_action_<action>")
 	action := strings.TrimPrefix(query.Data, "container_action_")
@@ -436,7 +438,7 @@ func (b *Bot) handleContainerActionSelection(query *tgbotapi.CallbackQuery) erro
 		}
 
 		isRunning := strings.Contains(strings.ToLower(container.State), "running")
-		
+
 		// Filter containers based on action
 		if action == "start" && isRunning {
 			continue // Don't show running containers for start action
@@ -579,7 +581,7 @@ func (b *Bot) handleTemplateSelection(query *tgbotapi.CallbackQuery) error {
 	default:
 		templateName = template
 	}
-	
+
 	editMsg := tgbotapi.NewEditMessageText(
 		query.Message.Chat.ID,
 		query.Message.MessageID,

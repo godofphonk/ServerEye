@@ -71,8 +71,8 @@ func (a *AgentAdapter) ProcessCommands(ctx context.Context, handler CommandHandl
 				cmdStream,
 				a.consumerGroup,
 				a.consumerName,
-				10,                // batch size
-				5*time.Second,     // block duration
+				10,            // batch size
+				5*time.Second, // block duration
 			)
 			if err != nil {
 				a.logger.WithError(err).Error("Failed to read messages")

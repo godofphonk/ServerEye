@@ -32,13 +32,13 @@ func (b *Bot) startHTTPServer() {
 	http.HandleFunc("/api/heartbeat", b.handleHeartbeat)
 	http.HandleFunc("/api/redis/publish", b.handleRedisPublish)
 	http.HandleFunc("/api/redis/subscribe", b.handleRedisSubscribe)
-	
+
 	// Redis Streams endpoints (new)
 	http.HandleFunc("/api/streams/xadd", b.handleStreamAdd)
 	http.HandleFunc("/api/streams/xread", b.handleStreamRead)
 	http.HandleFunc("/api/streams/xreadgroup", b.handleStreamReadGroup)
 	http.HandleFunc("/api/streams/xack", b.handleStreamAck)
-	
+
 	http.HandleFunc("/api/monitoring/memory", b.handleMemoryRequest)
 	http.HandleFunc("/api/monitoring/disk", b.handleDiskRequest)
 	http.HandleFunc("/api/monitoring/uptime", b.handleUptimeRequest)
@@ -352,7 +352,7 @@ func (b *Bot) handleStreamAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Redis client not available", http.StatusInternalServerError)
 		return
 	}
-	
+
 	id, err := rdb.XAdd(r.Context(), &redis.XAddArgs{
 		Stream: req.Stream,
 		Values: req.Values,

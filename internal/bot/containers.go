@@ -205,7 +205,7 @@ func (b *Bot) validateContainerAction(containerID, action string) error {
 }
 
 // createContainerFromTemplate creates a container from predefined template
-func (b *Bot) createContainerFromTemplate(userID int64, serverKey, template string) string {
+func (b *Bot) createContainerFromTemplate(userID int64, _ string, template string) string {
 	b.logger.Info("Creating container from template")
 
 	// Get template configuration
@@ -226,23 +226,26 @@ func (b *Bot) createContainerFromTemplate(userID int64, serverKey, template stri
 	}
 
 	// Use first server
-	serverKey = servers[0]
+	serverKey := servers[0]
 
 	// Send create container command via Streams
 	cmd := protocol.NewMessage(protocol.TypeCreateContainer, payload)
 	ctx, cancel := context.WithTimeout(b.ctx, 120*time.Second)
 	defer cancel()
-	
+
 	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 120*time.Second)
 	if err != nil {
 		b.logger.Error("Error occurred", err)
 		return fmt.Sprintf("❌ Failed to create container: %v", err)
 	}
-	
+
 	// Parse response
 	var response protocol.ContainerActionResponse
 	respData, _ := json.Marshal(resp.Payload)
-	json.Unmarshal(respData, &response)
+	if err := json.Unmarshal(respData, &response); err != nil {
+		b.logger.Error("Error occurred", err)
+		return fmt.Sprintf("❌ Failed to parse response: %v", err)
+	}
 
 	// Format response
 	if response.Success {
@@ -310,4 +313,3 @@ func (b *Bot) getTemplateConfig(template string) (*protocol.CreateContainerPaylo
 
 	return config, nil
 }
-

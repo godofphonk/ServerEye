@@ -55,7 +55,7 @@ func NewClient(config *Config, logger *logrus.Logger) (*Client, error) {
 // AddMessage adds a message to a stream
 func (c *Client) AddMessage(ctx context.Context, stream string, values map[string]string) (string, error) {
 	start := time.Now()
-	
+
 	// XADD stream * field1 value1 field2 value2 ...
 	args := &redis.XAddArgs{
 		Stream: stream,

@@ -320,7 +320,7 @@ func (a *Agent) sendResponseToCommand(msg *protocol.Message, commandID string) e
 	// Use Streams if available
 	if a.useStreams && a.streamsClient != nil {
 		respStream := fmt.Sprintf("stream:resp:%s", a.config.Server.SecretKey)
-		
+
 		values := map[string]string{
 			"type":       string(msg.Type),
 			"id":         msg.ID,
@@ -328,13 +328,13 @@ func (a *Agent) sendResponseToCommand(msg *protocol.Message, commandID string) e
 			"payload":    string(data),
 			"timestamp":  time.Now().Format(time.RFC3339),
 		}
-		
+
 		_, err := a.streamsClient.AddMessage(a.ctx, respStream, values)
 		if err != nil {
 			a.logger.WithError(err).Error("Failed to send via Streams")
 			return err
 		}
-		
+
 		a.logger.WithField("stream", respStream).Debug("Response sent via Streams")
 		return nil
 	}
@@ -718,10 +718,10 @@ func (d *DirectClientAdapter) Close() error {
 func (a *Agent) handleCommandsViaStreams() {
 	a.logger.Info("Streams command handler started")
 	cmdStream := fmt.Sprintf("stream:cmd:%s", a.config.Server.SecretKey)
-	
+
 	lastID := "0" // Start from beginning, then use "$" for new messages
 	firstRead := true
-	
+
 	for {
 		select {
 		case <-a.ctx.Done():
@@ -733,7 +733,7 @@ func (a *Agent) handleCommandsViaStreams() {
 			if !firstRead {
 				id = "$" // Only new messages after first read
 			}
-			
+
 			messages, err := a.streamsClient.ReadMessages(a.ctx, cmdStream, id, 10, 5*time.Second)
 			if err != nil {
 				if err.Error() != "XREAD failed: context deadline exceeded" {
@@ -742,13 +742,13 @@ func (a *Agent) handleCommandsViaStreams() {
 				time.Sleep(1 * time.Second)
 				continue
 			}
-			
+
 			firstRead = false
-			
+
 			// Process messages
 			for _, msg := range messages {
 				lastID = msg.ID
-				
+
 				// Parse command
 				payloadJSON := msg.Values["payload"]
 				command, err := protocol.FromJSON([]byte(payloadJSON))
@@ -756,12 +756,12 @@ func (a *Agent) handleCommandsViaStreams() {
 					a.logger.WithError(err).Error("Failed to parse command")
 					continue
 				}
-				
+
 				a.logger.WithFields(logrus.Fields{
 					"command_id":   command.ID,
 					"command_type": command.Type,
 				}).Info("Получена команда via Streams")
-				
+
 				// Process command (processCommand expects []byte)
 				cmdData, _ := command.ToJSON()
 				a.processCommand(cmdData)

@@ -16,14 +16,14 @@ func (b *Bot) sendCommandViaStreams(ctx context.Context, serverKey string, comma
 	// Use PURE Streams
 	if streamsClient, ok := b.streamsClient.(*streams.Client); ok {
 		b.logger.Info("Sending via Streams")
-		
+
 		var logger *logrus.Logger
 		if sl, ok := b.logger.(*StructuredLogger); ok {
 			logger = sl.logger
 		} else {
 			logger = logrus.New()
 		}
-		
+
 		adapter := streams.NewBotAdapter(streamsClient, logger)
 		response, err := adapter.SendCommand(ctx, serverKey, command, timeout)
 		if err == nil {
@@ -42,7 +42,7 @@ func (b *Bot) sendCommandViaStreams(ctx context.Context, serverKey string, comma
 func (b *Bot) sendCommandViaPubSub(ctx context.Context, serverKey string, command *protocol.Message, timeout time.Duration) (*protocol.Message, error) {
 	// Create unique response channel
 	responseChannel := fmt.Sprintf("resp:%s:%s", serverKey, command.ID)
-	
+
 	subscription, err := b.redisClient.Subscribe(ctx, responseChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe: %w", err)
@@ -84,7 +84,7 @@ func (b *Bot) sendCommandViaPubSub(ctx context.Context, serverKey string, comman
 // getContainersViaStreams fetches containers using Streams
 func (b *Bot) getContainersViaStreams(serverKey string) (*protocol.ContainersPayload, error) {
 	cmd := protocol.NewMessage(protocol.TypeGetContainers, nil)
-	
+
 	ctx, cancel := context.WithTimeout(b.ctx, 10*time.Second)
 	defer cancel()
 
