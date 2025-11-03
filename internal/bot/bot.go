@@ -201,6 +201,12 @@ func (b *Bot) Start() error {
 	// Setup graceful shutdown
 	b.setupGracefulShutdown()
 
+	// Setup bot menu commands
+	if err := b.setMenuCommands(); err != nil {
+		b.logger.Error("Failed to set menu commands", err)
+		// Non-critical error, continue
+	}
+
 	// Start HTTP server for agent API
 	go func() {
 		b.logger.Info("About to start HTTP server goroutine...")
@@ -429,6 +435,31 @@ func (b *Bot) processCallbackQuery(ctx context.Context, query *tgbotapi.Callback
 			Int64Field("user_id", query.From.ID),
 			StringField("data", query.Data))
 	}
+}
+
+// setMenuCommands sets up the bot menu commands
+func (b *Bot) setMenuCommands() error {
+	commands := []tgbotapi.BotCommand{
+		{Command: "start", Description: "Start bot and show welcome message"},
+		{Command: "help", Description: "Show available commands"},
+		{Command: "temp", Description: "Get CPU temperature"},
+		{Command: "memory", Description: "Get memory usage"},
+		{Command: "disk", Description: "Get disk usage"},
+		{Command: "uptime", Description: "Get system uptime"},
+		{Command: "processes", Description: "List running processes"},
+		{Command: "containers", Description: "Manage Docker containers"},
+		{Command: "servers", Description: "List your servers"},
+		{Command: "status", Description: "Get server status"},
+	}
+
+	cfg := tgbotapi.NewSetMyCommands(commands...)
+	_, err := b.telegramAPI.Request(cfg)
+	if err != nil {
+		return err
+	}
+
+	b.logger.Info("Bot menu commands set successfully")
+	return nil
 }
 
 // handleMessage processes a single message
