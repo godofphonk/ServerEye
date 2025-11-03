@@ -140,7 +140,7 @@ func (b *Bot) formatContainers(containers *protocol.ContainersPayload) string {
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("🐳 **Docker Containers (%d total):**\n\n", containers.Total))
+	result.WriteString(fmt.Sprintf("🐳 Docker Containers (%d total):\n\n", containers.Total))
 
 	for i, container := range containers.Containers {
 		if i >= 10 { // Limit to 10 containers to avoid message length issues
@@ -156,7 +156,7 @@ func (b *Bot) formatContainers(containers *protocol.ContainersPayload) string {
 			statusEmoji = "🟡" // Yellow for paused
 		}
 
-		result.WriteString(fmt.Sprintf("%s **%s**\n", statusEmoji, container.Name))
+		result.WriteString(fmt.Sprintf("%s %s\n", statusEmoji, container.Name))
 		result.WriteString(fmt.Sprintf("📷 Image: `%s`\n", container.Image))
 		result.WriteString(fmt.Sprintf("🔄 Status: %s\n", container.Status))
 

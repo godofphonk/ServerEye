@@ -104,7 +104,7 @@ func (b *Bot) executeTemperatureCommand(servers []ServerInfo, serverNum string) 
 		return fmt.Sprintf("❌ Failed to get temperature from %s: %v", serverName, err)
 	}
 
-	return fmt.Sprintf("🌡️ **%s** CPU Temperature: %.1f°C", serverName, temp)
+	return fmt.Sprintf("🌡️ %s CPU Temperature: %.1f°C", serverName, temp)
 }
 
 // executeContainersCommand executes containers command for specific server
@@ -122,7 +122,7 @@ func (b *Bot) executeContainersCommand(servers []ServerInfo, serverNum string) s
 		return fmt.Sprintf("❌ Failed to get containers from %s: %v", serverName, err)
 	}
 
-	response := fmt.Sprintf("🐳 **%s** Containers:\n\n", serverName)
+	response := fmt.Sprintf("🐳 %s Containers:\n\n", serverName)
 	response += b.formatContainers(containers)
 	return response
 }
@@ -147,14 +147,14 @@ func (b *Bot) executeMemoryCommand(servers []ServerInfo, serverNum string) strin
 	availableGB := float64(memInfo.Available) / 1024 / 1024 / 1024
 	freeGB := float64(memInfo.Free) / 1024 / 1024 / 1024
 
-	return fmt.Sprintf(`🧠 **%s** Memory Usage
+	return fmt.Sprintf(`🧠 %s Memory Usage
 
-💾 **Total:** %.1f GB
-📊 **Used:** %.1f GB (%.1f%%)
-✅ **Available:** %.1f GB
-🆓 **Free:** %.1f GB
-📦 **Buffers:** %.1f MB
-🗂️ **Cached:** %.1f MB`,
+💾 Total: %.1f GB
+📊 Used: %.1f GB (%.1f%%)
+✅ Available: %.1f GB
+🆓 Free: %.1f GB
+📦 Buffers: %.1f MB
+🗂️ Cached: %.1f MB`,
 		serverName,
 		totalGB,
 		usedGB, memInfo.UsedPercent,
@@ -180,10 +180,10 @@ func (b *Bot) executeDiskCommand(servers []ServerInfo, serverNum string) string 
 	}
 
 	if len(diskInfo.Disks) == 0 {
-		return fmt.Sprintf("💽 **%s** - No disk information available", serverName)
+		return fmt.Sprintf("💽 %s - No disk information available", serverName)
 	}
 
-	response := fmt.Sprintf("💽 **%s** Disk Usage\n\n", serverName)
+	response := fmt.Sprintf("💽 %s Disk Usage\n\n", serverName)
 	for _, disk := range diskInfo.Disks {
 		totalGB := float64(disk.Total) / 1024 / 1024 / 1024
 		usedGB := float64(disk.Used) / 1024 / 1024 / 1024
@@ -198,11 +198,11 @@ func (b *Bot) executeDiskCommand(servers []ServerInfo, serverNum string) string 
 			statusEmoji = "🟢"
 		}
 
-		response += fmt.Sprintf(`%s **%s**
-📁 **Path:** %s
-📊 **Used:** %.1f GB / %.1f GB (%.1f%%)
-🆓 **Free:** %.1f GB
-💾 **Type:** %s
+		response += fmt.Sprintf(`%s %s
+📁 Path: %s
+📊 Used: %.1f GB / %.1f GB (%.1f%%)
+🆓 Free: %.1f GB
+💾 Type: %s
 
 `,
 			statusEmoji, disk.Path,
@@ -236,11 +236,11 @@ func (b *Bot) executeUptimeCommand(servers []ServerInfo, serverNum string) strin
 	}
 	bootTime := time.Unix(int64(bootTimeUnix), 0)
 
-	return fmt.Sprintf(`⏰ **%s** System Uptime
+	return fmt.Sprintf(`⏰ %s System Uptime
 
-🚀 **Uptime:** %s
-📅 **Boot Time:** %s
-⏱️ **Running for:** %d seconds`,
+🚀 Uptime: %s
+📅 Boot Time: %s
+⏱️ Running for: %d seconds`,
 		serverName,
 		uptimeInfo.Formatted,
 		bootTime.Format("2006-01-02 15:04:05"),
@@ -263,10 +263,10 @@ func (b *Bot) executeProcessesCommand(servers []ServerInfo, serverNum string) st
 	}
 
 	if len(processes.Processes) == 0 {
-		return fmt.Sprintf("⚙️ **%s** - No process information available", serverName)
+		return fmt.Sprintf("⚙️ %s - No process information available", serverName)
 	}
 
-	response := fmt.Sprintf("⚙️ **%s** Top Processes\n\n", serverName)
+	response := fmt.Sprintf("⚙️ %s Top Processes\n\n", serverName)
 	for i, proc := range processes.Processes {
 		if i >= 10 { // Limit to top 10
 			break
@@ -281,11 +281,11 @@ func (b *Bot) executeProcessesCommand(servers []ServerInfo, serverNum string) st
 			statusEmoji = "🟢"
 		}
 
-		response += fmt.Sprintf(`%s **%s** (PID: %d)
-👤 **User:** %s
-🖥️ **CPU:** %.1f%%
-🧠 **Memory:** %d MB (%.1f%%)
-📊 **Status:** %s
+		response += fmt.Sprintf(`%s %s (PID: %d)
+👤 User: %s
+🖥️ CPU: %.1f%%
+🧠 Memory: %d MB (%.1f%%)
+📊 Status: %s
 
 `,
 			statusEmoji, proc.Name, proc.PID,
@@ -305,7 +305,7 @@ func (b *Bot) executeStatusCommand(servers []ServerInfo, serverNum string) strin
 	}
 
 	serverName := servers[num-1].Name
-	return fmt.Sprintf("🟢 **%s** Status: Online\n⏱️ Uptime: 15 days 8 hours\n💾 Last activity: just now", serverName)
+	return fmt.Sprintf("🟢 %s Status: Online\n⏱️ Uptime: 15 days 8 hours\n💾 Last activity: just now", serverName)
 }
 
 // handleContainerActionCallback handles container action button clicks
@@ -337,13 +337,13 @@ func (b *Bot) handleContainerActionCallback(query *tgbotapi.CallbackQuery) error
 	var processingMsg string
 	switch action {
 	case "start":
-		processingMsg = "▶️ **Starting** `%s`..."
+		processingMsg = "▶️ Starting `%s`..."
 	case "stop":
-		processingMsg = "⏹️ **Stopping** `%s`..."
+		processingMsg = "⏹️ Stopping `%s`..."
 	case "restart":
-		processingMsg = "🔄 **Restarting** `%s`..."
+		processingMsg = "🔄 Restarting `%s`..."
 	case "remove":
-		processingMsg = "🗑️ **Deleting** `%s`..."
+		processingMsg = "🗑️ Deleting `%s`..."
 	default:
 		processingMsg = "⏳ Processing container `%s`...\n\n_Please wait..._"
 	}
@@ -507,7 +507,7 @@ func (b *Bot) handleContainerActionSelection(query *tgbotapi.CallbackQuery) erro
 
 // handleContainerCreateTemplates shows template selection for creating containers
 func (b *Bot) handleContainerCreateTemplates(query *tgbotapi.CallbackQuery) error {
-	text := "📦 **Select container template:**\n\nChoose a pre-configured template to quickly deploy a container:"
+	text := "📦 Select container template:\n\nChoose a pre-configured template to quickly deploy a container:"
 
 	buttons := [][]tgbotapi.InlineKeyboardButton{
 		{
@@ -585,7 +585,7 @@ func (b *Bot) handleTemplateSelection(query *tgbotapi.CallbackQuery) error {
 	editMsg := tgbotapi.NewEditMessageText(
 		query.Message.Chat.ID,
 		query.Message.MessageID,
-		fmt.Sprintf("📦 **Creating %s**...", templateName),
+		fmt.Sprintf("📦 Creating %s...", templateName),
 	)
 	editMsg.ParseMode = "Markdown"
 	if _, err := b.telegramAPI.Send(editMsg); err != nil {

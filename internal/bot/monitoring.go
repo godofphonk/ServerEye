@@ -105,14 +105,14 @@ func (b *Bot) handleMemory(message *tgbotapi.Message) string {
 	availableGB := float64(memInfo.Available) / 1024 / 1024 / 1024
 	freeGB := float64(memInfo.Free) / 1024 / 1024 / 1024
 
-	response := fmt.Sprintf(`🧠 **Memory Usage**
+	response := fmt.Sprintf(`🧠 Memory Usage
 
-💾 **Total:** %.1f GB
-📊 **Used:** %.1f GB (%.1f%%)
-✅ **Available:** %.1f GB
-🆓 **Free:** %.1f GB
-📦 **Buffers:** %.1f MB
-🗂️ **Cached:** %.1f MB`,
+💾 Total: %.1f GB
+📊 Used: %.1f GB (%.1f%%)
+✅ Available: %.1f GB
+🆓 Free: %.1f GB
+📦 Buffers: %.1f MB
+🗂️ Cached: %.1f MB`,
 		totalGB,
 		usedGB, memInfo.UsedPercent,
 		availableGB,
@@ -152,7 +152,7 @@ func (b *Bot) handleDisk(message *tgbotapi.Message) string {
 		return "💽 No disk information available"
 	}
 
-	response := "💽 **Disk Usage**\n\n"
+	response := "💽 Disk Usage\n\n"
 	for _, disk := range diskInfo.Disks {
 		totalGB := float64(disk.Total) / 1024 / 1024 / 1024
 		usedGB := float64(disk.Used) / 1024 / 1024 / 1024
@@ -167,11 +167,11 @@ func (b *Bot) handleDisk(message *tgbotapi.Message) string {
 			statusEmoji = "🟢"
 		}
 
-		response += fmt.Sprintf(`%s **%s**
-📁 **Path:** %s
-📊 **Used:** %.1f GB / %.1f GB (%.1f%%)
-🆓 **Free:** %.1f GB
-💾 **Type:** %s
+		response += fmt.Sprintf(`%s %s
+📁 Path: %s
+📊 Used: %.1f GB / %.1f GB (%.1f%%)
+🆓 Free: %.1f GB
+💾 Type: %s
 
 `,
 			statusEmoji, disk.Path,
@@ -216,11 +216,11 @@ func (b *Bot) handleUptime(message *tgbotapi.Message) string {
 	}
 	bootTime := time.Unix(int64(bootTimeUnix), 0)
 
-	response := fmt.Sprintf(`⏰ **System Uptime**
+	response := fmt.Sprintf(`⏰ System Uptime
 
-🚀 **Uptime:** %s
-📅 **Boot Time:** %s
-⏱️ **Running for:** %d seconds`,
+🚀 Uptime: %s
+📅 Boot Time: %s
+⏱️ Running for: %d seconds`,
 		uptimeInfo.Formatted,
 		bootTime.Format("2006-01-02 15:04:05"),
 		uptimeInfo.Uptime)
@@ -257,7 +257,7 @@ func (b *Bot) handleProcesses(message *tgbotapi.Message) string {
 		return "⚙️ No process information available"
 	}
 
-	response := "⚙️ **Top Processes**\n\n"
+	response := "⚙️ Top Processes\n\n"
 	for i, proc := range processes.Processes {
 		if i >= 10 { // Limit to top 10
 			break
@@ -272,11 +272,11 @@ func (b *Bot) handleProcesses(message *tgbotapi.Message) string {
 			statusEmoji = "🟢"
 		}
 
-		response += fmt.Sprintf(`%s **%s** (PID: %d)
-👤 **User:** %s
-🖥️ **CPU:** %.1f%%
-🧠 **Memory:** %d MB (%.1f%%)
-📊 **Status:** %s
+		response += fmt.Sprintf(`%s %s (PID: %d)
+👤 User: %s
+🖥️ CPU: %.1f%%
+🧠 Memory: %d MB (%.1f%%)
+📊 Status: %s
 
 `,
 			statusEmoji, proc.Name, proc.PID,

@@ -110,7 +110,7 @@ func (b *Bot) sendContainerAction(serverKey string, messageType protocol.Message
 // formatContainerActionResponse formats container action response for display
 func (b *Bot) formatContainerActionResponse(response *protocol.ContainerActionResponse) string {
 	if !response.Success {
-		return fmt.Sprintf("❌ Failed to %s container **%s**:\n%s",
+		return fmt.Sprintf("❌ Failed to %s container %s:\n%s",
 			response.Action, response.ContainerName, response.Message)
 	}
 
@@ -133,7 +133,7 @@ func (b *Bot) formatContainerActionResponse(response *protocol.ContainerActionRe
 		actionText = response.Action + "ed"
 	}
 
-	result := fmt.Sprintf("✅ %s Container **%s** successfully %s!",
+	result := fmt.Sprintf("✅ %s Container %s successfully %s!",
 		actionEmoji, response.ContainerName, actionText)
 
 	if response.NewState != "" && response.Action != "remove" {
@@ -146,7 +146,7 @@ func (b *Bot) formatContainerActionResponse(response *protocol.ContainerActionRe
 		default:
 			stateEmoji = "🟡"
 		}
-		result += fmt.Sprintf("\n\n%s **Status:** %s", stateEmoji, response.NewState)
+		result += fmt.Sprintf("\n\n%s Status: %s", stateEmoji, response.NewState)
 	}
 
 	return result
@@ -249,7 +249,7 @@ func (b *Bot) createContainerFromTemplate(userID int64, _ string, template strin
 
 	// Format response
 	if response.Success {
-		return fmt.Sprintf("✅ Container **%s** created successfully!\n\n📷 Image: `%s`\n🔄 Status: %s",
+		return fmt.Sprintf("✅ Container %s created successfully!\n\n📷 Image: `%s`\n🔄 Status: %s",
 			response.ContainerName, payload.Image, response.Message)
 	}
 	return fmt.Sprintf("❌ Failed to create container: %s", response.Message)
