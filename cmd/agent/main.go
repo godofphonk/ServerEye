@@ -16,6 +16,7 @@ import (
 
 	"github.com/servereye/servereye/internal/agent"
 	"github.com/servereye/servereye/internal/config"
+	"github.com/servereye/servereye/internal/version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,16 +36,16 @@ type KeyRegistrationRequest struct {
 
 func main() {
 	var (
-		configPath = flag.String("config", defaultConfigPath, "Path to configuration file")
-		logLevel   = flag.String("log-level", defaultLogLevel, "Log level (debug, info, warn, error)")
-		install    = flag.Bool("install", false, "Install agent and generate secret key")
-		version    = flag.Bool("version", false, "Show version information")
+		configPath  = flag.String("config", defaultConfigPath, "Path to configuration file")
+		logLevel    = flag.String("log-level", defaultLogLevel, "Log level (debug, info, warn, error)")
+		install     = flag.Bool("install", false, "Install agent and generate secret key")
+		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
 
 	// Show version
-	if *version {
-		fmt.Println("ServerEye Agent v1.0.0")
+	if *showVersion {
+		fmt.Printf("ServerEye Agent v%s\n", version.GetFullVersion())
 		return
 	}
 

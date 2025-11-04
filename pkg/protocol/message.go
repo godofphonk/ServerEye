@@ -201,10 +201,10 @@ type UpdateAgentPayload struct {
 
 // UpdateAgentResponse represents agent update result
 type UpdateAgentResponse struct {
-	Success        bool   `json:"success"`
-	Message        string `json:"message"`
-	OldVersion     string `json:"old_version"`
-	NewVersion     string `json:"new_version"`
+	Success         bool   `json:"success"`
+	Message         string `json:"message"`
+	OldVersion      string `json:"old_version"`
+	NewVersion      string `json:"new_version"`
 	RestartRequired bool   `json:"restart_required"`
 }
 
