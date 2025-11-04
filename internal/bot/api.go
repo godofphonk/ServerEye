@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -13,30 +12,23 @@ import (
 
 // getCPUTemperature requests CPU temperature from agent via Streams
 func (b *Bot) getCPUTemperature(serverKey string) (float64, error) {
-	cmd := protocol.NewMessage(protocol.TypeGetCPUTemp, nil)
+	type tempResponse struct {
+		Temperature float64 `json:"temperature"`
+	}
 
-	ctx, cancel := context.WithTimeout(b.ctx, 10*time.Second)
-	defer cancel()
-
-	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 10*time.Second)
+	result, err := sendCommandAndParse[tempResponse](
+		b,
+		serverKey,
+		protocol.TypeGetCPUTemp,
+		nil,
+		protocol.TypeCPUTempResponse,
+		10*time.Second,
+	)
 	if err != nil {
 		return 0, err
 	}
 
-	if resp.Type == protocol.TypeErrorResponse {
-		return 0, fmt.Errorf("agent error: %v", resp.Payload)
-	}
-
-	if resp.Type == protocol.TypeCPUTempResponse {
-		if payload, ok := resp.Payload.(map[string]interface{}); ok {
-			if temp, ok := payload["temperature"].(float64); ok {
-				return temp, nil
-			}
-		}
-		return 0, fmt.Errorf("invalid temperature data in response")
-	}
-
-	return 0, fmt.Errorf("unexpected response type: %s", resp.Type)
+	return result.Temperature, nil
 }
 
 // getContainers requests Docker containers list from agent
@@ -69,12 +61,11 @@ func (b *Bot) getContainersViaPubSub(serverKey string) (*protocol.ContainersPayl
 	}
 	defer func() {
 		if subscription != nil {
-			subscription.Close()
+			if err := subscription.Close(); err != nil {
+				b.logger.Error("Failed to close subscription", err)
+			}
 		}
 	}()
-
-	// Small delay to ensure subscription is active
-	time.Sleep(300 * time.Millisecond)
 
 	// Send command to agent
 	cmdChannel := redis.GetCommandChannel(serverKey)
@@ -172,122 +163,50 @@ func (b *Bot) formatContainers(containers *protocol.ContainersPayload) string {
 
 // getMemoryInfo requests memory information from agent via Streams
 func (b *Bot) getMemoryInfo(serverKey string) (*protocol.MemoryInfo, error) {
-	cmd := protocol.NewMessage(protocol.TypeGetMemoryInfo, nil)
-
-	ctx, cancel := context.WithTimeout(b.ctx, 10*time.Second)
-	defer cancel()
-
-	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 10*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Type == protocol.TypeErrorResponse {
-		return nil, fmt.Errorf("agent error: %v", resp.Payload)
-	}
-
-	if resp.Type == protocol.TypeMemoryInfoResponse {
-		if payload, ok := resp.Payload.(map[string]interface{}); ok {
-			memData, _ := json.Marshal(payload)
-			var memInfo protocol.MemoryInfo
-			if err := json.Unmarshal(memData, &memInfo); err == nil {
-				return &memInfo, nil
-			}
-		}
-		return nil, fmt.Errorf("invalid memory data in response")
-	}
-
-	return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+	return sendCommandAndParse[protocol.MemoryInfo](
+		b,
+		serverKey,
+		protocol.TypeGetMemoryInfo,
+		nil,
+		protocol.TypeMemoryInfoResponse,
+		10*time.Second,
+	)
 }
 
 // getDiskInfo requests disk information from agent via Streams
 func (b *Bot) getDiskInfo(serverKey string) (*protocol.DiskInfoPayload, error) {
-	cmd := protocol.NewMessage(protocol.TypeGetDiskInfo, nil)
-
-	ctx, cancel := context.WithTimeout(b.ctx, 10*time.Second)
-	defer cancel()
-
-	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 10*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Type == protocol.TypeErrorResponse {
-		return nil, fmt.Errorf("agent error: %v", resp.Payload)
-	}
-
-	if resp.Type == protocol.TypeDiskInfoResponse {
-		if payload, ok := resp.Payload.(map[string]interface{}); ok {
-			diskData, _ := json.Marshal(payload)
-			var diskInfo protocol.DiskInfoPayload
-			if err := json.Unmarshal(diskData, &diskInfo); err == nil {
-				return &diskInfo, nil
-			}
-		}
-		return nil, fmt.Errorf("invalid disk data in response")
-	}
-
-	return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+	return sendCommandAndParse[protocol.DiskInfoPayload](
+		b,
+		serverKey,
+		protocol.TypeGetDiskInfo,
+		nil,
+		protocol.TypeDiskInfoResponse,
+		10*time.Second,
+	)
 }
 
 // getUptime requests uptime information from agent via Streams
 func (b *Bot) getUptime(serverKey string) (*protocol.UptimeInfo, error) {
-	cmd := protocol.NewMessage(protocol.TypeGetUptime, nil)
-
-	ctx, cancel := context.WithTimeout(b.ctx, 10*time.Second)
-	defer cancel()
-
-	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 10*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Type == protocol.TypeErrorResponse {
-		return nil, fmt.Errorf("agent error: %v", resp.Payload)
-	}
-
-	if resp.Type == protocol.TypeUptimeResponse {
-		if payload, ok := resp.Payload.(map[string]interface{}); ok {
-			uptimeData, _ := json.Marshal(payload)
-			var uptimeInfo protocol.UptimeInfo
-			if err := json.Unmarshal(uptimeData, &uptimeInfo); err == nil {
-				return &uptimeInfo, nil
-			}
-		}
-		return nil, fmt.Errorf("invalid uptime data in response")
-	}
-
-	return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+	return sendCommandAndParse[protocol.UptimeInfo](
+		b,
+		serverKey,
+		protocol.TypeGetUptime,
+		nil,
+		protocol.TypeUptimeResponse,
+		10*time.Second,
+	)
 }
 
 // getProcesses requests processes information from agent via Streams
 func (b *Bot) getProcesses(serverKey string) (*protocol.ProcessesPayload, error) {
-	cmd := protocol.NewMessage(protocol.TypeGetProcesses, nil)
-
-	ctx, cancel := context.WithTimeout(b.ctx, 10*time.Second)
-	defer cancel()
-
-	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 10*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Type == protocol.TypeErrorResponse {
-		return nil, fmt.Errorf("agent error: %v", resp.Payload)
-	}
-
-	if resp.Type == protocol.TypeProcessesResponse {
-		if payload, ok := resp.Payload.(map[string]interface{}); ok {
-			processData, _ := json.Marshal(payload)
-			var processes protocol.ProcessesPayload
-			if err := json.Unmarshal(processData, &processes); err == nil {
-				return &processes, nil
-			}
-		}
-		return nil, fmt.Errorf("invalid processes data in response")
-	}
-
-	return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+	return sendCommandAndParse[protocol.ProcessesPayload](
+		b,
+		serverKey,
+		protocol.TypeGetProcesses,
+		nil,
+		protocol.TypeProcessesResponse,
+		10*time.Second,
+	)
 }
 
 // updateAgent requests agent to update itself
@@ -295,30 +214,13 @@ func (b *Bot) updateAgent(serverKey string, version string) (*protocol.UpdateAge
 	payload := &protocol.UpdateAgentPayload{
 		Version: version,
 	}
-	cmd := protocol.NewMessage(protocol.TypeUpdateAgent, payload)
 
-	ctx, cancel := context.WithTimeout(b.ctx, 30*time.Second) // Longer timeout for update
-	defer cancel()
-
-	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 30*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Type == protocol.TypeErrorResponse {
-		return nil, fmt.Errorf("agent error: %v", resp.Payload)
-	}
-
-	if resp.Type == protocol.TypeUpdateAgentResponse {
-		if payload, ok := resp.Payload.(map[string]interface{}); ok {
-			updateData, _ := json.Marshal(payload)
-			var updateResp protocol.UpdateAgentResponse
-			if err := json.Unmarshal(updateData, &updateResp); err == nil {
-				return &updateResp, nil
-			}
-		}
-		return nil, fmt.Errorf("invalid update response data")
-	}
-
-	return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+	return sendCommandAndParse[protocol.UpdateAgentResponse](
+		b,
+		serverKey,
+		protocol.TypeUpdateAgent,
+		payload,
+		protocol.TypeUpdateAgentResponse,
+		30*time.Second,
+	)
 }

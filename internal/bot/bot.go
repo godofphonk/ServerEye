@@ -36,11 +36,11 @@ type Bot struct {
 	// Direct database access for internal methods
 	db *sql.DB
 
-	// Concrete Redis client for Streams (not in interface yet)
-	redisRawClient interface{}
+	// Concrete Redis client for Streams
+	redisRawClient *redis.Client
 
 	// Streams client for new architecture
-	streamsClient interface{}
+	streamsClient *streams.Client
 
 	// Context management
 	ctx    context.Context
@@ -257,7 +257,9 @@ func (b *Bot) setupGracefulShutdown() {
 	go func() {
 		sig := <-sigChan
 		b.logger.Info("Received shutdown signal", StringField("signal", sig.String()))
-		b.Stop()
+		if err := b.Stop(); err != nil {
+			b.logger.Error("Error during shutdown", err)
+		}
 	}()
 }
 

@@ -404,7 +404,7 @@ func (b *Bot) handleUpdate(message *tgbotapi.Message) string {
 	serverName := servers[0].Name
 
 	b.logger.Info("Updating agent...")
-	
+
 	// Send "updating" message
 	b.sendMessage(message.Chat.ID, fmt.Sprintf("🔄 Updating agent on %s...\n\nThis may take a minute.", serverName))
 
@@ -421,7 +421,7 @@ func (b *Bot) handleUpdate(message *tgbotapi.Message) string {
 	response := fmt.Sprintf("✅ Agent updated successfully on %s!\n\n", serverName)
 	response += fmt.Sprintf("📦 Old version: %s\n", updateResp.OldVersion)
 	response += fmt.Sprintf("📦 New version: %s\n", updateResp.NewVersion)
-	
+
 	if updateResp.RestartRequired {
 		response += "\n⚠️ Agent restart required to apply changes."
 	}

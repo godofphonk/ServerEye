@@ -165,10 +165,18 @@ func (b *Bot) handleDebug(message *tgbotapi.Message) string {
 
 	// Get total users and servers in database
 	var totalUsers, totalServers, totalKeys, connectedKeys int
-	b.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&totalUsers)
-	b.db.QueryRow("SELECT COUNT(*) FROM servers").Scan(&totalServers)
-	b.db.QueryRow("SELECT COUNT(*) FROM generated_keys").Scan(&totalKeys)
-	b.db.QueryRow("SELECT COUNT(*) FROM generated_keys WHERE status = 'connected'").Scan(&connectedKeys)
+	if err := b.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&totalUsers); err != nil {
+		b.logger.Error("Failed to get users count", err)
+	}
+	if err := b.db.QueryRow("SELECT COUNT(*) FROM servers").Scan(&totalServers); err != nil {
+		b.logger.Error("Failed to get servers count", err)
+	}
+	if err := b.db.QueryRow("SELECT COUNT(*) FROM generated_keys").Scan(&totalKeys); err != nil {
+		b.logger.Error("Failed to get keys count", err)
+	}
+	if err := b.db.QueryRow("SELECT COUNT(*) FROM generated_keys WHERE status = 'connected'").Scan(&connectedKeys); err != nil {
+		b.logger.Error("Failed to get connected keys count", err)
+	}
 
 	return fmt.Sprintf(`🔍 **Debug Information**
 

@@ -2,7 +2,6 @@ package bot
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,8 +12,8 @@ import (
 
 // sendCommandViaStreams sends command using PURE Streams
 func (b *Bot) sendCommandViaStreams(ctx context.Context, serverKey string, command *protocol.Message, timeout time.Duration) (*protocol.Message, error) {
-	// Use PURE Streams
-	if streamsClient, ok := b.streamsClient.(*streams.Client); ok {
+	// Use PURE Streams if available
+	if b.streamsClient != nil {
 		b.logger.Info("Sending via Streams")
 
 		var logger *logrus.Logger
@@ -24,7 +23,7 @@ func (b *Bot) sendCommandViaStreams(ctx context.Context, serverKey string, comma
 			logger = logrus.New()
 		}
 
-		adapter := streams.NewBotAdapter(streamsClient, logger)
+		adapter := streams.NewBotAdapter(b.streamsClient, logger)
 		response, err := adapter.SendCommand(ctx, serverKey, command, timeout)
 		if err == nil {
 			b.logger.Info("Streams success")
@@ -48,9 +47,6 @@ func (b *Bot) sendCommandViaPubSub(ctx context.Context, serverKey string, comman
 		return nil, fmt.Errorf("failed to subscribe: %w", err)
 	}
 	defer subscription.Close()
-
-	// Small delay for subscription stability
-	time.Sleep(100 * time.Millisecond)
 
 	// Send command
 	commandChannel := fmt.Sprintf("cmd:%s", serverKey)
@@ -83,28 +79,12 @@ func (b *Bot) sendCommandViaPubSub(ctx context.Context, serverKey string, comman
 
 // getContainersViaStreams fetches containers using Streams
 func (b *Bot) getContainersViaStreams(serverKey string) (*protocol.ContainersPayload, error) {
-	cmd := protocol.NewMessage(protocol.TypeGetContainers, nil)
-
-	ctx, cancel := context.WithTimeout(b.ctx, 10*time.Second)
-	defer cancel()
-
-	response, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 10*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	if response.Type == protocol.TypeErrorResponse {
-		return nil, fmt.Errorf("agent error: %v", response.Payload)
-	}
-
-	if response.Type == protocol.TypeContainersResponse {
-		payloadData, _ := json.Marshal(response.Payload)
-		var containers protocol.ContainersPayload
-		if err := json.Unmarshal(payloadData, &containers); err != nil {
-			return nil, fmt.Errorf("failed to parse containers: %w", err)
-		}
-		return &containers, nil
-	}
-
-	return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	return sendCommandAndParse[protocol.ContainersPayload](
+		b,
+		serverKey,
+		protocol.TypeGetContainers,
+		nil,
+		protocol.TypeContainersResponse,
+		10*time.Second,
+	)
 }

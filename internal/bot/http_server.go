@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	pkgredis "github.com/servereye/servereye/pkg/redis"
 )
 
 // KeyRegistrationRequest represents a request to register a generated key
@@ -100,24 +99,17 @@ func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 
 	b.logger.Info("Operation completed")
 
-	response := map[string]interface{}{
-		"success": true,
+	b.writeJSONSuccess(w, map[string]string{
 		"message": "Key registered successfully",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 // handleHealth handles health check requests
 func (b *Bot) handleHealth(w http.ResponseWriter, r *http.Request) {
-	response := map[string]interface{}{
+	b.writeJSON(w, map[string]string{
 		"status":  "healthy",
 		"service": "servereye-bot",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 // HeartbeatRequest represents an agent heartbeat
@@ -138,14 +130,10 @@ func (b *Bot) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Simply acknowledge the heartbeat
-	response := map[string]interface{}{
+	b.writeJSON(w, map[string]string{
 		"status":     "ok",
 		"server_key": req.ServerKey,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 // RedisPublishRequest represents a request to publish to Redis
@@ -234,7 +222,9 @@ func (b *Bot) handleRedisSubscribe(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() {
 		if subscription != nil {
-			subscription.Close()
+			if err := subscription.Close(); err != nil {
+				b.logger.Error("Failed to close subscription", err)
+			}
 		}
 	}()
 
@@ -324,8 +314,8 @@ func (b *Bot) handleProcessesRequest(w http.ResponseWriter, r *http.Request) {
 
 // getRawRedisClient returns the underlying redis.Client for Streams operations
 func (b *Bot) getRawRedisClient() (*redis.Client, bool) {
-	if rawClient, ok := b.redisRawClient.(*pkgredis.Client); ok {
-		return rawClient.GetRawClient(), true
+	if b.redisRawClient != nil {
+		return b.redisRawClient.GetRawClient(), true
 	}
 	return nil, false
 }
