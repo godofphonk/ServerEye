@@ -81,7 +81,8 @@ func TestHandleUpdateAgent_InvalidPayload(t *testing.T) {
 		},
 	}
 
-	msg := protocol.NewMessage(protocol.TypeUpdateAgent, "invalid")
+	// Invalid payload - number instead of object
+	msg := protocol.NewMessage(protocol.TypeUpdateAgent, 12345)
 	response := agent.handleUpdateAgent(msg)
 
 	if response == nil {
