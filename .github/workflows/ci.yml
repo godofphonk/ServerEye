@@ -50,7 +50,8 @@ jobs:
       - name: Run unit tests
         run: |
           echo "🧪 Running unit tests..."
-          go test -v -short -race -coverprofile=coverage.txt -covermode=atomic ./...
+          rm -f coverage.txt
+          go test -short -race -coverprofile=coverage.txt -covermode=atomic ./...
       
       # Шаг 6.1: Детальное покрытие по модулям
       - name: Show detailed coverage
