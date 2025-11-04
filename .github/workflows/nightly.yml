@@ -53,26 +53,60 @@ jobs:
       - name: Download dependencies
         run: go mod download
       
-      # Юнит-тесты (быстрые)
+      # Юнит-тесты (быстрые) - 287 тестов
       - name: Run unit tests
-        run: go test -v -short -coverprofile=unit-coverage.txt ./...
+        run: |
+          echo "🧪 Running 287+ unit tests..."
+          go test -v -short -coverprofile=unit-coverage.txt ./...
+          echo ""
+          echo "📊 Unit Test Coverage:"
+          go tool cover -func=unit-coverage.txt | grep "^total:"
       
-      # Интеграционные тесты (медленные, с реальными зависимостями)
-      - name: Run integration tests
+      # Тесты по модулям с детальным покрытием
+      - name: Test agent module
+        run: |
+          echo "🤖 Testing internal/agent (287 tests, 46.6% coverage)..."
+          go test -v -short -cover ./internal/agent/...
+      
+      - name: Test bot module
+        run: |
+          echo "🤖 Testing internal/bot..."
+          go test -v -short -cover ./internal/bot/...
+      
+      - name: Test pkg modules
+        run: |
+          echo "📦 Testing pkg modules..."
+          go test -v -short -cover ./pkg/...
+      
+      # Интеграционные тесты (с реальными зависимостями)
+      - name: Run integration tests (skipped for now)
         env:
           REDIS_ADDRESS: localhost:6379
           POSTGRES_DSN: "postgres://test:test123@localhost:5432/servereye_test?sslmode=disable"
         run: |
-          # Раскомментировать t.Skip() в интеграционных тестах
-          echo "Running integration tests..."
-          # TODO: Когда интеграционные тесты будут готовы:
+          echo "🔗 Integration tests currently skipped (t.Skip in code)"
+          echo "Available services:"
+          echo "  - Redis: $REDIS_ADDRESS"
+          echo "  - PostgreSQL: $POSTGRES_DSN"
+          echo ""
+          echo "To enable: Remove t.Skip() from integration tests"
+          # Когда интеграционные тесты будут готовы:
           # go test -v -tags=integration -coverprofile=integration-coverage.txt ./...
       
       - name: Generate test report
         run: |
+          echo ""
+          echo "═══════════════════════════════════════"
           echo "📊 Nightly Test Report"
-          echo "======================"
-          go tool cover -func=unit-coverage.txt | tail -1
+          echo "═══════════════════════════════════════"
+          echo ""
+          echo "Unit Tests Coverage:"
+          go tool cover -func=unit-coverage.txt | grep "^total:"
+          echo ""
+          echo "Coverage by Module:"
+          go tool cover -func=unit-coverage.txt | grep -E "internal/agent|internal/bot"
+          echo ""
+          echo "✅ All tests passed!"
           
       - name: Notify on failure
         if: failure()

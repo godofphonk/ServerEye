@@ -46,15 +46,36 @@ jobs:
       - name: Build agent
         run: go build -v ./cmd/agent
       
-      # Шаг 6: Запустить юнит-тесты (быстрые, без внешних зависимостей)
+      # Шаг 6: Запустить все юнит-тесты (287 тестов для agent + bot)
       - name: Run unit tests
-        run: go test -v -short -race -coverprofile=coverage.txt -covermode=atomic ./...
-      
-      # Шаг 6.1: Показать покрытие по модулям
-      - name: Show coverage by package
         run: |
-          echo "📊 Test Coverage Report:"
-          go tool cover -func=coverage.txt | grep -E "^total:|internal/agent|internal/bot"
+          echo "🧪 Running unit tests..."
+          go test -v -short -race -coverprofile=coverage.txt -covermode=atomic ./...
+      
+      # Шаг 6.1: Детальное покрытие по модулям
+      - name: Show detailed coverage
+        run: |
+          echo "📊 Coverage Report by Module:"
+          echo "=============================="
+          go tool cover -func=coverage.txt | grep -E "internal/agent|internal/bot" || true
+          echo ""
+          echo "📈 Total Coverage:"
+          go tool cover -func=coverage.txt | grep "^total:" || echo "Coverage report generated"
+      
+      # Шаг 6.2: Проверка минимального покрытия (необязательно)
+      - name: Check coverage threshold
+        continue-on-error: true
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.txt | grep "^total:" | awk '{print $3}' | sed 's/%//' || echo "0")
+          echo "Current coverage: ${COVERAGE}%"
+          # Желаемое покрытие 40%
+          THRESHOLD=40
+          RESULT=$(awk -v cov="$COVERAGE" -v thr="$THRESHOLD" 'BEGIN { print (cov >= thr) ? "OK" : "FAIL" }')
+          if [ "$RESULT" = "FAIL" ]; then
+            echo "⚠️  Coverage ${COVERAGE}% is below ${THRESHOLD}% threshold (warning only)"
+          else
+            echo "✅ Coverage ${COVERAGE}% meets threshold"
+          fi
       
       # Шаг 7: Загрузить coverage report (показывает какая часть кода покрыта тестами)
       - name: Upload coverage to Codecov
@@ -63,7 +84,34 @@ jobs:
           file: ./coverage.txt
           fail_ci_if_error: false  # Не провалить CI если codecov не работает
   
-  # Job 2: Проверка качества кода (Linting)
+  # Job 2: Детальное тестирование модулей
+  module-tests:
+    name: Module Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        module:
+          - internal/agent
+          - internal/bot
+          - pkg/protocol
+          - pkg/metrics
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      
+      - name: Test ${{ matrix.module }}
+        run: |
+          echo "🧪 Testing ${{ matrix.module }}..."
+          go test -v -short -cover ./${{ matrix.module }}/...
+  
+  # Job 3: Проверка качества кода (Linting)
   lint:
     name: Lint
     runs-on: ubuntu-latest

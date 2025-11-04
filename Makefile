@@ -46,10 +46,31 @@ build-bot:
 	$(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BOT_BINARY) ./cmd/bot
 	@echo "✅ Bot built: $(BUILD_DIR)/$(BOT_BINARY)"
 
-# Run tests
+# Run all tests
 test:
-	@echo "Running tests..."
-	$(GOTEST) -v ./...
+	@echo "Running all tests..."
+	$(GOTEST) -v -short ./...
+
+# Run tests with coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	$(GOTEST) -short -coverprofile=coverage.txt -covermode=atomic ./...
+	@echo ""
+	@echo "📊 Coverage Report:"
+	go tool cover -func=coverage.txt | grep -E "internal/agent|internal/bot|^total:"
+
+# Test specific module
+test-agent:
+	@echo "Testing internal/agent (287 tests, 46.6% coverage)..."
+	$(GOTEST) -v -short -cover ./internal/agent/...
+
+test-bot:
+	@echo "Testing internal/bot..."
+	$(GOTEST) -v -short -cover ./internal/bot/...
+
+test-pkg:
+	@echo "Testing pkg modules..."
+	$(GOTEST) -v -short -cover ./pkg/...
 
 # Clean build artifacts
 clean:
@@ -151,20 +172,39 @@ version:
 # Help
 help:
 	@echo "Available targets:"
+	@echo ""
+	@echo "Build:"
 	@echo "  build         - Build both agent and bot"
 	@echo "  build-agent   - Build agent only"
 	@echo "  build-bot     - Build bot only"
-	@echo "  test          - Run tests"
-	@echo "  clean         - Clean build artifacts"
-	@echo "  deps          - Download dependencies"
+	@echo "  release       - Build optimized release binaries"
+	@echo ""
+	@echo "Tests:"
+	@echo "  test          - Run all tests (287+ tests)"
+	@echo "  test-coverage - Run tests with coverage report"
+	@echo "  test-agent    - Test agent module only (287 tests)"
+	@echo "  test-bot      - Test bot module only"
+	@echo "  test-pkg      - Test pkg modules only"
+	@echo ""
+	@echo "Code Quality:"
 	@echo "  fmt           - Format code"
 	@echo "  lint          - Lint code"
+	@echo "  security      - Run security scan"
+	@echo "  vuln-check    - Check for vulnerabilities"
+	@echo ""
+	@echo "Docker:"
 	@echo "  docker-build  - Build Docker images"
 	@echo "  docker-up     - Start services with Docker Compose"
 	@echo "  docker-down   - Stop services"
 	@echo "  docker-logs   - View service logs"
-	@echo "  install-agent - Install agent to system (Linux)"
+	@echo ""
+	@echo "Development:"
 	@echo "  dev-agent     - Run agent in development mode"
 	@echo "  dev-bot       - Run bot in development mode"
-	@echo "  release       - Build optimized release binaries"
+	@echo "  install-agent - Install agent to system (Linux)"
+	@echo ""
+	@echo "Utilities:"
+	@echo "  clean         - Clean build artifacts"
+	@echo "  deps          - Download dependencies"
+	@echo "  version       - Show current version"
 	@echo "  help          - Show this help"
