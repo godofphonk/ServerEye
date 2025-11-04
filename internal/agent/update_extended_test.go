@@ -3,8 +3,8 @@ package agent
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/pkg/protocol"
@@ -13,11 +13,20 @@ import (
 
 func TestHandleUpdateAgent_ValidPayload(t *testing.T) {
 	mockClient := &mockRedisClient{}
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		redisClient: mockClient,
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
+		},
+		// Mock update function to avoid real file operations
+		updateFunc: func(version string) error {
+			defer wg.Done()
+			// Simulate successful update
+			return nil
 		},
 	}
 
@@ -41,18 +50,25 @@ func TestHandleUpdateAgent_ValidPayload(t *testing.T) {
 	if response.ID != msg.ID {
 		t.Errorf("Response ID = %v, want %v", response.ID, msg.ID)
 	}
-	
-	// Give background goroutine time to start
-	time.Sleep(10 * time.Millisecond)
+
+	// Wait for background goroutine to complete
+	wg.Wait()
 }
 
 func TestHandleUpdateAgent_LatestVersion(t *testing.T) {
 	mockClient := &mockRedisClient{}
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		redisClient: mockClient,
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
+		},
+		updateFunc: func(version string) error {
+			defer wg.Done()
+			return nil
 		},
 	}
 
@@ -75,9 +91,9 @@ func TestHandleUpdateAgent_LatestVersion(t *testing.T) {
 	if updateResp.NewVersion != "latest" {
 		t.Errorf("NewVersion = %v, want latest", updateResp.NewVersion)
 	}
-	
-	// Give background goroutine time to start
-	time.Sleep(10 * time.Millisecond)
+
+	// Wait for background goroutine
+	wg.Wait()
 }
 
 func TestHandleUpdateAgent_InvalidPayload(t *testing.T) {
@@ -227,7 +243,7 @@ func TestVerifyChecksum_InvalidChecksumFormat(t *testing.T) {
 		t.Fatalf("Failed to create checksum file: %v", err)
 	}
 	defer os.Remove(checksumFile.Name())
-	
+
 	// Invalid format - no agent filename
 	checksumFile.Write([]byte("invalid checksum format\n"))
 	checksumFile.Close()
@@ -256,7 +272,7 @@ func TestVerifyChecksum_MultipleLines(t *testing.T) {
 		t.Fatalf("Failed to create checksum file: %v", err)
 	}
 	defer os.Remove(checksumFile.Name())
-	
+
 	// Multiple lines with agent checksum in the middle
 	content := `abc123  other-file
 def456  another-file
@@ -278,11 +294,18 @@ func TestRestartAgent_SystemctlRequired(t *testing.T) {
 
 func TestHandleUpdateAgent_BackgroundExecution(t *testing.T) {
 	mockClient := &mockRedisClient{}
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		redisClient: mockClient,
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
+		},
+		updateFunc: func(version string) error {
+			defer wg.Done()
+			return nil
 		},
 	}
 
@@ -310,9 +333,9 @@ func TestHandleUpdateAgent_BackgroundExecution(t *testing.T) {
 	if !updateResp.RestartRequired {
 		t.Error("Expected restart_required=true")
 	}
-	
-	// Give background goroutine time to start and potentially fail
-	time.Sleep(10 * time.Millisecond)
+
+	// Wait for background goroutine to complete
+	wg.Wait()
 }
 
 func TestUpdatePaths_Validation(t *testing.T) {
@@ -434,7 +457,7 @@ func TestChecksumParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hasAgentChecksum := len(tt.checksumLine) > 0 && 
+			hasAgentChecksum := len(tt.checksumLine) > 0 &&
 				filepath.Base(tt.checksumLine) == "servereye-agent-linux-amd64" ||
 				filepath.Base(tt.checksumLine) != ""
 

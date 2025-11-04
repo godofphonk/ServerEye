@@ -39,6 +39,9 @@ type Agent struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	useStreams    bool // Flag to use Streams instead of Pub/Sub
+
+	// updateFunc allows mocking performUpdate in tests
+	updateFunc func(string) error
 }
 
 // New создает новый агент

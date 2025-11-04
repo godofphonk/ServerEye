@@ -34,11 +34,23 @@ func (a *Agent) handleUpdateAgent(msg *protocol.Message) *protocol.Message {
 
 	// Perform update in background to avoid blocking
 	go func() {
-		if err := a.performUpdate(targetVersion); err != nil {
+		var err error
+		if a.updateFunc != nil {
+			// Use mock function in tests
+			err = a.updateFunc(targetVersion)
+		} else {
+			// Use real update function in production
+			err = a.performUpdate(targetVersion)
+		}
+
+		if err != nil {
 			a.logger.WithError(err).Error("Ошибка обновления агента")
 		} else {
 			a.logger.Info("Агент успешно обновлен, перезапуск...")
-			a.restartAgent()
+			if a.updateFunc == nil {
+				// Only restart in production
+				a.restartAgent()
+			}
 		}
 	}()
 
