@@ -49,7 +49,7 @@ func TestParsePayload_ContainerAction(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var result protocol.ContainerActionPayload
 			err := parsePayload(tt.payload, &result)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parsePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -100,7 +100,7 @@ func TestParsePayload_CreateContainer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var result protocol.CreateContainerPayload
 			err := parsePayload(tt.payload, &result)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parsePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -140,7 +140,7 @@ func TestParsePayload_UpdateAgent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var result protocol.UpdateAgentPayload
 			err := parsePayload(tt.payload, &result)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parsePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -175,7 +175,7 @@ func TestParsePayload_EmptyMaps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			payload := map[string]interface{}{}
 			err := parsePayload(payload, tt.target)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parsePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -201,7 +201,7 @@ func TestParsePayload_NestedStructures(t *testing.T) {
 
 	var result protocol.CreateContainerPayload
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Fatalf("parsePayload() error = %v", err)
 	}
@@ -244,7 +244,7 @@ func TestParsePayload_TypeConversions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var result protocol.ContainerActionPayload
 			err := parsePayload(tt.payload, &result)
-			
+
 			// Just test that it doesn't panic
 			if err != nil {
 				t.Logf("parsePayload() returned error (may be expected): %v", err)
@@ -256,18 +256,18 @@ func TestParsePayload_TypeConversions(t *testing.T) {
 func TestParsePayload_LargePayloads(t *testing.T) {
 	// Create payload with multiple ports
 	ports := map[string]string{
-		"80/tcp":   "8080",
-		"443/tcp":  "8443",
-		"3000/tcp": "3000",
-		"5432/tcp": "5432",
-		"6379/tcp": "6379",
-		"8000/tcp": "8000",
-		"9000/tcp": "9000",
-		"3306/tcp": "3306",
+		"80/tcp":    "8080",
+		"443/tcp":   "8443",
+		"3000/tcp":  "3000",
+		"5432/tcp":  "5432",
+		"6379/tcp":  "6379",
+		"8000/tcp":  "8000",
+		"9000/tcp":  "9000",
+		"3306/tcp":  "3306",
 		"27017/tcp": "27017",
-		"5000/tcp": "5000",
+		"5000/tcp":  "5000",
 	}
-	
+
 	payload := map[string]interface{}{
 		"name":  "large-container",
 		"image": "nginx:latest",
@@ -276,7 +276,7 @@ func TestParsePayload_LargePayloads(t *testing.T) {
 
 	var result protocol.CreateContainerPayload
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Fatalf("parsePayload() error = %v", err)
 	}
@@ -294,7 +294,7 @@ func TestParsePayload_SpecialCharacters(t *testing.T) {
 
 	var result protocol.CreateContainerPayload
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Fatalf("parsePayload() error = %v", err)
 	}
@@ -317,7 +317,7 @@ func TestParsePayload_BooleanValues(t *testing.T) {
 
 	var result map[string]interface{}
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Logf("parsePayload() error: %v", err)
 	}
@@ -332,7 +332,7 @@ func TestParsePayload_NumericValues(t *testing.T) {
 
 	var result map[string]interface{}
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Logf("parsePayload() error: %v", err)
 	}

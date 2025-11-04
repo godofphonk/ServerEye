@@ -31,7 +31,7 @@ func (m *mockRedisClient) Close() error {
 func TestSendHeartbeat(t *testing.T) {
 	mockRedis := &mockRedisClient{}
 	logger := logrus.New()
-	
+
 	agent := &Agent{
 		redisClient: mockRedis,
 		logger:      logger,
@@ -69,7 +69,7 @@ func TestStartHeartbeat_Cancellation(t *testing.T) {
 	mockRedis := &mockRedisClient{}
 	logger := logrus.New()
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	agent := &Agent{
 		redisClient: mockRedis,
 		logger:      logger,

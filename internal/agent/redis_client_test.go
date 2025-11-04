@@ -13,16 +13,16 @@ func TestRedisClient_Interface(t *testing.T) {
 func TestRedisClient_MockPublish(t *testing.T) {
 	mock := &mockRedisClient{}
 	ctx := context.Background()
-	
+
 	err := mock.Publish(ctx, "test-channel", []byte("test message"))
 	if err != nil {
 		t.Errorf("Mock Publish() error = %v", err)
 	}
-	
+
 	if len(mock.publishedMessages) != 1 {
 		t.Errorf("Expected 1 message, got %d", len(mock.publishedMessages))
 	}
-	
+
 	if mock.publishedMessages[0] != "test message" {
 		t.Errorf("Message = %v, want 'test message'", mock.publishedMessages[0])
 	}
@@ -30,7 +30,7 @@ func TestRedisClient_MockPublish(t *testing.T) {
 
 func TestRedisClient_MockClose(t *testing.T) {
 	mock := &mockRedisClient{}
-	
+
 	err := mock.Close()
 	if err != nil {
 		t.Errorf("Mock Close() error = %v", err)

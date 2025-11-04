@@ -130,10 +130,10 @@ func TestMonitoringHandlers_ResponseIDs(t *testing.T) {
 	}
 
 	handlers := map[string]func(*protocol.Message) *protocol.Message{
-		"cpu_temp": agent.handleGetCPUTemp,
-		"memory":   agent.handleGetMemoryInfo,
-		"disk":     agent.handleGetDiskInfo,
-		"uptime":   agent.handleGetUptime,
+		"cpu_temp":  agent.handleGetCPUTemp,
+		"memory":    agent.handleGetMemoryInfo,
+		"disk":      agent.handleGetDiskInfo,
+		"uptime":    agent.handleGetUptime,
 		"processes": agent.handleGetProcesses,
 	}
 
@@ -141,13 +141,13 @@ func TestMonitoringHandlers_ResponseIDs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			msg := protocol.NewMessage(protocol.TypePing, nil)
 			msg.ID = "test-" + name
-			
+
 			response := handler(msg)
-			
+
 			if response == nil {
 				t.Fatal("Handler returned nil")
 			}
-			
+
 			if response.ID == "" {
 				t.Error("Response ID is empty")
 			}

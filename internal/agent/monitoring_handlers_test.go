@@ -13,7 +13,7 @@ import (
 func TestHandleGetCPUTemp(t *testing.T) {
 	logger := logrus.New()
 	cpuMetrics := metrics.NewCPUMetrics()
-	
+
 	agent := &Agent{
 		logger:     logger,
 		cpuMetrics: cpuMetrics,
@@ -41,7 +41,7 @@ func TestHandleGetCPUTemp(t *testing.T) {
 func TestHandleGetMemoryInfo(t *testing.T) {
 	logger := logrus.New()
 	systemMonitor := metrics.NewSystemMonitor(logger)
-	
+
 	agent := &Agent{
 		logger:        logger,
 		systemMonitor: systemMonitor,
@@ -67,7 +67,7 @@ func TestHandleGetMemoryInfo(t *testing.T) {
 func TestHandleGetDiskInfo(t *testing.T) {
 	logger := logrus.New()
 	systemMonitor := metrics.NewSystemMonitor(logger)
-	
+
 	agent := &Agent{
 		logger:        logger,
 		systemMonitor: systemMonitor,
@@ -93,7 +93,7 @@ func TestHandleGetDiskInfo(t *testing.T) {
 func TestHandleGetUptime(t *testing.T) {
 	logger := logrus.New()
 	systemMonitor := metrics.NewSystemMonitor(logger)
-	
+
 	agent := &Agent{
 		logger:        logger,
 		systemMonitor: systemMonitor,
@@ -119,7 +119,7 @@ func TestHandleGetUptime(t *testing.T) {
 func TestHandleGetProcesses(t *testing.T) {
 	logger := logrus.New()
 	systemMonitor := metrics.NewSystemMonitor(logger)
-	
+
 	agent := &Agent{
 		logger:        logger,
 		systemMonitor: systemMonitor,
@@ -149,7 +149,7 @@ func TestMonitoringHandlers_ErrorPayload(t *testing.T) {
 
 func TestAgentNew_Success(t *testing.T) {
 	t.Skip("Requires Redis connection")
-	
+
 	cfg := &config.AgentConfig{
 		Server: config.ServerConfig{
 			Name:      "test-server",
@@ -161,9 +161,9 @@ func TestAgentNew_Success(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	
+
 	agent, err := New(cfg, logger)
-	
+
 	if err != nil {
 		t.Logf("Expected error without Redis: %v", err)
 		return

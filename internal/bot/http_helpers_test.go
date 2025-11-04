@@ -21,11 +21,11 @@ func TestWriteJSON(t *testing.T) {
 		{
 			name: "simple string map",
 			data: map[string]string{
-				"status": "ok",
+				"status":  "ok",
 				"message": "success",
 			},
 			want: map[string]interface{}{
-				"status": "ok",
+				"status":  "ok",
 				"message": "success",
 			},
 		},

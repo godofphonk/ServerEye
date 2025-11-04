@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+
 func TestAgent_ProcessCommand_Ping(t *testing.T) {
 	mockClient := &mockRedisClient{}
 	agent := &Agent{
@@ -19,6 +20,7 @@ func TestAgent_ProcessCommand_Ping(t *testing.T) {
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
+		updateFunc: MockUpdateFunc(),
 	}
 
 	msg := protocol.NewMessage(protocol.TypePing, nil)
@@ -34,12 +36,13 @@ func TestAgent_ProcessCommand_Ping(t *testing.T) {
 
 func TestAgent_ProcessCommand_InvalidJSON(t *testing.T) {
 	agent := &Agent{
-		logger: logrus.New(),
-		ctx:    context.Background(),
+		logger:     logrus.New(),
+		ctx:        context.Background(),
+		updateFunc: MockUpdateFunc(),
 	}
 
 	invalidJSON := []byte("{invalid json")
-	
+
 	// Should not panic
 	agent.processCommand(invalidJSON)
 }
@@ -53,6 +56,7 @@ func TestAgent_ProcessCommand_AllTypes(t *testing.T) {
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
+		updateFunc: MockUpdateFunc(),
 	}
 
 	messageTypes := []protocol.MessageType{
@@ -69,7 +73,7 @@ func TestAgent_ProcessCommand_AllTypes(t *testing.T) {
 		t.Run(string(msgType), func(t *testing.T) {
 			msg := protocol.NewMessage(msgType, nil)
 			jsonBytes, _ := msg.ToJSON()
-			
+
 			// Should not panic
 			agent.processCommand(jsonBytes)
 		})
@@ -79,12 +83,13 @@ func TestAgent_ProcessCommand_AllTypes(t *testing.T) {
 func TestAgent_Stop(t *testing.T) {
 	mockClient := &mockRedisClient{}
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		ctx:         ctx,
 		cancel:      cancel,
 		redisClient: mockClient,
+		updateFunc:  MockUpdateFunc(),
 	}
 
 	err := agent.Stop()
@@ -103,11 +108,12 @@ func TestAgent_Stop(t *testing.T) {
 
 func TestAgent_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	agent := &Agent{
-		logger: logrus.New(),
-		ctx:    ctx,
-		cancel: cancel,
+		logger:     logrus.New(),
+		ctx:        ctx,
+		cancel:     cancel,
+		updateFunc: MockUpdateFunc(),
 	}
 
 	// Cancel context
@@ -125,12 +131,13 @@ func TestAgent_ContextCancellation(t *testing.T) {
 func TestAgent_MultipleStops(t *testing.T) {
 	mockClient := &mockRedisClient{}
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		ctx:         ctx,
 		cancel:      cancel,
 		redisClient: mockClient,
+		updateFunc:  MockUpdateFunc(),
 	}
 
 	// Call Stop multiple times
@@ -151,8 +158,9 @@ func TestAgent_ConfigAccess(t *testing.T) {
 	}
 
 	agent := &Agent{
-		config: cfg,
-		logger: logrus.New(),
+		config:     cfg,
+		logger:     logrus.New(),
+		updateFunc: MockUpdateFunc(),
 	}
 
 	if agent.config.Server.Name != "test-server" {
@@ -167,7 +175,8 @@ func TestAgent_ConfigAccess(t *testing.T) {
 func TestAgent_LoggerAccess(t *testing.T) {
 	logger := logrus.New()
 	agent := &Agent{
-		logger: logger,
+		logger:     logger,
+		updateFunc: MockUpdateFunc(),
 	}
 
 	if agent.logger == nil {
@@ -237,6 +246,7 @@ func TestAgent_MessageHandling(t *testing.T) {
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
+		updateFunc: MockUpdateFunc(),
 	}
 
 	// Test with valid message
@@ -260,6 +270,7 @@ func TestAgent_ConcurrentProcessing(t *testing.T) {
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
+		updateFunc: MockUpdateFunc(),
 	}
 
 	// Process multiple messages concurrently
@@ -291,6 +302,7 @@ func TestAgent_ErrorRecovery(t *testing.T) {
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
+		updateFunc: MockUpdateFunc(),
 	}
 
 	// Should handle nil client gracefully in some way

@@ -31,7 +31,7 @@ func TestGetUserServersWithInfo(t *testing.T) {
 func TestDatabaseSchema(t *testing.T) {
 	// Test that schema constants are defined
 	tables := []string{"users", "servers", "user_servers"}
-	
+
 	for _, table := range tables {
 		if table == "" {
 			t.Error("Table name is empty")
@@ -44,11 +44,11 @@ func TestServerInfoStruct(t *testing.T) {
 		SecretKey: "test-key",
 		Name:      "test-server",
 	}
-	
+
 	if server.SecretKey != "test-key" {
 		t.Errorf("SecretKey = %v, want test-key", server.SecretKey)
 	}
-	
+
 	if server.Name != "test-server" {
 		t.Errorf("Name = %v, want test-server", server.Name)
 	}

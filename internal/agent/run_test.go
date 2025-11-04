@@ -12,35 +12,35 @@ import (
 
 func TestHandleCommands_NilMessage(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msgChan := make(chan []byte, 1)
 	msgChan <- nil
 	close(msgChan)
-	
+
 	// Should exit gracefully
 	agent.handleCommands(msgChan)
 }
 
 func TestHandleCommands_ValidMessage(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msg := protocol.NewMessage(protocol.TypePing, nil)
 	jsonBytes, _ := msg.ToJSON()
-	
+
 	msgChan := make(chan []byte, 1)
 	msgChan <- jsonBytes
-	
+
 	// Start handling in goroutine
 	done := make(chan bool)
 	go func() {
 		agent.handleCommands(msgChan)
 		done <- true
 	}()
-	
+
 	// Close channel to exit handler
 	time.Sleep(50 * time.Millisecond)
 	close(msgChan)
-	
+
 	// Wait for completion
 	select {
 	case <-done:
@@ -52,9 +52,9 @@ func TestHandleCommands_ValidMessage(t *testing.T) {
 
 func TestHandleCommands_MultipleMessages(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msgChan := make(chan []byte, 10)
-	
+
 	// Send multiple messages
 	for i := 0; i < 5; i++ {
 		msg := protocol.NewMessage(protocol.TypePing, nil)
@@ -62,18 +62,18 @@ func TestHandleCommands_MultipleMessages(t *testing.T) {
 		jsonBytes, _ := msg.ToJSON()
 		msgChan <- jsonBytes
 	}
-	
+
 	// Start handling
 	done := make(chan bool)
 	go func() {
 		agent.handleCommands(msgChan)
 		done <- true
 	}()
-	
+
 	// Wait a bit for processing
 	time.Sleep(100 * time.Millisecond)
 	close(msgChan)
-	
+
 	// Wait for completion
 	select {
 	case <-done:
@@ -89,7 +89,7 @@ func TestHandleCommands_MultipleMessages(t *testing.T) {
 func TestHandleCommands_ContextCancellation(t *testing.T) {
 	mockClient := &mockRedisClient{}
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		ctx:         ctx,
@@ -98,35 +98,35 @@ func TestHandleCommands_ContextCancellation(t *testing.T) {
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
 	}
-	
+
 	msgChan := make(chan []byte)
-	
+
 	// Start handling
 	go agent.handleCommands(msgChan)
-	
+
 	// Cancel context
 	time.Sleep(50 * time.Millisecond)
 	cancel()
-	
+
 	// Should exit
 	time.Sleep(100 * time.Millisecond)
 }
 
 func TestHandleCommands_InvalidJSON(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msgChan := make(chan []byte, 1)
 	msgChan <- []byte("{invalid json}")
-	
+
 	done := make(chan bool)
 	go func() {
 		agent.handleCommands(msgChan)
 		done <- true
 	}()
-	
+
 	time.Sleep(50 * time.Millisecond)
 	close(msgChan)
-	
+
 	select {
 	case <-done:
 		// Expected - should handle invalid JSON gracefully
@@ -137,19 +137,19 @@ func TestHandleCommands_InvalidJSON(t *testing.T) {
 
 func TestHandleCommands_EmptyMessage(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msgChan := make(chan []byte, 1)
 	msgChan <- []byte("")
-	
+
 	done := make(chan bool)
 	go func() {
 		agent.handleCommands(msgChan)
 		done <- true
 	}()
-	
+
 	time.Sleep(50 * time.Millisecond)
 	close(msgChan)
-	
+
 	select {
 	case <-done:
 		// Expected
@@ -160,9 +160,9 @@ func TestHandleCommands_EmptyMessage(t *testing.T) {
 
 func TestHandleCommands_RapidMessages(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msgChan := make(chan []byte, 100)
-	
+
 	// Send many messages rapidly
 	for i := 0; i < 50; i++ {
 		msg := protocol.NewMessage(protocol.TypePing, nil)
@@ -170,16 +170,16 @@ func TestHandleCommands_RapidMessages(t *testing.T) {
 		jsonBytes, _ := msg.ToJSON()
 		msgChan <- jsonBytes
 	}
-	
+
 	done := make(chan bool)
 	go func() {
 		agent.handleCommands(msgChan)
 		done <- true
 	}()
-	
+
 	time.Sleep(200 * time.Millisecond)
 	close(msgChan)
-	
+
 	select {
 	case <-done:
 		mockClient := agent.redisClient.(*mockRedisClient)
@@ -193,9 +193,9 @@ func TestHandleCommands_RapidMessages(t *testing.T) {
 
 func TestHandleCommands_MixedMessageTypes(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msgChan := make(chan []byte, 10)
-	
+
 	messageTypes := []protocol.MessageType{
 		protocol.TypePing,
 		protocol.TypeGetCPUTemp,
@@ -203,22 +203,22 @@ func TestHandleCommands_MixedMessageTypes(t *testing.T) {
 		protocol.TypeGetDiskInfo,
 		protocol.TypeGetUptime,
 	}
-	
+
 	for _, msgType := range messageTypes {
 		msg := protocol.NewMessage(msgType, nil)
 		jsonBytes, _ := msg.ToJSON()
 		msgChan <- jsonBytes
 	}
-	
+
 	done := make(chan bool)
 	go func() {
 		agent.handleCommands(msgChan)
 		done <- true
 	}()
-	
+
 	time.Sleep(200 * time.Millisecond)
 	close(msgChan)
-	
+
 	select {
 	case <-done:
 		mockClient := agent.redisClient.(*mockRedisClient)
@@ -233,7 +233,7 @@ func TestHandleCommands_MixedMessageTypes(t *testing.T) {
 func TestStop_Basic(t *testing.T) {
 	mockClient := &mockRedisClient{}
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		ctx:         ctx,
@@ -258,7 +258,7 @@ func TestStop_Basic(t *testing.T) {
 func TestStop_MultipleCalls(t *testing.T) {
 	mockClient := &mockRedisClient{}
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		ctx:         ctx,
@@ -281,7 +281,7 @@ func TestRun_Integration(t *testing.T) {
 
 func TestMessageProcessing_Pipeline(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	// Create a pipeline of messages
 	messages := []struct {
 		msgType protocol.MessageType
@@ -291,13 +291,13 @@ func TestMessageProcessing_Pipeline(t *testing.T) {
 		{protocol.TypeGetCPUTemp, nil},
 		{protocol.TypeGetMemoryInfo, nil},
 	}
-	
+
 	for _, m := range messages {
 		msg := protocol.NewMessage(m.msgType, m.payload)
 		jsonBytes, _ := msg.ToJSON()
 		agent.processCommand(jsonBytes)
 	}
-	
+
 	mockClient := agent.redisClient.(*mockRedisClient)
 	if len(mockClient.publishedMessages) < len(messages) {
 		t.Errorf("Expected %d responses, got %d", len(messages), len(mockClient.publishedMessages))
@@ -306,17 +306,17 @@ func TestMessageProcessing_Pipeline(t *testing.T) {
 
 func TestChannelClosed_Handling(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msgChan := make(chan []byte)
 	close(msgChan) // Close immediately
-	
+
 	// Should exit without hanging
 	done := make(chan bool)
 	go func() {
 		agent.handleCommands(msgChan)
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Expected
@@ -327,12 +327,12 @@ func TestChannelClosed_Handling(t *testing.T) {
 
 func TestSelectCase_ContextAndMessage(t *testing.T) {
 	agent := createTestAgent()
-	
+
 	msgChan := make(chan []byte, 1)
 	msg := protocol.NewMessage(protocol.TypePing, nil)
 	jsonBytes, _ := msg.ToJSON()
 	msgChan <- jsonBytes
-	
+
 	done := make(chan bool)
 	go func() {
 		select {
@@ -343,7 +343,7 @@ func TestSelectCase_ContextAndMessage(t *testing.T) {
 		}
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Expected

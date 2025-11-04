@@ -24,10 +24,7 @@ func createTestAgent() *Agent {
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
-		// Mock update function to avoid real file operations in all tests
-		updateFunc: func(version string) error {
-			return nil
-		},
+		updateFunc: MockUpdateFunc(),
 	}
 }
 

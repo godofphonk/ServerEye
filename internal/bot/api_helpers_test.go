@@ -86,7 +86,7 @@ func TestTimeoutHandling(t *testing.T) {
 
 func TestGenericHelperTypeConstraints(t *testing.T) {
 	// Test that different types can be used with generic helpers
-	
+
 	type CustomStruct struct {
 		ID   string
 		Data map[string]interface{}

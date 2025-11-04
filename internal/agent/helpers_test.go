@@ -146,7 +146,7 @@ func TestSendResponse_WithoutRedisClient(t *testing.T) {
 
 func TestSendResponseToCommand_WithMockClient(t *testing.T) {
 	mockClient := &mockRedisClient{}
-	
+
 	agent := &Agent{
 		logger:      logrus.New(),
 		ctx:         context.Background(),

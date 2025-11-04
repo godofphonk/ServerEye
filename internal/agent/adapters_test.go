@@ -31,19 +31,19 @@ func TestDirectSubscriptionAdapter_Interface(t *testing.T) {
 
 func TestHTTPClientAdapter_Creation(t *testing.T) {
 	logger := logrus.New()
-	
+
 	httpClient, err := redis.NewHTTPClient(redis.HTTPConfig{
 		BaseURL: "https://api.example.com",
 		Timeout: 30 * time.Second,
 	}, logger)
-	
+
 	if err != nil {
 		t.Logf("Expected error without real API: %v", err)
 		return
 	}
 
 	adapter := &HTTPClientAdapter{client: httpClient}
-	
+
 	if adapter == nil {
 		t.Error("Adapter is nil")
 	}
@@ -59,18 +59,18 @@ func TestHTTPClientAdapter_Subscribe(t *testing.T) {
 
 func TestHTTPClientAdapter_Close(t *testing.T) {
 	logger := logrus.New()
-	
+
 	httpClient, err := redis.NewHTTPClient(redis.HTTPConfig{
 		BaseURL: "https://api.example.com",
 		Timeout: 30 * time.Second,
 	}, logger)
-	
+
 	if err != nil {
 		t.Skip("Cannot create HTTP client")
 	}
 
 	adapter := &HTTPClientAdapter{client: httpClient}
-	
+
 	err = adapter.Close()
 	if err != nil {
 		t.Errorf("Close() error = %v", err)
@@ -166,7 +166,7 @@ func TestAgentWithDirectAdapter(t *testing.T) {
 func TestAdapterSelection_HTTPConfig(t *testing.T) {
 	// Test that API.BaseURL triggers HTTP adapter
 	hasBaseURL := "https://api.example.com" != ""
-	
+
 	if !hasBaseURL {
 		t.Error("Base URL check failed")
 	}
@@ -176,7 +176,7 @@ func TestAdapterSelection_RedisConfig(t *testing.T) {
 	// Test that empty API.BaseURL triggers Redis adapter
 	baseURL := ""
 	hasBaseURL := baseURL != ""
-	
+
 	if hasBaseURL {
 		t.Error("Empty base URL should be false")
 	}
@@ -184,7 +184,7 @@ func TestAdapterSelection_RedisConfig(t *testing.T) {
 
 func TestContext_Usage(t *testing.T) {
 	ctx := context.Background()
-	
+
 	if ctx == nil {
 		t.Error("Context is nil")
 	}

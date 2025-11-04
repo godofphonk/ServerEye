@@ -15,7 +15,7 @@ func TestHandleHelp_Command(t *testing.T) {
 func TestUserPermissions(t *testing.T) {
 	// Test user ID validation
 	validUserIDs := []int64{12345, 67890, 111222}
-	
+
 	for _, userID := range validUserIDs {
 		if userID <= 0 {
 			t.Errorf("Invalid user ID: %d", userID)

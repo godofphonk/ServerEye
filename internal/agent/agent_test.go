@@ -11,7 +11,7 @@ import (
 
 func TestNew_DirectRedis(t *testing.T) {
 	t.Skip("Skipping test that requires Redis connection")
-	
+
 	cfg := &config.AgentConfig{
 		Server: config.ServerConfig{
 			Name:      "test-server",
@@ -69,7 +69,7 @@ func TestNew_WithAPI(t *testing.T) {
 		t.Log("Agent is nil (expected without real API)")
 		return
 	}
-	
+
 	if agent.config == nil {
 		t.Error("Agent config should not be nil")
 	}
@@ -98,11 +98,11 @@ func TestNew_InvalidConfig(t *testing.T) {
 
 func TestProcessCommand_UnknownType(t *testing.T) {
 	t.Skip("Requires Redis client initialization")
-	
+
 	logger := logrus.New()
 	agent := &Agent{
-		logger: logger,
-		ctx:    context.Background(),
+		logger:      logger,
+		ctx:         context.Background(),
 		redisClient: &mockRedisClient{},
 	}
 
@@ -130,7 +130,7 @@ func TestProcessCommand_InvalidJSON(t *testing.T) {
 
 func TestAgentStop(t *testing.T) {
 	t.Skip("Requires Redis connection")
-	
+
 	cfg := &config.AgentConfig{
 		Server: config.ServerConfig{
 			Name:      "test-server",

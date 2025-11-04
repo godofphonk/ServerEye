@@ -57,7 +57,7 @@ func TestParsePayload_ContainerActionPayload(t *testing.T) {
 
 	var result protocol.ContainerActionPayload
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Fatalf("parsePayload() error = %v", err)
 	}
@@ -80,7 +80,7 @@ func TestParsePayload_CreateContainerPayload(t *testing.T) {
 
 	var result protocol.CreateContainerPayload
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Fatalf("parsePayload() error = %v", err)
 	}
@@ -99,7 +99,7 @@ func TestParsePayload_EmptyPayload(t *testing.T) {
 
 	var result protocol.ContainerActionPayload
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Fatalf("parsePayload() with empty payload error = %v", err)
 	}
@@ -124,7 +124,7 @@ func TestParsePayload_ComplexPayload(t *testing.T) {
 
 	var result protocol.CreateContainerPayload
 	err := parsePayload(payload, &result)
-	
+
 	if err != nil {
 		t.Fatalf("parsePayload() error = %v", err)
 	}
