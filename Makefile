@@ -23,17 +23,28 @@ all: build
 # Build both agent and bot
 build: build-agent build-bot
 
+# Версия и build info (определяется выше для release, но дублируем для clarity)
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_DATE = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+GIT_COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+LDFLAGS = -X github.com/servereye/servereye/internal/version.Version=$(VERSION) \
+	-X github.com/servereye/servereye/internal/version.BuildDate=$(BUILD_DATE) \
+	-X github.com/servereye/servereye/internal/version.GitCommit=$(GIT_COMMIT)
+
 # Build agent
 build-agent:
-	@echo "Building agent..."
+	@echo "Building agent $(VERSION)..."
 	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) -o $(BUILD_DIR)/$(AGENT_BINARY) ./cmd/agent
+	$(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(AGENT_BINARY) ./cmd/agent
+	@echo "✅ Agent built: $(BUILD_DIR)/$(AGENT_BINARY)"
 
 # Build bot
 build-bot:
-	@echo "Building bot..."
+	@echo "Building bot $(VERSION)..."
 	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) -o $(BUILD_DIR)/$(BOT_BINARY) ./cmd/bot
+	$(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BOT_BINARY) ./cmd/bot
+	@echo "✅ Bot built: $(BUILD_DIR)/$(BOT_BINARY)"
 
 # Run tests
 test:
@@ -114,13 +125,28 @@ vuln-check:
 	@echo "Checking for vulnerabilities..."
 	govulncheck ./...
 
-# Release build with optimizations
+# Release build with optimizations and version
+RELEASE_LDFLAGS = -w -s \
+	-X github.com/servereye/servereye/internal/version.Version=$(VERSION) \
+	-X github.com/servereye/servereye/internal/version.BuildDate=$(BUILD_DATE) \
+	-X github.com/servereye/servereye/internal/version.GitCommit=$(GIT_COMMIT)
+
 release: clean
-	@echo "Building release binaries..."
+	@echo "Building release binaries for version $(VERSION)..."
+	@echo "Build date: $(BUILD_DATE)"
+	@echo "Git commit: $(GIT_COMMIT)"
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags="-w -s" -o $(BUILD_DIR)/$(AGENT_BINARY)-linux-amd64 ./cmd/agent
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) -ldflags="-w -s" -o $(BUILD_DIR)/$(AGENT_BINARY)-linux-arm64 ./cmd/agent
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags="-w -s" -o $(BUILD_DIR)/$(BOT_BINARY)-linux-amd64 ./cmd/bot
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags="$(RELEASE_LDFLAGS)" -o $(BUILD_DIR)/$(AGENT_BINARY)-linux-amd64 ./cmd/agent
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) -ldflags="$(RELEASE_LDFLAGS)" -o $(BUILD_DIR)/$(AGENT_BINARY)-linux-arm64 ./cmd/agent
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags="$(RELEASE_LDFLAGS)" -o $(BUILD_DIR)/$(BOT_BINARY)-linux-amd64 ./cmd/bot
+	@echo "✅ Release build complete!"
+	@$(BUILD_DIR)/$(AGENT_BINARY)-linux-amd64 --version
+
+# Показать текущую версию
+version:
+	@echo "Version: $(VERSION)"
+	@echo "Build Date: $(BUILD_DATE)"
+	@echo "Git Commit: $(GIT_COMMIT)"
 
 # Help
 help:

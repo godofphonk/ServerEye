@@ -46,9 +46,15 @@ jobs:
       - name: Build agent
         run: go build -v ./cmd/agent
       
-      # Шаг 6: Запустить тесты (если есть)
-      - name: Run tests
-        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      # Шаг 6: Запустить юнит-тесты (быстрые, без внешних зависимостей)
+      - name: Run unit tests
+        run: go test -v -short -race -coverprofile=coverage.txt -covermode=atomic ./...
+      
+      # Шаг 6.1: Показать покрытие по модулям
+      - name: Show coverage by package
+        run: |
+          echo "📊 Test Coverage Report:"
+          go tool cover -func=coverage.txt | grep -E "^total:|internal/agent|internal/bot"
       
       # Шаг 7: Загрузить coverage report (показывает какая часть кода покрыта тестами)
       - name: Upload coverage to Codecov

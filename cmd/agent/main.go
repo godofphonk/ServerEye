@@ -214,7 +214,7 @@ func registerKeyWithBot(secretKey string) error {
 
 	req := KeyRegistrationRequest{
 		SecretKey:    secretKey,
-		AgentVersion: "1.0.0",
+		AgentVersion: version.GetVersion(),
 		OSInfo:       runtime.GOOS + " " + runtime.GOARCH,
 		Hostname:     hostname,
 	}
