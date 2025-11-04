@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/pkg/protocol"
@@ -40,6 +41,9 @@ func TestHandleUpdateAgent_ValidPayload(t *testing.T) {
 	if response.ID != msg.ID {
 		t.Errorf("Response ID = %v, want %v", response.ID, msg.ID)
 	}
+	
+	// Give background goroutine time to start
+	time.Sleep(10 * time.Millisecond)
 }
 
 func TestHandleUpdateAgent_LatestVersion(t *testing.T) {
@@ -71,6 +75,9 @@ func TestHandleUpdateAgent_LatestVersion(t *testing.T) {
 	if updateResp.NewVersion != "latest" {
 		t.Errorf("NewVersion = %v, want latest", updateResp.NewVersion)
 	}
+	
+	// Give background goroutine time to start
+	time.Sleep(10 * time.Millisecond)
 }
 
 func TestHandleUpdateAgent_InvalidPayload(t *testing.T) {
@@ -303,6 +310,9 @@ func TestHandleUpdateAgent_BackgroundExecution(t *testing.T) {
 	if !updateResp.RestartRequired {
 		t.Error("Expected restart_required=true")
 	}
+	
+	// Give background goroutine time to start and potentially fail
+	time.Sleep(10 * time.Millisecond)
 }
 
 func TestUpdatePaths_Validation(t *testing.T) {
