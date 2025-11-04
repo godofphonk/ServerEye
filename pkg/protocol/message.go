@@ -24,6 +24,7 @@ const (
 	TypeGetDiskInfo      MessageType = "get_disk_info"
 	TypeGetUptime        MessageType = "get_uptime"
 	TypeGetProcesses     MessageType = "get_processes"
+	TypeUpdateAgent      MessageType = "update_agent"
 	TypePing             MessageType = "ping"
 
 	// Responses from agent to bot
@@ -35,6 +36,7 @@ const (
 	TypeDiskInfoResponse        MessageType = "disk_info_response"
 	TypeUptimeResponse          MessageType = "uptime_response"
 	TypeProcessesResponse       MessageType = "processes_response"
+	TypeUpdateAgentResponse     MessageType = "update_agent_response"
 	TypePong                    MessageType = "pong"
 	TypeErrorResponse           MessageType = "error_response"
 )
@@ -190,6 +192,20 @@ type ProcessInfo struct {
 type ProcessesPayload struct {
 	Processes []ProcessInfo `json:"processes"`
 	Total     int           `json:"total"`
+}
+
+// UpdateAgentPayload represents agent update request
+type UpdateAgentPayload struct {
+	Version string `json:"version"` // Target version or "latest"
+}
+
+// UpdateAgentResponse represents agent update result
+type UpdateAgentResponse struct {
+	Success        bool   `json:"success"`
+	Message        string `json:"message"`
+	OldVersion     string `json:"old_version"`
+	NewVersion     string `json:"new_version"`
+	RestartRequired bool   `json:"restart_required"`
 }
 
 // Error codes

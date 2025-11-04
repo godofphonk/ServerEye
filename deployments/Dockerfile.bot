@@ -19,11 +19,8 @@ COPY . .
 # Build the bot binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bot ./cmd/bot
 
-# Final stage
-FROM alpine:latest
-
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Final stage - use golang alpine as we already have it
+FROM golang:1.23-alpine
 
 # Create non-root user
 RUN adduser -D -s /bin/sh servereye

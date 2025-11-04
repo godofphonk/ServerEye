@@ -289,3 +289,36 @@ func (b *Bot) getProcesses(serverKey string) (*protocol.ProcessesPayload, error)
 
 	return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
 }
+
+// updateAgent requests agent to update itself
+func (b *Bot) updateAgent(serverKey string, version string) (*protocol.UpdateAgentResponse, error) {
+	payload := &protocol.UpdateAgentPayload{
+		Version: version,
+	}
+	cmd := protocol.NewMessage(protocol.TypeUpdateAgent, payload)
+
+	ctx, cancel := context.WithTimeout(b.ctx, 30*time.Second) // Longer timeout for update
+	defer cancel()
+
+	resp, err := b.sendCommandViaStreams(ctx, serverKey, cmd, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Type == protocol.TypeErrorResponse {
+		return nil, fmt.Errorf("agent error: %v", resp.Payload)
+	}
+
+	if resp.Type == protocol.TypeUpdateAgentResponse {
+		if payload, ok := resp.Payload.(map[string]interface{}); ok {
+			updateData, _ := json.Marshal(payload)
+			var updateResp protocol.UpdateAgentResponse
+			if err := json.Unmarshal(updateData, &updateResp); err == nil {
+				return &updateResp, nil
+			}
+		}
+		return nil, fmt.Errorf("invalid update response data")
+	}
+
+	return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
+}

@@ -55,6 +55,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	case strings.HasPrefix(message.Text, "/debug"):
 		b.logger.Info("Info message")
 		response = b.handleDebug(message)
+	case strings.HasPrefix(message.Text, "/update"):
+		b.logger.Info("Info message")
+		response = b.handleUpdate(message)
 	case strings.HasPrefix(message.Text, "/stats"):
 		b.logger.Info("Info message")
 		response = b.handleStats(message)
@@ -118,6 +121,7 @@ func (b *Bot) handleHelp(message *tgbotapi.Message) string {
 ⚙️ Server Management:
 /servers - List your servers
 /status - Get server status
+/update - Update agent to latest version
 /rename_server <#> <name> - Rename server
 /remove_server <#> - Remove server
 /add <key> [name] - Add new server

@@ -80,6 +80,8 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 		response = b.executeProcessesCommand(servers, serverNum)
 	case "status":
 		response = b.executeStatusCommand(servers, serverNum)
+	case "update":
+		response = b.executeUpdateCommand(servers, serverNum, query.Message.Chat.ID)
 	default:
 		response = "❌ Unknown command"
 	}
@@ -306,6 +308,39 @@ func (b *Bot) executeStatusCommand(servers []ServerInfo, serverNum string) strin
 
 	serverName := servers[num-1].Name
 	return fmt.Sprintf("🟢 %s Status: Online\n⏱️ Uptime: 15 days 8 hours\n💾 Last activity: just now", serverName)
+}
+
+// executeUpdateCommand executes update command for specific server
+func (b *Bot) executeUpdateCommand(servers []ServerInfo, serverNum string, chatID int64) string {
+	num, err := strconv.Atoi(serverNum)
+	if err != nil || num < 1 || num > len(servers) {
+		return "❌ Invalid server selection"
+	}
+
+	serverKey := servers[num-1].SecretKey
+	serverName := servers[num-1].Name
+
+	// Send "updating" message
+	b.sendMessage(chatID, fmt.Sprintf("🔄 Updating agent on %s...\n\nThis may take a minute.", serverName))
+
+	updateResp, err := b.updateAgent(serverKey, "latest")
+	if err != nil {
+		return fmt.Sprintf("❌ Failed to update agent on %s: %v", serverName, err)
+	}
+
+	if !updateResp.Success {
+		return fmt.Sprintf("❌ Update failed on %s:\n%s", serverName, updateResp.Message)
+	}
+
+	response := fmt.Sprintf("✅ Agent updated successfully on %s!\n\n", serverName)
+	response += fmt.Sprintf("📦 Old version: %s\n", updateResp.OldVersion)
+	response += fmt.Sprintf("📦 New version: %s\n", updateResp.NewVersion)
+	
+	if updateResp.RestartRequired {
+		response += "\n⚠️ Agent restart required to apply changes."
+	}
+
+	return response
 }
 
 // handleContainerActionCallback handles container action button clicks

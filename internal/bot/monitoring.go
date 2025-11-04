@@ -376,3 +376,56 @@ func (b *Bot) handleContainers(message *tgbotapi.Message) string {
 	b.sendContainersWithActionButtons(message.Chat.ID, serverKey, containers)
 	return ""
 }
+
+// handleUpdate handles the /update command to update agent
+func (b *Bot) handleUpdate(message *tgbotapi.Message) string {
+	servers, err := b.getUserServersWithInfo(message.From.ID)
+	if err != nil {
+		b.logger.Error("Error occurred", err)
+		return "❌ Failed to retrieve servers."
+	}
+
+	if len(servers) == 0 {
+		return "❌ No servers found. Add a server first using /add command."
+	}
+
+	// If multiple servers, show selection buttons
+	if len(servers) > 1 {
+		parts := strings.Fields(message.Text)
+		if len(parts) == 1 {
+			// No server specified, show buttons
+			b.sendServerSelectionButtons(message.Chat.ID, "update", "🔄 Select server to update:", servers)
+			return ""
+		}
+	}
+
+	// Single server - update directly
+	serverKey := servers[0].SecretKey
+	serverName := servers[0].Name
+
+	b.logger.Info("Updating agent...")
+	
+	// Send "updating" message
+	b.sendMessage(message.Chat.ID, fmt.Sprintf("🔄 Updating agent on %s...\n\nThis may take a minute.", serverName))
+
+	updateResp, err := b.updateAgent(serverKey, "latest")
+	if err != nil {
+		b.logger.Error("Error occurred", err)
+		return fmt.Sprintf("❌ Failed to update agent on %s: %v", serverName, err)
+	}
+
+	if !updateResp.Success {
+		return fmt.Sprintf("❌ Update failed on %s:\n%s", serverName, updateResp.Message)
+	}
+
+	response := fmt.Sprintf("✅ Agent updated successfully on %s!\n\n", serverName)
+	response += fmt.Sprintf("📦 Old version: %s\n", updateResp.OldVersion)
+	response += fmt.Sprintf("📦 New version: %s\n", updateResp.NewVersion)
+	
+	if updateResp.RestartRequired {
+		response += "\n⚠️ Agent restart required to apply changes."
+	}
+
+	b.logger.Info("Agent updated successfully")
+	return response
+}

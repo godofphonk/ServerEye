@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/servereye/servereye/internal/config"
@@ -213,6 +216,8 @@ func (a *Agent) processCommand(data []byte) {
 		response = a.handleGetUptime(msg)
 	case protocol.TypeGetProcesses:
 		response = a.handleGetProcesses(msg)
+	case protocol.TypeUpdateAgent:
+		response = a.handleUpdateAgent(msg)
 	case protocol.TypePing:
 		response = a.handlePing(msg)
 	default:
@@ -781,4 +786,168 @@ func (d *DirectSubscriptionAdapter) Channel() <-chan []byte {
 
 func (d *DirectSubscriptionAdapter) Close() error {
 	return d.sub.Close()
+}
+
+// handleUpdateAgent обрабатывает команду обновления агента
+func (a *Agent) handleUpdateAgent(msg *protocol.Message) *protocol.Message {
+	a.logger.Info("Обработка команды обновления агента")
+
+	// Parse payload
+	var payload protocol.UpdateAgentPayload
+	payloadData, _ := json.Marshal(msg.Payload)
+	if err := json.Unmarshal(payloadData, &payload); err != nil {
+		a.logger.WithError(err).Error("Ошибка парсинга payload")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    "INVALID_PAYLOAD",
+			ErrorMessage: fmt.Sprintf("Ошибка парсинга payload: %v", err),
+		})
+	}
+
+	// Get current version
+	currentVersion := a.getAgentVersion()
+	a.logger.WithField("current_version", currentVersion).Info("Текущая версия агента")
+
+	// Target version (default to "latest")
+	targetVersion := payload.Version
+	if targetVersion == "" {
+		targetVersion = "latest"
+	}
+
+	// Perform update in background to avoid blocking
+	go func() {
+		err := a.performUpdate(targetVersion)
+		if err != nil {
+			a.logger.WithError(err).Error("Ошибка обновления агента")
+		} else {
+			a.logger.Info("Агент успешно обновлен, перезапуск...")
+			// Restart systemd service
+			a.restartAgent()
+		}
+	}()
+
+	// Return immediate response
+	response := protocol.NewMessage(protocol.TypeUpdateAgentResponse, protocol.UpdateAgentResponse{
+		Success:         true,
+		Message:         "Agent update started",
+		OldVersion:      currentVersion,
+		NewVersion:      targetVersion,
+		RestartRequired: true,
+	})
+	response.ID = msg.ID
+	return response
+}
+
+// getAgentVersion возвращает текущую версию агента
+func (a *Agent) getAgentVersion() string {
+	// Read version from embedded constant or file
+	return "1.0.3" // TODO: Make this dynamic
+}
+
+// performUpdate выполняет обновление агента
+func (a *Agent) performUpdate(targetVersion string) error {
+	a.logger.WithField("target_version", targetVersion).Info("Начало обновления агента")
+
+	// Download URL
+	downloadURL := fmt.Sprintf("https://github.com/godofphonk/ServerEye/releases/latest/download/servereye-agent-linux-amd64")
+	checksumURL := fmt.Sprintf("https://github.com/godofphonk/ServerEye/releases/latest/download/checksums.txt")
+
+	// Download new binary to temp file
+	tmpFile := "/tmp/servereye-agent-new"
+	cmd := exec.Command("wget", "-q", "-O", tmpFile, downloadURL)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to download new version: %v", err)
+	}
+
+	// Download and verify checksum
+	checksumFile := "/tmp/servereye-checksums.txt"
+	cmd = exec.Command("wget", "-q", "-O", checksumFile, checksumURL)
+	if err := cmd.Run(); err != nil {
+		a.logger.Warn("Failed to download checksums, skipping verification")
+	} else {
+		// Verify SHA256
+		if err := a.verifyChecksum(tmpFile, checksumFile); err != nil {
+			os.Remove(tmpFile)
+			os.Remove(checksumFile)
+			return fmt.Errorf("checksum verification failed: %v", err)
+		}
+		os.Remove(checksumFile)
+		a.logger.Info("Checksum verified successfully")
+	}
+
+	// Make executable
+	if err := os.Chmod(tmpFile, 0755); err != nil {
+		return fmt.Errorf("failed to chmod: %v", err)
+	}
+
+	// Backup current binary
+	currentBinary := "/opt/servereye/servereye-agent"
+	backupBinary := "/opt/servereye/servereye-agent.backup"
+	
+	cmd = exec.Command("cp", currentBinary, backupBinary)
+	if err := cmd.Run(); err != nil {
+		a.logger.WithError(err).Warn("Failed to backup current binary")
+	}
+
+	// Replace binary
+	cmd = exec.Command("mv", tmpFile, currentBinary)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to replace binary: %v", err)
+	}
+
+	a.logger.Info("Binary replaced successfully")
+	return nil
+}
+
+// verifyChecksum проверяет SHA256 checksum
+func (a *Agent) verifyChecksum(binaryFile, checksumFile string) error {
+	// Read expected checksum
+	data, err := os.ReadFile(checksumFile)
+	if err != nil {
+		return err
+	}
+
+	// Find checksum for our file
+	lines := strings.Split(string(data), "\n")
+	var expectedChecksum string
+	for _, line := range lines {
+		if strings.Contains(line, "servereye-agent-linux-amd64") {
+			parts := strings.Fields(line)
+			if len(parts) >= 1 {
+				expectedChecksum = parts[0]
+				break
+			}
+		}
+	}
+
+	if expectedChecksum == "" {
+		return fmt.Errorf("checksum not found in file")
+	}
+
+	// Calculate actual checksum
+	cmd := exec.Command("sha256sum", binaryFile)
+	output, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	actualChecksum := strings.Fields(string(output))[0]
+
+	if actualChecksum != expectedChecksum {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum)
+	}
+
+	return nil
+}
+
+// restartAgent перезапускает агент через systemctl
+func (a *Agent) restartAgent() {
+	a.logger.Info("Перезапуск агента...")
+	
+	// Give time for response to be sent
+	time.Sleep(2 * time.Second)
+
+	cmd := exec.Command("systemctl", "restart", "servereye-agent")
+	if err := cmd.Run(); err != nil {
+		a.logger.WithError(err).Error("Failed to restart agent")
+	}
 }

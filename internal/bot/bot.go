@@ -448,6 +448,7 @@ func (b *Bot) setMenuCommands() error {
 		{Command: "uptime", Description: "Get system uptime"},
 		{Command: "processes", Description: "List running processes"},
 		{Command: "containers", Description: "Manage Docker containers"},
+		{Command: "update", Description: "Update agent to latest version"},
 		{Command: "servers", Description: "List your servers"},
 		{Command: "status", Description: "Get server status"},
 	}
