@@ -31,7 +31,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - servereye-network
+      - servereye-shared
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
@@ -45,7 +45,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - servereye-network
+      - servereye-shared
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U servereye"]
       interval: 10s
@@ -61,7 +61,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - servereye-network
+      - servereye-shared
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
@@ -92,5 +92,5 @@ volumes:
     driver: local
 
 networks:
-  servereye-network:
+  servereye-shared:
     driver: bridge
