@@ -17,9 +17,11 @@ version: '3.8'
 
 services:
   servereye-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile.bot
+    image: ghcr.io/godofphonk/servereye-bot:latest
+    # Для локальной сборки раскомментируй:
+    # build:
+    #   context: ..
+    #   dockerfile: deployments/Dockerfile.bot
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
@@ -35,6 +37,8 @@ services:
     restart: unless-stopped
     networks:
       - servereye-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
   redis:
     image: redis:7-alpine
@@ -73,6 +77,21 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  # Watchtower - автоматическое обновление контейнеров
+  watchtower:
+    image: containrrr/watchtower
+    container_name: servereye-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      --interval 300
+      --cleanup
+      --label-enable
+    environment:
+      - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
 
 volumes:
   redis_data:
