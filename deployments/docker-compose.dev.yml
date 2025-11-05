@@ -72,20 +72,6 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # Watchtower - auto-update DEV bot every minute
-  watchtower-dev:
-    image: containrrr/watchtower
-    container_name: servereye-watchtower-dev
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: >
-      --interval 60
-      --cleanup
-      --label-enable
-    environment:
-      - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
-      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
 
 volumes:
   redis_data:

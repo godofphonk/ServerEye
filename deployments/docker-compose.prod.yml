@@ -70,7 +70,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # Watchtower - auto-update PROD bot on new stable releases
+  # Watchtower - auto-update both DEV and PROD bots
   watchtower:
     image: containrrr/watchtower
     container_name: servereye-watchtower
@@ -78,9 +78,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: >
-      --interval 300
+      --interval 60
       --cleanup
-      --label-enable
+      servereye-bot-dev
+      servereye-bot-prod
     environment:
       - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
       - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
