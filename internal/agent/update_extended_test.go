@@ -3,8 +3,8 @@ package agent
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/pkg/protocol"
@@ -13,8 +13,7 @@ import (
 
 func TestHandleUpdateAgent_ValidPayload(t *testing.T) {
 	mockClient := &mockRedisClient{}
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := make(chan bool, 1)
 
 	agent := &Agent{
 		logger:      logrus.New(),
@@ -24,10 +23,9 @@ func TestHandleUpdateAgent_ValidPayload(t *testing.T) {
 		},
 		// Mock update function to avoid real file operations
 		updateFunc: func(version string) error {
-			defer wg.Done()
-			// Simulate successful update
 			return nil
 		},
+		updateDoneChan: done,
 	}
 
 	payload := protocol.UpdateAgentPayload{
@@ -51,14 +49,18 @@ func TestHandleUpdateAgent_ValidPayload(t *testing.T) {
 		t.Errorf("Response ID = %v, want %v", response.ID, msg.ID)
 	}
 
-	// Wait for background goroutine to complete
-	wg.Wait()
+	// Wait for background goroutine to complete FULLY
+	select {
+	case <-done:
+		time.Sleep(10 * time.Millisecond) // Extra time for logging after updateFunc
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for update goroutine")
+	}
 }
 
 func TestHandleUpdateAgent_LatestVersion(t *testing.T) {
 	mockClient := &mockRedisClient{}
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := make(chan bool, 1)
 
 	agent := &Agent{
 		logger:      logrus.New(),
@@ -67,9 +69,9 @@ func TestHandleUpdateAgent_LatestVersion(t *testing.T) {
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
 		updateFunc: func(version string) error {
-			defer wg.Done()
 			return nil
 		},
+		updateDoneChan: done,
 	}
 
 	payload := protocol.UpdateAgentPayload{
@@ -92,8 +94,13 @@ func TestHandleUpdateAgent_LatestVersion(t *testing.T) {
 		t.Errorf("NewVersion = %v, want latest", updateResp.NewVersion)
 	}
 
-	// Wait for background goroutine
-	wg.Wait()
+	// Wait for background goroutine to complete FULLY
+	select {
+	case <-done:
+		time.Sleep(10 * time.Millisecond)
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for update goroutine")
+	}
 }
 
 func TestHandleUpdateAgent_InvalidPayload(t *testing.T) {
@@ -294,8 +301,7 @@ func TestRestartAgent_SystemctlRequired(t *testing.T) {
 
 func TestHandleUpdateAgent_BackgroundExecution(t *testing.T) {
 	mockClient := &mockRedisClient{}
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := make(chan bool, 1)
 
 	agent := &Agent{
 		logger:      logrus.New(),
@@ -304,9 +310,9 @@ func TestHandleUpdateAgent_BackgroundExecution(t *testing.T) {
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
 		updateFunc: func(version string) error {
-			defer wg.Done()
 			return nil
 		},
+		updateDoneChan: done,
 	}
 
 	payload := protocol.UpdateAgentPayload{
@@ -334,8 +340,13 @@ func TestHandleUpdateAgent_BackgroundExecution(t *testing.T) {
 		t.Error("Expected restart_required=true")
 	}
 
-	// Wait for background goroutine to complete
-	wg.Wait()
+	// Wait for background goroutine to complete FULLY
+	select {
+	case <-done:
+		time.Sleep(10 * time.Millisecond)
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for update goroutine")
+	}
 }
 
 func TestUpdatePaths_Validation(t *testing.T) {

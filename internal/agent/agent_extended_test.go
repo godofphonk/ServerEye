@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/servereye/servereye/internal/config"
+	"github.com/servereye/servereye/pkg/metrics"
 	"github.com/servereye/servereye/pkg/protocol"
 	"github.com/sirupsen/logrus"
 )
-
 
 func TestAgent_ProcessCommand_Ping(t *testing.T) {
 	mockClient := &mockRedisClient{}
@@ -262,11 +262,14 @@ func TestAgent_MessageHandling(t *testing.T) {
 }
 
 func TestAgent_ConcurrentProcessing(t *testing.T) {
+	logger := logrus.New()
 	mockClient := &mockRedisClient{}
 	agent := &Agent{
-		logger:      logrus.New(),
-		ctx:         context.Background(),
-		redisClient: mockClient,
+		logger:        logger,
+		ctx:           context.Background(),
+		redisClient:   mockClient,
+		cpuMetrics:    metrics.NewCPUMetrics(),
+		systemMonitor: metrics.NewSystemMonitor(logger),
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},
@@ -295,10 +298,13 @@ func TestAgent_ConcurrentProcessing(t *testing.T) {
 }
 
 func TestAgent_ErrorRecovery(t *testing.T) {
+	logger := logrus.New()
 	agent := &Agent{
-		logger:      logrus.New(),
-		ctx:         context.Background(),
-		redisClient: nil, // Will cause issues but shouldn't crash
+		logger:        logger,
+		ctx:           context.Background(),
+		redisClient:   nil, // Will cause issues but shouldn't crash
+		cpuMetrics:    metrics.NewCPUMetrics(),
+		systemMonitor: metrics.NewSystemMonitor(logger),
 		config: &config.AgentConfig{
 			Server: config.ServerConfig{SecretKey: "test-key"},
 		},

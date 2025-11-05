@@ -46,7 +46,7 @@ func (a *Agent) handleUpdateAgent(msg *protocol.Message) *protocol.Message {
 		response.ID = msg.ID
 		return response
 	}
-	
+
 	go func() {
 		var err error
 		if a.updateFunc != nil {
@@ -65,6 +65,12 @@ func (a *Agent) handleUpdateAgent(msg *protocol.Message) *protocol.Message {
 				// Only restart in production
 				a.restartAgent()
 			}
+		}
+
+		// Notify tests that goroutine finished completely (AFTER all work)
+		if a.updateDoneChan != nil {
+			time.Sleep(10 * time.Millisecond) // Ensure all logging is flushed
+			a.updateDoneChan <- true
 		}
 	}()
 

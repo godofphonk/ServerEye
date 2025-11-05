@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 )
 
 type mockRedisClient struct {
+	mu                sync.Mutex
 	publishedMessages []string
 	publishedChannels []string
 }
@@ -19,6 +21,8 @@ func (m *mockRedisClient) Subscribe(ctx context.Context, channel string) (Subscr
 }
 
 func (m *mockRedisClient) Publish(ctx context.Context, channel string, message []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.publishedChannels = append(m.publishedChannels, channel)
 	m.publishedMessages = append(m.publishedMessages, string(message))
 	return nil

@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/pkg/metrics"
@@ -120,6 +121,8 @@ func TestProcessCommand_TypeGetProcesses(t *testing.T) {
 
 func TestProcessCommand_TypeUpdateAgent(t *testing.T) {
 	agent := createTestAgent()
+	done := make(chan bool, 1)
+	agent.updateDoneChan = done
 
 	msg := protocol.NewMessage(protocol.TypeUpdateAgent, map[string]interface{}{
 		"version": "1.0.0",
@@ -129,6 +132,14 @@ func TestProcessCommand_TypeUpdateAgent(t *testing.T) {
 	jsonBytes, _ := msg.ToJSON()
 
 	agent.processCommand(jsonBytes)
+
+	// Wait for update goroutine to complete
+	select {
+	case <-done:
+		// OK
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for update goroutine")
+	}
 
 	mockClient := agent.redisClient.(*mockRedisClient)
 	if len(mockClient.publishedMessages) == 0 {
@@ -174,6 +185,20 @@ func TestProcessCommand_AllCommandTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			agent := createTestAgent()
+
+			// For update commands, add done channel and wait
+			if tt.msgType == protocol.TypeUpdateAgent {
+				done := make(chan bool, 1)
+				agent.updateDoneChan = done
+				defer func() {
+					select {
+					case <-done:
+						// OK
+					case <-time.After(1 * time.Second):
+						t.Fatal("Timeout waiting for update goroutine")
+					}
+				}()
+			}
 
 			msg := protocol.NewMessage(tt.msgType, tt.payload)
 			msg.ID = "test-" + tt.name

@@ -42,6 +42,8 @@ type Agent struct {
 
 	// updateFunc allows mocking performUpdate in tests
 	updateFunc func(string) error
+	// updateDoneChan notifies when update goroutine completes (for tests)
+	updateDoneChan chan<- bool
 }
 
 // New создает новый агент
