@@ -24,7 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'  # Версия Go из твоего проекта
+          go-version: '1.24'  # Обновлено для исправления уязвимостей
       
       # Шаг 3: Кэшировать зависимости (чтобы быстрее работало)
       - name: Cache Go modules
@@ -108,7 +108,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
       
       - name: Test ${{ matrix.module }}
         run: |
@@ -127,7 +127,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
       
       # Запускаем golangci-lint - проверяет код на ошибки и стиль
       - name: Run golangci-lint
@@ -135,3 +135,51 @@ jobs:
         with:
           version: latest
           args: --timeout=5m  # Таймаут 5 минут
+  
+  # Job 4: Проверка безопасности кода (Security Scan)
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      
+      - name: Run Gosec Security Scanner
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          echo "🔒 Running security scan..."
+          gosec -fmt=text ./... || echo "⚠️ Security issues found (non-blocking)"
+  
+  # Job 5: Проверка уязвимостей в зависимостях
+  vulnerability-check:
+    name: Vulnerability Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      
+      - name: Download dependencies
+        run: go mod download
+      
+      - name: Check for vulnerabilities
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+      
+      - name: Check for outdated dependencies
+        continue-on-error: true
+        run: |
+          echo "📦 Checking dependencies..."
+          go list -u -m all
