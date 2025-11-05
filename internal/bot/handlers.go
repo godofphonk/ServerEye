@@ -39,7 +39,8 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		response = b.handleStatus(message)
 	case strings.HasPrefix(message.Text, "/servers"):
 		b.logger.Info("Info message")
-		response = b.handleServers(message)
+		b.handleServers(message)
+		return nil // No response needed, handleServers sends message directly
 	case strings.HasPrefix(message.Text, "/help"):
 		b.logger.Info("Info message")
 		response = b.handleHelp(message)

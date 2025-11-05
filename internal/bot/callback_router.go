@@ -48,6 +48,25 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 		return nil
 	}
 
+	// Check for back to servers
+	if query.Data == "back_to_servers" {
+		return b.handleBackToServers(query)
+	}
+
+	// Check for server management actions
+	if query.Data == "add_server" {
+		return b.handleAddServerCallback(query)
+	}
+	if query.Data == "server_status" {
+		return b.handleServerStatusCallback(query)
+	}
+	if query.Data == "server_rename" {
+		return b.handleServerRenameCallback(query)
+	}
+	if query.Data == "server_remove" {
+		return b.handleServerRemoveCallback(query)
+	}
+
 	// Check if it's a create template selection
 	if strings.HasPrefix(query.Data, "create_template_") {
 		return b.handleTemplateSelection(query)

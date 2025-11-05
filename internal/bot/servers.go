@@ -9,16 +9,31 @@ import (
 )
 
 // handleServers handles the /servers command
-func (b *Bot) handleServers(message *tgbotapi.Message) string {
+func (b *Bot) handleServers(message *tgbotapi.Message) {
 	servers, err := b.getUserServersWithInfo(message.From.ID)
 	if err != nil {
-		return "❌ Error retrieving servers."
+		b.sendMessage(message.Chat.ID, "❌ Error retrieving servers.")
+		return
 	}
 
 	if len(servers) == 0 {
-		return "📭 No servers connected.\n\n💡 To connect a server:\n1. Install ServerEye agent\n2. Use /add srv_your_key MyServerName"
+		text := "📭 No servers connected.\n\n💡 To connect a server:\n1. Install ServerEye agent\n2. Use /add srv_your_key MyServerName"
+		
+		// Add button
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("➕ Add Server", "add_server"),
+			),
+		)
+		
+		msg := tgbotapi.NewMessage(message.Chat.ID, text)
+		msg.ReplyMarkup = keyboard
+		b.telegramAPI.Send(msg)
+		return
 	}
 
+	// Build server list text
+	var response string
 	if len(servers) == 1 {
 		statusIcon := "🟢"
 		if servers[0].Status == "offline" {
@@ -28,30 +43,40 @@ func (b *Bot) handleServers(message *tgbotapi.Message) string {
 		if len(keyPreview) > 12 {
 			keyPreview = keyPreview[:12] + "..."
 		}
-		return fmt.Sprintf("📋 Your servers:\n%s **%s** (%s)\n\n💡 All commands will use this server automatically.\n\n🔧 Management:\n/rename_server 1 <name> - Rename server\n/remove_server 1 - Remove server",
+		response = fmt.Sprintf("📋 Your server:\n%s **%s** (%s)\n\n💡 All commands will use this server automatically.",
 			statusIcon, servers[0].Name, keyPreview)
+	} else {
+		// Multiple servers
+		response = "📋 Your servers:\n\n"
+		for i, server := range servers {
+			statusIcon := "🟢"
+			if server.Status == "offline" {
+				statusIcon = "🔴"
+			}
+			keyPreview := server.SecretKey
+			if len(keyPreview) > 12 {
+				keyPreview = keyPreview[:12] + "..."
+			}
+			response += fmt.Sprintf("%d. %s **%s** (%s)\n", i+1, statusIcon, server.Name, keyPreview)
+		}
+		response += "\n💡 Commands will show buttons to select server."
 	}
 
-	// Multiple servers - show list with numbers
-	response := "📋 Your servers:\n\n"
-	for i, server := range servers {
-		statusIcon := "🟢"
-		if server.Status == "offline" {
-			statusIcon = "🔴"
-		}
-		keyPreview := server.SecretKey
-		if len(keyPreview) > 12 {
-			keyPreview = keyPreview[:12] + "..."
-		}
-		response += fmt.Sprintf("%d. %s **%s** (%s)\n", i+1, statusIcon, server.Name, keyPreview)
-	}
-	response += "\n💡 Commands will show buttons to select server:\n"
-	response += "Just use /temp or /containers - no numbers needed!\n\n"
-	response += "🔧 Management:\n"
-	response += "/rename_server <#> <name> - Rename server\n"
-	response += "/remove_server <#> - Remove server"
+	// Add management buttons
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📊 Status", "server_status"),
+			tgbotapi.NewInlineKeyboardButtonData("✏️ Rename", "server_rename"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🗑 Remove", "server_remove"),
+			tgbotapi.NewInlineKeyboardButtonData("➕ Add", "add_server"),
+		),
+	)
 
-	return response
+	msg := tgbotapi.NewMessage(message.Chat.ID, response)
+	msg.ReplyMarkup = keyboard
+	b.telegramAPI.Send(msg)
 }
 
 // handleRenameServer handles the /rename_server command
