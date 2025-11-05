@@ -58,7 +58,9 @@ func (b *Bot) handleServerStatusCallback(query *tgbotapi.CallbackQuery) error {
 			query.Message.MessageID,
 			text,
 		)
-		b.telegramAPI.Send(editMsg)
+		if _, sendErr := b.telegramAPI.Send(editMsg); sendErr != nil {
+			b.logger.Error("Failed to send message", sendErr)
+		}
 		return err
 	}
 
@@ -114,7 +116,9 @@ func (b *Bot) handleServerRenameCallback(query *tgbotapi.CallbackQuery) error {
 			query.Message.MessageID,
 			text,
 		)
-		b.telegramAPI.Send(editMsg)
+		if _, sendErr := b.telegramAPI.Send(editMsg); sendErr != nil {
+			b.logger.Error("Failed to send message", sendErr)
+		}
 		return err
 	}
 
@@ -164,7 +168,9 @@ func (b *Bot) handleServerRemoveCallback(query *tgbotapi.CallbackQuery) error {
 			query.Message.MessageID,
 			text,
 		)
-		b.telegramAPI.Send(editMsg)
+		if _, sendErr := b.telegramAPI.Send(editMsg); sendErr != nil {
+			b.logger.Error("Failed to send message", sendErr)
+		}
 		return err
 	}
 
@@ -214,7 +220,9 @@ func (b *Bot) handleBackToServers(query *tgbotapi.CallbackQuery) error {
 			query.Message.MessageID,
 			text,
 		)
-		b.telegramAPI.Send(editMsg)
+		if _, sendErr := b.telegramAPI.Send(editMsg); sendErr != nil {
+			b.logger.Error("Failed to send message", sendErr)
+		}
 		return err
 	}
 
@@ -233,7 +241,9 @@ func (b *Bot) handleBackToServers(query *tgbotapi.CallbackQuery) error {
 			text,
 		)
 		editMsg.ReplyMarkup = &keyboard
-		b.telegramAPI.Send(editMsg)
+		if _, err := b.telegramAPI.Send(editMsg); err != nil {
+			b.logger.Error("Failed to send message", err)
+		}
 		return nil
 	}
 

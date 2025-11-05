@@ -18,17 +18,19 @@ func (b *Bot) handleServers(message *tgbotapi.Message) {
 
 	if len(servers) == 0 {
 		text := "📭 No servers connected.\n\n💡 To connect a server:\n1. Install ServerEye agent\n2. Use /add srv_your_key MyServerName"
-		
+
 		// Add button
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("➕ Add Server", "add_server"),
 			),
 		)
-		
+
 		msg := tgbotapi.NewMessage(message.Chat.ID, text)
 		msg.ReplyMarkup = keyboard
-		b.telegramAPI.Send(msg)
+		if _, err := b.telegramAPI.Send(msg); err != nil {
+			b.logger.Error("Failed to send message", err)
+		}
 		return
 	}
 
@@ -76,7 +78,9 @@ func (b *Bot) handleServers(message *tgbotapi.Message) {
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, response)
 	msg.ReplyMarkup = keyboard
-	b.telegramAPI.Send(msg)
+	if _, err := b.telegramAPI.Send(msg); err != nil {
+		b.logger.Error("Failed to send message", err)
+	}
 }
 
 // handleRenameServer handles the /rename_server command
