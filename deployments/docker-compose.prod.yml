@@ -1,0 +1,96 @@
+# ServerEye PRODUCTION Environment
+# Stable releases only (triggered by git tags)
+# Updates only when you create a new release
+#
+# Setup:
+# 1. Copy .env.prod.example to .env.prod
+# 2. Fill in TELEGRAM_TOKEN, DB_PASSWORD, REDIS_PASSWORD
+# 3. Run: docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# 4. Check logs: docker-compose -f docker-compose.prod.yml logs -f servereye-bot-prod
+#
+# Auto-update: git tag v1.0.0 → new :stable image → Watchtower updates in ~5 min
+
+version: '3.8'
+
+services:
+  servereye-bot:
+    image: ghcr.io/godofphonk/servereye-bot:stable
+    container_name: servereye-bot-prod
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - REDIS_ADDRESS=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DATABASE_URL=postgresql://servereye:${DB_PASSWORD}@postgres:5432/servereye?sslmode=disable
+      - ENVIRONMENT=production
+    ports:
+      - "8090:8080"  # PROD API port
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - servereye-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: servereye-postgres
+    environment:
+      - POSTGRES_DB=servereye
+      - POSTGRES_USER=servereye
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - servereye-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U servereye"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: servereye-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - servereye-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # Watchtower - auto-update PROD bot on new stable releases
+  watchtower:
+    image: containrrr/watchtower
+    container_name: servereye-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      --interval 300
+      --cleanup
+      --label-enable
+    environment:
+      - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  servereye-network:
+    driver: bridge
