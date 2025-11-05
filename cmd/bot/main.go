@@ -94,20 +94,23 @@ func setupLogger(level string) *logrus.Logger {
 // loadConfigFromEnv loads configuration from environment variables
 func loadConfigFromEnv() (*config.BotConfig, error) {
 	telegramToken := os.Getenv("TELEGRAM_TOKEN")
-	redisURL := os.Getenv("REDIS_URL")
+	redisAddress := os.Getenv("REDIS_ADDRESS")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
 	databaseURL := os.Getenv("DATABASE_URL")
 
-	if telegramToken == "" || redisURL == "" || databaseURL == "" {
-		return nil, fmt.Errorf("missing required environment variables")
+	// Support legacy REDIS_URL format
+	if redisAddress == "" {
+		redisURL := os.Getenv("REDIS_URL")
+		if redisURL != "" {
+			// Extract address from redis://host:port format
+			if len(redisURL) > 8 && redisURL[:8] == "redis://" {
+				redisAddress = redisURL[8:]
+			}
+		}
 	}
 
-	// Parse Redis URL (simple implementation)
-	redisAddr := "localhost:6379"
-	if redisURL != "" {
-		// Extract address from redis://host:port format
-		if len(redisURL) > 8 && redisURL[:8] == "redis://" {
-			redisAddr = redisURL[8:]
-		}
+	if telegramToken == "" || redisAddress == "" || databaseURL == "" {
+		return nil, fmt.Errorf("missing required environment variables")
 	}
 
 	return &config.BotConfig{
@@ -115,8 +118,8 @@ func loadConfigFromEnv() (*config.BotConfig, error) {
 			Token: telegramToken,
 		},
 		Redis: config.RedisConfig{
-			Address:  redisAddr,
-			Password: "",
+			Address:  redisAddress,
+			Password: redisPassword,
 			DB:       0,
 		},
 		Database: config.DatabaseConfig{
