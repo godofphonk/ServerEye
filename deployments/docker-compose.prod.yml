@@ -14,7 +14,7 @@ version: '3.8'
 
 services:
   servereye-bot:
-    image: ghcr.io/godofphonk/servereye-bot:stable
+    image: ghcr.io/godofphonk/servereye-bot:latest
     container_name: servereye-bot-prod
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}

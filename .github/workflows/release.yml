@@ -38,25 +38,12 @@ jobs:
             -X github.com/servereye/servereye/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
             -X github.com/servereye/servereye/internal/version.GitCommit=${GIT_COMMIT}"
           
-          # Agent binaries
+          # Agent binaries (Linux only for now)
           echo "Building agent ${VERSION} for Linux (amd64)..."
           GOOS=linux GOARCH=amd64 go build -o servereye-agent-linux-amd64 -ldflags="${LDFLAGS}" ./cmd/agent
           
           echo "Building agent ${VERSION} for Linux (arm64)..."
           GOOS=linux GOARCH=arm64 go build -o servereye-agent-linux-arm64 -ldflags="${LDFLAGS}" ./cmd/agent
-          
-          echo "Building agent ${VERSION} for macOS (amd64)..."
-          GOOS=darwin GOARCH=amd64 go build -o servereye-agent-darwin-amd64 -ldflags="${LDFLAGS}" ./cmd/agent
-          
-          echo "Building agent ${VERSION} for macOS (arm64/M1)..."
-          GOOS=darwin GOARCH=arm64 go build -o servereye-agent-darwin-arm64 -ldflags="${LDFLAGS}" ./cmd/agent
-          
-          echo "Building agent ${VERSION} for Windows (amd64)..."
-          GOOS=windows GOARCH=amd64 go build -o servereye-agent-windows-amd64.exe -ldflags="${LDFLAGS}" ./cmd/agent
-          
-          # Bot binary
-          echo "Building bot ${VERSION} for Linux (amd64)..."
-          GOOS=linux GOARCH=amd64 go build -o servereye-bot-linux-amd64 -ldflags="${LDFLAGS}" ./cmd/bot
 
       - name: Generate checksums
         run: |
