@@ -39,6 +39,8 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: servereye-postgres
+    ports:
+      - "5432:5432"  # Exposed for pgAdmin access via SSH tunnel
     environment:
       - POSTGRES_DB=servereye
       - POSTGRES_USER=servereye
