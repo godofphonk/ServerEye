@@ -9,6 +9,31 @@ import (
 	"github.com/servereye/servereye/pkg/protocol"
 )
 
+// escapeMarkdown escapes special Markdown characters
+func escapeMarkdown(text string) string {
+	replacer := strings.NewReplacer(
+		"_", "\\_",
+		"*", "\\*",
+		"[", "\\[",
+		"]", "\\]",
+		"(", "\\(",
+		")", "\\)",
+		"~", "\\~",
+		"`", "\\`",
+		">", "\\>",
+		"#", "\\#",
+		"+", "\\+",
+		"-", "\\-",
+		"=", "\\=",
+		"|", "\\|",
+		"{", "\\{",
+		"}", "\\}",
+		".", "\\.",
+		"!", "\\!",
+	)
+	return replacer.Replace(text)
+}
+
 // sendMessage sends a message to a chat
 func (b *Bot) sendMessage(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
@@ -102,12 +127,13 @@ func (b *Bot) sendContainersWithActionButtons(chatID int64, serverKey string, co
 			statusEmoji = "🟡" // Yellow for paused
 		}
 
-		text.WriteString(fmt.Sprintf("%s **%s**\n", statusEmoji, container.Name))
-		text.WriteString(fmt.Sprintf("📷 Image: `%s`\n", container.Image))
-		text.WriteString(fmt.Sprintf("🔄 Status: %s\n", container.Status))
+		text.WriteString(fmt.Sprintf("%s **%s**\n", statusEmoji, escapeMarkdown(container.Name)))
+		text.WriteString(fmt.Sprintf("📷 Image: `%s`\n", escapeMarkdown(container.Image)))
+		text.WriteString(fmt.Sprintf("🔄 Status: %s\n", escapeMarkdown(container.Status)))
 
 		if len(container.Ports) > 0 {
-			text.WriteString(fmt.Sprintf("🔌 Ports: %s\n", strings.Join(container.Ports, ", ")))
+			portsStr := strings.Join(container.Ports, ", ")
+			text.WriteString(fmt.Sprintf("🔌 Ports: %s\n", escapeMarkdown(portsStr)))
 		}
 
 		text.WriteString("\n")
