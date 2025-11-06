@@ -85,6 +85,8 @@ services:
       servereye-bot-dev
       servereye-bot-prod
     environment:
+      - REPO_USER=godofphonk
+      - REPO_PASS=${GITHUB_TOKEN}
       - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
       - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
 
