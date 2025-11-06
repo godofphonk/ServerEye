@@ -66,31 +66,21 @@ wget -q -O "$AGENT_DIR/servereye-agent.new" "$AGENT_URL" || {
     exit 1
 }
 
-# Get expected SHA256 from GitHub API
+# Get expected SHA256 from checksums.txt
 echo "[*] Verifying binary integrity..."
-echo "[*] Getting SHA256 from GitHub..."
+echo "[*] Downloading checksums..."
 
-GITHUB_API="https://api.github.com/repos/godofphonk/ServerEye/releases/latest"
-RELEASE_DATA=$(curl -s "$GITHUB_API" || wget -qO- "$GITHUB_API")
+CHECKSUMS=$(curl -sL "$CHECKSUM_URL" 2>/dev/null || wget -qO- "$CHECKSUM_URL" 2>/dev/null)
 
-if [ -z "$RELEASE_DATA" ]; then
-    echo "[ERROR] Failed to fetch release information from GitHub"
+if [ -z "$CHECKSUMS" ]; then
+    echo "[ERROR] Failed to download checksums file"
     echo "   Cannot verify binary integrity without checksum"
     rm -f "$AGENT_DIR/servereye-agent.new"
     exit 1
 fi
 
-# Extract SHA256 from GitHub API response
-EXPECTED_CHECKSUM=$(echo "$RELEASE_DATA" | grep -A 5 '"name": "servereye-agent-linux-amd64"' | grep '"label":' | sed 's/.*sha256:\([a-f0-9]*\).*/\1/' | head -n1)
-
-# If not found in label, try to download from checksums.txt asset
-if [ -z "$EXPECTED_CHECKSUM" ]; then
-    echo "[*] Fetching checksums file..."
-    CHECKSUMS=$(curl -sL "$CHECKSUM_URL" || wget -qO- "$CHECKSUM_URL")
-    if [ -n "$CHECKSUMS" ]; then
-        EXPECTED_CHECKSUM=$(echo "$CHECKSUMS" | grep "servereye-agent-linux-amd64" | awk '{print $1}')
-    fi
-fi
+# Extract SHA256 for our binary
+EXPECTED_CHECKSUM=$(echo "$CHECKSUMS" | grep "servereye-agent-linux-amd64" | awk '{print $1}')
 
 if [ -z "$EXPECTED_CHECKSUM" ]; then
     echo "[ERROR] Could not retrieve SHA256 checksum from GitHub"
