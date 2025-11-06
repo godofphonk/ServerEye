@@ -37,6 +37,23 @@ if ! id "$AGENT_USER" &>/dev/null; then
     useradd -r -s /bin/false -d "$AGENT_DIR" "$AGENT_USER"
 fi
 
+# Add servereye user to docker group (if docker exists)
+if command -v docker &> /dev/null; then
+    echo "[*] Adding servereye user to docker group..."
+    usermod -aG docker "$AGENT_USER" 2>/dev/null || echo "[WARNING] Could not add user to docker group (docker group may not exist)"
+fi
+
+# Clean up old user service if exists (check for user who called sudo)
+REAL_USER="${SUDO_USER:-$USER}"
+USER_HOME=$(eval echo "~$REAL_USER")
+if [ -f "$USER_HOME/.config/systemd/user/servereye-agent.service" ]; then
+    echo "[*] Removing old user service for $REAL_USER..."
+    su - "$REAL_USER" -c "systemctl --user stop servereye-agent 2>/dev/null || true"
+    su - "$REAL_USER" -c "systemctl --user disable servereye-agent 2>/dev/null || true"
+    rm -f "$USER_HOME/.config/systemd/user/servereye-agent.service"
+    su - "$REAL_USER" -c "systemctl --user daemon-reload 2>/dev/null || true"
+fi
+
 # Check if this is an update
 UPDATE_MODE=false
 if systemctl is-active --quiet servereye-agent 2>/dev/null; then
@@ -53,8 +70,39 @@ mkdir -p "$AGENT_DIR" "$CONFIG_DIR" "$LOG_DIR"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR" "$LOG_DIR"
 chmod 755 "$CONFIG_DIR"
 
-# Backup existing binary if updating
+# Check version if updating
 if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
+    echo "[*] Checking installed version..."
+    INSTALLED_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'version \K[0-9.]+' || echo "unknown")
+    
+    # Get latest version from GitHub
+    LATEST_VERSION=$(curl -sL https://api.github.com/repos/godofphonk/ServerEye/releases/latest | grep -oP '"tag_name": "\K[^"]+' | sed 's/^v//' || echo "unknown")
+    
+    if [ "$INSTALLED_VERSION" != "unknown" ] && [ "$LATEST_VERSION" != "unknown" ] && [ "$INSTALLED_VERSION" = "$LATEST_VERSION" ]; then
+        echo "[OK] You already have the latest version ($INSTALLED_VERSION)!"
+        echo ""
+        
+        # Show existing key
+        if [ -f "$CONFIG_DIR/config.yaml" ]; then
+            SECRET_KEY=$(grep 'secret_key:' "$CONFIG_DIR/config.yaml" | awk '{print $2}' | tr -d '"')
+            echo "Your secret key: $SECRET_KEY"
+            echo ""
+            echo "To connect to Telegram bot:"
+            echo "1. Find @ServerEyeBot in Telegram"
+            echo "2. Send /start command"
+            echo "3. Send: /add $SECRET_KEY"
+            echo ""
+        fi
+        
+        echo "Service status:"
+        systemctl status servereye-agent --no-pager -l
+        exit 0
+    fi
+    
+    if [ "$INSTALLED_VERSION" != "unknown" ] && [ "$LATEST_VERSION" != "unknown" ]; then
+        echo "[*] Updating from version $INSTALLED_VERSION to $LATEST_VERSION..."
+    fi
+    
     echo "[*] Backing up current binary..."
     cp "$AGENT_DIR/servereye-agent" "$AGENT_DIR/servereye-agent.backup"
 fi
