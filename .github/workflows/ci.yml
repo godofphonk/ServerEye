@@ -5,6 +5,7 @@ name: CI
 on:
   push:
     branches: [ master, main ]  # При push в master или main
+    tags: [ 'v*' ]  # При создании тегов v*
   pull_request:
     branches: [ master, main ]  # При создании Pull Request
 
