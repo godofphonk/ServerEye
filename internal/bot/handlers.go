@@ -107,32 +107,24 @@ Available commands:
 
 // handleHelp handles the /help command
 func (b *Bot) handleHelp(message *tgbotapi.Message) string {
-	return `🤖 ServerEye Bot Commands:
+	return `🤖 **ServerEye Bot Commands**
 
-📊 Monitoring:
+📊 **Monitoring:**
 /temp - Get CPU temperature
 /memory - Get memory usage  
 /disk - Get disk usage
 /uptime - Get system uptime
 /processes - List running processes
 
-🐳 Docker Management:
-/containers - Manage Docker containers (with start/stop/restart buttons)
+🐳 **Docker Management:**
+/containers - Manage containers (start/stop/restart via buttons)
 
-⚙️ Server Management:
-/servers - List your servers
-/status - Get server status
-/update - Update agent to latest version
-/rename_server <#> <name> - Rename server
-/remove_server <#> - Remove server
+⚙️ **Server Management:**
+/servers - Manage your servers (use buttons for rename/remove/update)
 /add <key> [name] - Add new server
 
-🔍 Debug:
+🔍 **Debug:**
 /debug - Show connection status
 
-💡 Multiple Servers:
-If you have multiple servers, select from buttons that appear when you use commands.
-
-🔗 Connect Server:
-Use /add command: /add srv_your_key [name]`
+💡 **Tip:** Most server management is now done through interactive buttons after using /servers`
 }
