@@ -2,6 +2,8 @@ package bot
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -158,7 +160,7 @@ func (b *Bot) handleServerRenameCallback(query *tgbotapi.CallbackQuery) error {
 	return nil
 }
 
-// handleServerRemoveCallback shows remove instructions with server selection
+// handleServerRemoveCallback shows remove buttons for each server
 func (b *Bot) handleServerRemoveCallback(query *tgbotapi.CallbackQuery) error {
 	servers, err := b.getUserServersWithInfo(query.From.ID)
 	if err != nil || len(servers) == 0 {
@@ -184,9 +186,6 @@ func (b *Bot) handleServerRemoveCallback(query *tgbotapi.CallbackQuery) error {
 		text += fmt.Sprintf("%d. %s **%s**\n", i+1, statusIcon, server.Name)
 	}
 
-	text += "\n💡 **Usage:**\n/remove_server <#>\n\n"
-	text += "**Example:**\n/remove_server 1"
-
 	editMsg := tgbotapi.NewEditMessageText(
 		query.Message.Chat.ID,
 		query.Message.MessageID,
@@ -194,10 +193,91 @@ func (b *Bot) handleServerRemoveCallback(query *tgbotapi.CallbackQuery) error {
 	)
 	editMsg.ParseMode = "Markdown"
 
+	// Create remove buttons for each server
+	var buttons [][]tgbotapi.InlineKeyboardButton
+	for i, server := range servers {
+		buttons = append(buttons, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("🗑 Remove %d: %s", i+1, server.Name),
+				fmt.Sprintf("remove_server_%d", i),
+			),
+		))
+	}
+	
 	// Add back button
+	buttons = append(buttons, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("« Back", "back_to_servers"),
+	))
+	
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+	editMsg.ReplyMarkup = &keyboard
+
+	if _, err := b.telegramAPI.Send(editMsg); err != nil {
+		b.logger.Error("Failed to send message", err)
+		return err
+	}
+
+	return nil
+}
+
+// handleRemoveServerConfirm handles actual server removal
+func (b *Bot) handleRemoveServerConfirm(query *tgbotapi.CallbackQuery) error {
+	// Extract server index from callback data (format: "remove_server_0")
+	parts := strings.Split(query.Data, "_")
+	if len(parts) != 3 {
+		b.logger.Error("Invalid callback data", fmt.Errorf("expected 3 parts, got %d", len(parts)))
+		return fmt.Errorf("invalid callback data")
+	}
+
+	serverIdx, err := strconv.Atoi(parts[2])
+	if err != nil {
+		b.logger.Error("Invalid server index", err)
+		return err
+	}
+
+	// Get user servers
+	servers, err := b.getUserServersWithInfo(query.From.ID)
+	if err != nil || serverIdx >= len(servers) {
+		text := "❌ Error: Server not found."
+		editMsg := tgbotapi.NewEditMessageText(
+			query.Message.Chat.ID,
+			query.Message.MessageID,
+			text,
+		)
+		if _, sendErr := b.telegramAPI.Send(editMsg); sendErr != nil {
+			b.logger.Error("Failed to send message", sendErr)
+		}
+		return err
+	}
+
+	serverToRemove := servers[serverIdx]
+
+	// Remove server
+	if err := b.removeServer(query.From.ID, serverToRemove.SecretKey); err != nil {
+		text := "❌ Failed to remove server."
+		editMsg := tgbotapi.NewEditMessageText(
+			query.Message.Chat.ID,
+			query.Message.MessageID,
+			text,
+		)
+		if _, sendErr := b.telegramAPI.Send(editMsg); sendErr != nil {
+			b.logger.Error("Failed to send message", sendErr)
+		}
+		return err
+	}
+
+	// Success message and return to servers menu
+	text := fmt.Sprintf("✅ Server **%s** removed successfully.", serverToRemove.Name)
+	editMsg := tgbotapi.NewEditMessageText(
+		query.Message.Chat.ID,
+		query.Message.MessageID,
+		text,
+	)
+	editMsg.ParseMode = "Markdown"
+
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("« Back", "back_to_servers"),
+			tgbotapi.NewInlineKeyboardButtonData("« Back to Servers", "back_to_servers"),
 		),
 	)
 	editMsg.ReplyMarkup = &keyboard

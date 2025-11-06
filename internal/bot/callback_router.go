@@ -66,6 +66,9 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 	if query.Data == "server_remove" {
 		return b.handleServerRemoveCallback(query)
 	}
+	if strings.HasPrefix(query.Data, "remove_server_") {
+		return b.handleRemoveServerConfirm(query)
+	}
 
 	// Check if it's a create template selection
 	if strings.HasPrefix(query.Data, "create_template_") {
