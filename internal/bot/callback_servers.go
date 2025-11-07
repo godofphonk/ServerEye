@@ -203,12 +203,12 @@ func (b *Bot) handleServerRemoveCallback(query *tgbotapi.CallbackQuery) error {
 			),
 		))
 	}
-	
+
 	// Add back button
 	buttons = append(buttons, tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData("« Back", "back_to_servers"),
 	))
-	
+
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
 	editMsg.ReplyMarkup = &keyboard
 
