@@ -7,8 +7,10 @@ import (
 
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/pkg/docker"
+	"github.com/servereye/servereye/pkg/kafka"
 	"github.com/servereye/servereye/pkg/metrics"
 	"github.com/servereye/servereye/pkg/protocol"
+	"github.com/servereye/servereye/pkg/publisher"
 	"github.com/servereye/servereye/pkg/redis"
 	"github.com/servereye/servereye/pkg/redis/streams"
 	"github.com/sirupsen/logrus"
@@ -29,21 +31,82 @@ type SubscriptionInterface interface {
 
 // Agent представляет агент ServerEye
 type Agent struct {
-	config        *config.AgentConfig
-	logger        *logrus.Logger
-	redisClient   RedisClientInterface
-	streamsClient streams.StreamClient // NEW: for Streams support
-	cpuMetrics    *metrics.CPUMetrics
-	systemMonitor *metrics.SystemMonitor
-	dockerClient  *docker.Client
-	ctx           context.Context
-	cancel        context.CancelFunc
-	useStreams    bool // Flag to use Streams instead of Pub/Sub
+	config         *config.AgentConfig
+	logger         *logrus.Logger
+	redisClient    RedisClientInterface
+	streamsClient  streams.StreamClient // NEW: for Streams support
+	metricPublisher publisher.Publisher  // NEW: unified publisher (может быть multi-publisher)
+	cpuMetrics     *metrics.CPUMetrics
+	systemMonitor  *metrics.SystemMonitor
+	dockerClient   *docker.Client
+	ctx            context.Context
+	cancel         context.CancelFunc
+	useStreams     bool // Flag to use Streams instead of Pub/Sub
 
 	// updateFunc allows mocking performUpdate in tests
 	updateFunc func(string) error
 	// updateDoneChan notifies when update goroutine completes (for tests)
 	updateDoneChan chan<- bool
+}
+
+// initializeMetricPublisher создает publisher на основе конфигурации
+func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (publisher.Publisher, error) {
+	var publishers []publisher.Publisher
+
+	// Kafka publisher (если включен)
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		kafkaConfig := kafka.Config{
+			Brokers:      cfg.Kafka.Brokers,
+			TopicPrefix:  cfg.Kafka.TopicPrefix,
+			Compression:  cfg.Kafka.Compression,
+			MaxAttempts:  cfg.Kafka.MaxAttempts,
+			BatchSize:    cfg.Kafka.BatchSize,
+			RequiredAcks: cfg.Kafka.RequiredAcks,
+		}
+
+		// Установка дефолтных значений если не указаны
+		if kafkaConfig.TopicPrefix == "" {
+			kafkaConfig.TopicPrefix = "metrics"
+		}
+		if kafkaConfig.Compression == "" {
+			kafkaConfig.Compression = "snappy"
+		}
+		if kafkaConfig.MaxAttempts == 0 {
+			kafkaConfig.MaxAttempts = 3
+		}
+		if kafkaConfig.BatchSize == 0 {
+			kafkaConfig.BatchSize = 100
+		}
+		if kafkaConfig.RequiredAcks == 0 {
+			kafkaConfig.RequiredAcks = 1
+		}
+
+		kafkaPub, err := kafka.NewProducer(kafkaConfig, logger)
+		if err != nil {
+			return nil, fmt.Errorf("не удалось создать Kafka publisher: %w", err)
+		}
+
+		publishers = append(publishers, kafkaPub)
+		logger.Info("Kafka publisher инициализирован")
+	}
+
+	// Если нет publishers, возвращаем nil (агент работает только через Redis Streams)
+	if len(publishers) == 0 {
+		logger.Info("Metric publishers не настроены, используется только Redis Streams")
+		return nil, nil
+	}
+
+	// Если один publisher, возвращаем его напрямую
+	if len(publishers) == 1 {
+		return publishers[0], nil
+	}
+
+	// Если несколько publishers, создаем multi-publisher
+	// Используем FailIfPrimary - ошибка только если Kafka (первый) упадет
+	multiPub := publisher.NewMultiPublisher(publishers, publisher.FailIfPrimary, logger)
+	logger.WithField("count", len(publishers)).Info("Multi-publisher инициализирован")
+
+	return multiPub, nil
 }
 
 // New создает новый агент
@@ -94,17 +157,24 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 		logger.Info("Streams support enabled via HTTP API")
 	}
 
+	// Initialize metric publisher(s)
+	metricPublisher, err := initializeMetricPublisher(cfg, logger)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось инициализировать metric publisher: %v", err)
+	}
+
 	return &Agent{
-		config:        cfg,
-		logger:        logger,
-		redisClient:   redisClient,
-		streamsClient: streamsClient,
-		useStreams:    useStreams,
-		cpuMetrics:    metrics.NewCPUMetrics(),
-		systemMonitor: metrics.NewSystemMonitor(logger),
-		dockerClient:  docker.NewClient(logger),
-		ctx:           ctx,
-		cancel:        cancel,
+		config:          cfg,
+		logger:          logger,
+		redisClient:     redisClient,
+		streamsClient:   streamsClient,
+		metricPublisher: metricPublisher,
+		useStreams:      useStreams,
+		cpuMetrics:      metrics.NewCPUMetrics(),
+		systemMonitor:   metrics.NewSystemMonitor(logger),
+		dockerClient:    docker.NewClient(logger),
+		ctx:             ctx,
+		cancel:          cancel,
 	}, nil
 }
 
@@ -141,6 +211,14 @@ func (a *Agent) Start() error {
 func (a *Agent) Stop() error {
 	a.logger.Info("Остановка агента")
 	a.cancel()
+	
+	// Закрываем metric publisher если есть
+	if a.metricPublisher != nil {
+		if err := a.metricPublisher.Close(); err != nil {
+			a.logger.WithError(err).Error("Ошибка при закрытии metric publisher")
+		}
+	}
+	
 	return a.redisClient.Close()
 }
 
@@ -234,12 +312,15 @@ func (a *Agent) processCommand(data []byte) {
 			"response_type": response.Type,
 		}).Info("Отправляем ответ")
 
-		// Отправляем в уникальный канал с ID команды
+		// Отправляем в уникальный канал с ID команды (Redis Streams)
 		if err := a.sendResponseToCommand(response, msg.ID); err != nil {
 			a.logger.WithError(err).Error("Не удалось отправить ответ")
 		} else {
 			a.logger.WithField("command_id", msg.ID).Info("Ответ успешно отправлен")
 		}
+
+		// Дополнительно отправляем метрику в Kafka (если настроен)
+		a.publishMetricToKafka(response)
 	} else {
 		a.logger.WithField("command_id", msg.ID).Error("Ответ не сгенерирован")
 	}

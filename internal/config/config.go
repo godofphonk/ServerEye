@@ -12,6 +12,7 @@ type AgentConfig struct {
 	Server  ServerConfig  `yaml:"server"`
 	Redis   RedisConfig   `yaml:"redis,omitempty"`
 	API     APIConfig     `yaml:"api,omitempty"`
+	Kafka   KafkaConfig   `yaml:"kafka,omitempty"`
 	Metrics MetricsConfig `yaml:"metrics"`
 	Logging LoggingConfig `yaml:"logging"`
 }
@@ -64,6 +65,17 @@ type TelegramConfig struct {
 // DatabaseConfig конфигурация базы данных
 type DatabaseConfig struct {
 	URL string `yaml:"url"`
+}
+
+// KafkaConfig конфигурация Kafka
+type KafkaConfig struct {
+	Enabled      bool     `yaml:"enabled"`
+	Brokers      []string `yaml:"brokers"`
+	TopicPrefix  string   `yaml:"topic_prefix"`
+	Compression  string   `yaml:"compression"`
+	MaxAttempts  int      `yaml:"max_attempts"`
+	BatchSize    int      `yaml:"batch_size"`
+	RequiredAcks int      `yaml:"required_acks"`
 }
 
 // LoadAgentConfig загружает конфигурацию агента
