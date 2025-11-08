@@ -57,7 +57,7 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 	}
 
 	// Преобразуем строку compression в тип
-	var compression kafka.CompressionCodec
+	var compression kafka.Compression
 	switch cfg.Compression {
 	case "gzip":
 		compression = kafka.Gzip
@@ -68,7 +68,7 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 	case "zstd":
 		compression = kafka.Zstd
 	default:
-		compression = kafka.CompressionNone
+		compression = kafka.Compression(0) // None
 	}
 
 	writer := &kafka.Writer{
