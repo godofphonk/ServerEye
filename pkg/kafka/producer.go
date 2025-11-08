@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -56,32 +57,50 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 		logger = logrus.New()
 	}
 
-	// Преобразуем строку compression в тип
-	var compression kafka.Compression
-	switch cfg.Compression {
-	case "gzip":
-		compression = kafka.Gzip
-	case "snappy":
-		compression = kafka.Snappy
-	case "lz4":
-		compression = kafka.Lz4
-	case "zstd":
-		compression = kafka.Zstd
-	default:
-		compression = kafka.Compression(0) // None
-	}
-
-	writer := &kafka.Writer{
-		Addr:         kafka.TCP(cfg.Brokers...),
-		Balancer:     &kafka.Hash{}, // Распределение по server_id
-		Compression:  compression,
+	// Создаем writer config
+	writer := kafka.NewWriter(kafka.WriterConfig{
+		Brokers:      cfg.Brokers, // Используем напрямую список брокеров
+		Balancer:     &kafka.Hash{},
 		MaxAttempts:  cfg.MaxAttempts,
 		BatchSize:    cfg.BatchSize,
 		BatchTimeout: cfg.BatchTimeout,
 		ReadTimeout:  cfg.WriteTimeout,
 		WriteTimeout: cfg.WriteTimeout,
-		RequiredAcks: kafka.RequiredAcks(cfg.RequiredAcks),
-		Async:        false, // Синхронная отправка для гарантии
+		RequiredAcks: cfg.RequiredAcks,
+		Async:        false,
+	})
+	
+	// Создаем custom dialer который не использует DNS lookup
+	dialer := &kafka.Dialer{
+		Timeout:   10 * time.Second,
+		DualStack: true,
+		Resolver: &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				// Игнорируем address из аргумента и используем прямой брокер
+				d := net.Dialer{Timeout: 5 * time.Second}
+				return d.DialContext(ctx, "tcp", cfg.Brokers[0])
+			},
+		},
+	}
+	
+	// Устанавливаем transport с custom dialer
+	writer.Transport = &kafka.Transport{
+		Dial: dialer.DialFunc,
+	}
+	
+	// Устанавливаем compression через метод writer
+	switch cfg.Compression {
+	case "gzip":
+		writer.Compression = kafka.Gzip
+	case "snappy":
+		writer.Compression = kafka.Snappy
+	case "lz4":
+		writer.Compression = kafka.Lz4
+	case "zstd":
+		writer.Compression = kafka.Zstd
+	default:
+		writer.Compression = kafka.Compression(0) // None
 	}
 
 	if cfg.EnableIdempot {
