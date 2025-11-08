@@ -7,14 +7,14 @@ import (
 
 // Metric представляет метрику для отправки
 type Metric struct {
-	ServerID   string                 `json:"server_id"`
-	ServerKey  string                 `json:"server_key"`
-	ServerName string                 `json:"server_name,omitempty"`
-	Type       string                 `json:"type"`
-	Timestamp  time.Time              `json:"timestamp"`
-	Value      interface{}            `json:"value"`
-	Tags       map[string]string      `json:"tags,omitempty"`
-	Version    string                 `json:"version"`
+	ServerID   string            `json:"server_id"`
+	ServerKey  string            `json:"server_key"`
+	ServerName string            `json:"server_name,omitempty"`
+	Type       string            `json:"type"`
+	Timestamp  time.Time         `json:"timestamp"`
+	Value      interface{}       `json:"value"`
+	Tags       map[string]string `json:"tags,omitempty"`
+	Version    string            `json:"version"`
 }
 
 // Publisher определяет интерфейс для публикации метрик

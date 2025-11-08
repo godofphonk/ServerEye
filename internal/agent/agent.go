@@ -31,17 +31,17 @@ type SubscriptionInterface interface {
 
 // Agent представляет агент ServerEye
 type Agent struct {
-	config         *config.AgentConfig
-	logger         *logrus.Logger
-	redisClient    RedisClientInterface
-	streamsClient  streams.StreamClient // NEW: for Streams support
+	config          *config.AgentConfig
+	logger          *logrus.Logger
+	redisClient     RedisClientInterface
+	streamsClient   streams.StreamClient // NEW: for Streams support
 	metricPublisher publisher.Publisher  // NEW: unified publisher (может быть multi-publisher)
-	cpuMetrics     *metrics.CPUMetrics
-	systemMonitor  *metrics.SystemMonitor
-	dockerClient   *docker.Client
-	ctx            context.Context
-	cancel         context.CancelFunc
-	useStreams     bool // Flag to use Streams instead of Pub/Sub
+	cpuMetrics      *metrics.CPUMetrics
+	systemMonitor   *metrics.SystemMonitor
+	dockerClient    *docker.Client
+	ctx             context.Context
+	cancel          context.CancelFunc
+	useStreams      bool // Flag to use Streams instead of Pub/Sub
 
 	// updateFunc allows mocking performUpdate in tests
 	updateFunc func(string) error
@@ -160,6 +160,7 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 	// Initialize metric publisher(s)
 	metricPublisher, err := initializeMetricPublisher(cfg, logger)
 	if err != nil {
+		cancel() // Cleanup context
 		return nil, fmt.Errorf("не удалось инициализировать metric publisher: %v", err)
 	}
 
@@ -211,14 +212,14 @@ func (a *Agent) Start() error {
 func (a *Agent) Stop() error {
 	a.logger.Info("Остановка агента")
 	a.cancel()
-	
+
 	// Закрываем metric publisher если есть
 	if a.metricPublisher != nil {
 		if err := a.metricPublisher.Close(); err != nil {
 			a.logger.WithError(err).Error("Ошибка при закрытии metric publisher")
 		}
 	}
-	
+
 	return a.redisClient.Close()
 }
 

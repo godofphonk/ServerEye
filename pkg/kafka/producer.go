@@ -13,15 +13,15 @@ import (
 
 // Config конфигурация Kafka producer
 type Config struct {
-	Brokers        []string      // Список Kafka брокеров
-	TopicPrefix    string        // Префикс для топиков (например, "metrics")
-	Compression    string        // Тип сжатия: "none", "gzip", "snappy", "lz4", "zstd"
-	MaxAttempts    int           // Максимальное количество попыток отправки
-	BatchSize      int           // Размер батча сообщений
-	BatchTimeout   time.Duration // Таймаут для батча
-	RequiredAcks   int           // -1 = all, 0 = none, 1 = leader
-	WriteTimeout   time.Duration // Таймаут записи
-	EnableIdempot  bool          // Включить идемпотентность
+	Brokers       []string      // Список Kafka брокеров
+	TopicPrefix   string        // Префикс для топиков (например, "metrics")
+	Compression   string        // Тип сжатия: "none", "gzip", "snappy", "lz4", "zstd"
+	MaxAttempts   int           // Максимальное количество попыток отправки
+	BatchSize     int           // Размер батча сообщений
+	BatchTimeout  time.Duration // Таймаут для батча
+	RequiredAcks  int           // -1 = all, 0 = none, 1 = leader
+	WriteTimeout  time.Duration // Таймаут записи
+	EnableIdempot bool          // Включить идемпотентность
 }
 
 // DefaultConfig возвращает конфигурацию по умолчанию
@@ -131,19 +131,19 @@ func (p *Producer) Publish(ctx context.Context, metric *publisher.Metric) error 
 	err = p.writer.WriteMessages(ctx, msg)
 	if err != nil {
 		p.logger.WithFields(logrus.Fields{
-			"topic":      topic,
-			"server_id":  metric.ServerID,
+			"topic":       topic,
+			"server_id":   metric.ServerID,
 			"metric_type": metric.Type,
-			"error":      err,
+			"error":       err,
 		}).Error("Failed to publish metric to Kafka")
 		return fmt.Errorf("kafka write failed: %w", err)
 	}
 
 	p.logger.WithFields(logrus.Fields{
-		"topic":      topic,
-		"server_id":  metric.ServerID,
+		"topic":       topic,
+		"server_id":   metric.ServerID,
 		"metric_type": metric.Type,
-		"duration":   time.Since(start),
+		"duration":    time.Since(start),
 	}).Debug("Metric published to Kafka")
 
 	return nil

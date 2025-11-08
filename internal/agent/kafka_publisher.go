@@ -15,9 +15,9 @@ func (a *Agent) publishMetricToKafka(msg *protocol.Message) {
 	}
 
 	// Пропускаем ошибки и некоторые служебные сообщения
-	if msg.Type == protocol.TypeErrorResponse || 
-	   msg.Type == protocol.TypePong ||
-	   msg.Type == protocol.TypeUpdateAgentResponse {
+	if msg.Type == protocol.TypeErrorResponse ||
+		msg.Type == protocol.TypePong ||
+		msg.Type == protocol.TypeUpdateAgentResponse {
 		return
 	}
 

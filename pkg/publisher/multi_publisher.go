@@ -12,7 +12,7 @@ import (
 type MultiPublisher struct {
 	publishers []Publisher
 	logger     *logrus.Logger
-	
+
 	// Стратегия обработки ошибок
 	failureStrategy FailureStrategy
 }
@@ -23,10 +23,10 @@ type FailureStrategy int
 const (
 	// FailIfAll - возвращает ошибку только если все publishers упали
 	FailIfAll FailureStrategy = iota
-	
+
 	// FailIfAny - возвращает ошибку если хотя бы один publisher упал
 	FailIfAny
-	
+
 	// FailIfPrimary - возвращает ошибку только если первый (основной) publisher упал
 	FailIfPrimary
 )
@@ -36,7 +36,7 @@ func NewMultiPublisher(publishers []Publisher, strategy FailureStrategy, logger 
 	if logger == nil {
 		logger = logrus.New()
 	}
-	
+
 	return &MultiPublisher{
 		publishers:      publishers,
 		failureStrategy: strategy,
@@ -49,21 +49,21 @@ func (m *MultiPublisher) Publish(ctx context.Context, metric *Metric) error {
 	if len(m.publishers) == 0 {
 		return fmt.Errorf("no publishers configured")
 	}
-	
+
 	// Если только один publisher, отправляем напрямую
 	if len(m.publishers) == 1 {
 		return m.publishers[0].Publish(ctx, metric)
 	}
-	
+
 	// Параллельная отправка в несколько publishers
 	var wg sync.WaitGroup
 	errors := make([]error, len(m.publishers))
-	
+
 	for i, pub := range m.publishers {
 		wg.Add(1)
 		go func(index int, publisher Publisher) {
 			defer wg.Done()
-			
+
 			if err := publisher.Publish(ctx, metric); err != nil {
 				errors[index] = err
 				m.logger.WithFields(logrus.Fields{
@@ -81,9 +81,9 @@ func (m *MultiPublisher) Publish(ctx context.Context, metric *Metric) error {
 			}
 		}(i, pub)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Анализируем ошибки согласно стратегии
 	return m.evaluateErrors(errors)
 }
@@ -93,19 +93,19 @@ func (m *MultiPublisher) PublishBatch(ctx context.Context, metrics []*Metric) er
 	if len(m.publishers) == 0 {
 		return fmt.Errorf("no publishers configured")
 	}
-	
+
 	if len(metrics) == 0 {
 		return nil
 	}
-	
+
 	var wg sync.WaitGroup
 	errors := make([]error, len(m.publishers))
-	
+
 	for i, pub := range m.publishers {
 		wg.Add(1)
 		go func(index int, publisher Publisher) {
 			defer wg.Done()
-			
+
 			if err := publisher.PublishBatch(ctx, metrics); err != nil {
 				errors[index] = err
 				m.logger.WithFields(logrus.Fields{
@@ -116,16 +116,16 @@ func (m *MultiPublisher) PublishBatch(ctx context.Context, metrics []*Metric) er
 			}
 		}(i, pub)
 	}
-	
+
 	wg.Wait()
-	
+
 	return m.evaluateErrors(errors)
 }
 
 // Close закрывает все publishers
 func (m *MultiPublisher) Close() error {
 	var lastErr error
-	
+
 	for _, pub := range m.publishers {
 		if err := pub.Close(); err != nil {
 			m.logger.WithFields(logrus.Fields{
@@ -135,7 +135,7 @@ func (m *MultiPublisher) Close() error {
 			lastErr = err
 		}
 	}
-	
+
 	return lastErr
 }
 
@@ -164,7 +164,7 @@ func (m *MultiPublisher) evaluateErrors(errors []error) error {
 			return fmt.Errorf("all publishers failed: %v", errors)
 		}
 		return nil
-		
+
 	case FailIfAny:
 		// Возвращаем ошибку если хотя бы один упал
 		for i, err := range errors {
@@ -173,14 +173,14 @@ func (m *MultiPublisher) evaluateErrors(errors []error) error {
 			}
 		}
 		return nil
-		
+
 	case FailIfPrimary:
 		// Возвращаем ошибку только если первый (основной) publisher упал
 		if len(errors) > 0 && errors[0] != nil {
 			return fmt.Errorf("primary publisher failed: %w", errors[0])
 		}
 		return nil
-		
+
 	default:
 		return fmt.Errorf("unknown failure strategy: %d", m.failureStrategy)
 	}

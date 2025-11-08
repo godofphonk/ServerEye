@@ -29,13 +29,13 @@ func (a *Agent) CreateMetricFromData(metricType string, value interface{}, tags 
 	if tags == nil {
 		tags = make(map[string]string)
 	}
-	
+
 	// Добавляем дефолтные теги
 	tags["server_name"] = a.config.Server.Name
 	if a.config.Server.Description != "" {
 		tags["description"] = a.config.Server.Description
 	}
-	
+
 	return &publisher.Metric{
 		ServerID:   a.config.Server.SecretKey,
 		ServerKey:  a.config.Server.SecretKey,
