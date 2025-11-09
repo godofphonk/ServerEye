@@ -205,6 +205,11 @@ func (a *Agent) Start() error {
 	// Запускаем heartbeat
 	go a.startHeartbeat()
 
+	// Запускаем сборщик метрик если Kafka включен
+	if a.config.Kafka.Enabled && a.metricPublisher != nil {
+		go a.startMetricsCollection()
+	}
+
 	return nil
 }
 

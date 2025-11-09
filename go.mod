@@ -20,5 +20,6 @@ require (
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 )
