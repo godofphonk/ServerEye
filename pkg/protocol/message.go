@@ -24,6 +24,7 @@ const (
 	TypeGetDiskInfo      MessageType = "get_disk_info"
 	TypeGetUptime        MessageType = "get_uptime"
 	TypeGetProcesses     MessageType = "get_processes"
+	TypeGetNetworkInfo   MessageType = "get_network_info"
 	TypeUpdateAgent      MessageType = "update_agent"
 	TypePing             MessageType = "ping"
 
@@ -36,6 +37,7 @@ const (
 	TypeDiskInfoResponse        MessageType = "disk_info_response"
 	TypeUptimeResponse          MessageType = "uptime_response"
 	TypeProcessesResponse       MessageType = "processes_response"
+	TypeNetworkInfoResponse     MessageType = "network_info_response"
 	TypeUpdateAgentResponse     MessageType = "update_agent_response"
 	TypePong                    MessageType = "pong"
 	TypeErrorResponse           MessageType = "error_response"
@@ -192,6 +194,29 @@ type ProcessInfo struct {
 type ProcessesPayload struct {
 	Processes []ProcessInfo `json:"processes"`
 	Total     int           `json:"total"`
+}
+
+// NetworkInterfaceInfo represents network interface statistics
+type NetworkInterfaceInfo struct {
+	Name        string  `json:"name"`          // Interface name (eth0, wlan0, etc.)
+	BytesSent   uint64  `json:"bytes_sent"`    // Total bytes sent
+	BytesRecv   uint64  `json:"bytes_recv"`    // Total bytes received
+	PacketsSent uint64  `json:"packets_sent"`  // Total packets sent
+	PacketsRecv uint64  `json:"packets_recv"`  // Total packets received
+	ErrorsIn    uint64  `json:"errors_in"`     // Input errors
+	ErrorsOut   uint64  `json:"errors_out"`    // Output errors
+	DropIn      uint64  `json:"drop_in"`       // Dropped packets (input)
+	DropOut     uint64  `json:"drop_out"`      // Dropped packets (output)
+	SpeedMbps   float64 `json:"speed_mbps"`    // Link speed in Mbps (if available)
+}
+
+// NetworkInfo represents network statistics
+type NetworkInfo struct {
+	Interfaces    []NetworkInterfaceInfo `json:"interfaces"`
+	DownloadSpeed float64                `json:"download_speed_mbps"` // Current download speed in Mbps
+	UploadSpeed   float64                `json:"upload_speed_mbps"`   // Current upload speed in Mbps
+	TotalDownload uint64                 `json:"total_download_gb"`   // Total downloaded in GB
+	TotalUpload   uint64                 `json:"total_upload_gb"`     // Total uploaded in GB
 }
 
 // UpdateAgentPayload represents agent update request

@@ -14,12 +14,23 @@ import (
 // SystemMonitor provides system monitoring capabilities
 type SystemMonitor struct {
 	logger *logrus.Logger
+	// Previous network stats for speed calculation
+	prevNetStats map[string]*networkStats
+	prevNetTime  time.Time
+}
+
+// networkStats stores previous network statistics for delta calculation
+type networkStats struct {
+	bytesSent uint64
+	bytesRecv uint64
 }
 
 // NewSystemMonitor creates a new system monitor
 func NewSystemMonitor(logger *logrus.Logger) *SystemMonitor {
 	return &SystemMonitor{
-		logger: logger,
+		logger:       logger,
+		prevNetStats: make(map[string]*networkStats),
+		prevNetTime:  time.Now(),
 	}
 }
 
@@ -268,6 +279,123 @@ func (s *SystemMonitor) GetTopProcesses(limit int) (*protocol.ProcessesPayload, 
 
 	s.logger.WithField("processes_count", len(processes)).Debug("Top processes retrieved")
 	return payload, nil
+}
+
+// GetNetworkInfo retrieves network interface statistics
+func (s *SystemMonitor) GetNetworkInfo() (*protocol.NetworkInfo, error) {
+	s.logger.Debug("Getting network information")
+
+	// Read /proc/net/dev
+	cmd := exec.Command("cat", "/proc/net/dev")
+	output, err := cmd.Output()
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to read /proc/net/dev")
+		return nil, fmt.Errorf("failed to get network info: %w", err)
+	}
+
+	lines := strings.Split(string(output), "\n")
+	var interfaces []protocol.NetworkInterfaceInfo
+	var totalDownload, totalUpload uint64
+	var downloadSpeed, uploadSpeed float64
+
+	currentTime := time.Now()
+	timeDelta := currentTime.Sub(s.prevNetTime).Seconds()
+
+	// Skip first 2 header lines
+	for i, line := range lines {
+		if i < 2 || strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		// Parse interface line
+		parts := strings.Split(line, ":")
+		if len(parts) < 2 {
+			continue
+		}
+
+		ifName := strings.TrimSpace(parts[0])
+		
+		// Skip loopback
+		if ifName == "lo" {
+			continue
+		}
+
+		fields := strings.Fields(parts[1])
+		if len(fields) < 16 {
+			continue
+		}
+
+		// Parse statistics
+		bytesRecv, _ := strconv.ParseUint(fields[0], 10, 64)
+		packetsRecv, _ := strconv.ParseUint(fields[1], 10, 64)
+		errorsIn, _ := strconv.ParseUint(fields[2], 10, 64)
+		dropIn, _ := strconv.ParseUint(fields[3], 10, 64)
+
+		bytesSent, _ := strconv.ParseUint(fields[8], 10, 64)
+		packetsSent, _ := strconv.ParseUint(fields[9], 10, 64)
+		errorsOut, _ := strconv.ParseUint(fields[10], 10, 64)
+		dropOut, _ := strconv.ParseUint(fields[11], 10, 64)
+
+		// Calculate speed (Mbps) if we have previous data
+		var ifDownloadSpeed, ifUploadSpeed float64
+		if prev, exists := s.prevNetStats[ifName]; exists && timeDelta > 0 {
+			bytesRecvDelta := float64(bytesRecv - prev.bytesRecv)
+			bytesSentDelta := float64(bytesSent - prev.bytesSent)
+			
+			// Convert bytes/sec to Mbps: (bytes/sec * 8) / 1,000,000
+			ifDownloadSpeed = (bytesRecvDelta / timeDelta * 8) / 1000000
+			ifUploadSpeed = (bytesSentDelta / timeDelta * 8) / 1000000
+
+			downloadSpeed += ifDownloadSpeed
+			uploadSpeed += ifUploadSpeed
+		}
+
+		// Store current stats for next calculation
+		s.prevNetStats[ifName] = &networkStats{
+			bytesSent: bytesSent,
+			bytesRecv: bytesRecv,
+		}
+
+		totalDownload += bytesRecv
+		totalUpload += bytesSent
+
+		ifInfo := protocol.NetworkInterfaceInfo{
+			Name:        ifName,
+			BytesSent:   bytesSent,
+			BytesRecv:   bytesRecv,
+			PacketsSent: packetsSent,
+			PacketsRecv: packetsRecv,
+			ErrorsIn:    errorsIn,
+			ErrorsOut:   errorsOut,
+			DropIn:      dropIn,
+			DropOut:     dropOut,
+			SpeedMbps:   0, // Link speed not easily available from /proc/net/dev
+		}
+
+		interfaces = append(interfaces, ifInfo)
+	}
+
+	s.prevNetTime = currentTime
+
+	// Convert total to GB
+	totalDownloadGB := totalDownload / 1024 / 1024 / 1024
+	totalUploadGB := totalUpload / 1024 / 1024 / 1024
+
+	networkInfo := &protocol.NetworkInfo{
+		Interfaces:    interfaces,
+		DownloadSpeed: downloadSpeed,
+		UploadSpeed:   uploadSpeed,
+		TotalDownload: totalDownloadGB,
+		TotalUpload:   totalUploadGB,
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"interfaces_count": len(interfaces),
+		"download_mbps":    downloadSpeed,
+		"upload_mbps":      uploadSpeed,
+	}).Debug("Network info retrieved")
+
+	return networkInfo, nil
 }
 
 // parseHumanSize converts human readable size (like 1.5G, 512M) to bytes

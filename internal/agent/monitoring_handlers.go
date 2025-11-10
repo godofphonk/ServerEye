@@ -108,3 +108,27 @@ func (a *Agent) handleGetProcesses(msg *protocol.Message) *protocol.Message {
 	response.ID = msg.ID
 	return response
 }
+
+// handleGetNetworkInfo обрабатывает команду получения информации о сети
+func (a *Agent) handleGetNetworkInfo(msg *protocol.Message) *protocol.Message {
+	a.logger.Debug("Обработка команды получения информации о сети")
+
+	networkInfo, err := a.systemMonitor.GetNetworkInfo()
+	if err != nil {
+		a.logger.WithError(err).Error("Ошибка получения информации о сети")
+		return protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
+			ErrorCode:    "NETWORK_INFO_ERROR",
+			ErrorMessage: fmt.Sprintf("Ошибка получения информации о сети: %v", err),
+		})
+	}
+
+	a.logger.WithFields(logrus.Fields{
+		"interfaces_count": len(networkInfo.Interfaces),
+		"download_mbps":    networkInfo.DownloadSpeed,
+		"upload_mbps":      networkInfo.UploadSpeed,
+	}).Info("Информация о сети получена")
+
+	response := protocol.NewMessage(protocol.TypeNetworkInfoResponse, networkInfo)
+	response.ID = msg.ID
+	return response
+}

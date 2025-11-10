@@ -303,6 +303,8 @@ func (a *Agent) processCommand(data []byte) {
 		response = a.handleGetUptime(msg)
 	case protocol.TypeGetProcesses:
 		response = a.handleGetProcesses(msg)
+	case protocol.TypeGetNetworkInfo:
+		response = a.handleGetNetworkInfo(msg)
 	case protocol.TypeUpdateAgent:
 		response = a.handleUpdateAgent(msg)
 	case protocol.TypePing:
