@@ -27,6 +27,7 @@ func (b *Bot) startHTTPServer() {
 
 	b.logger.Info("Info message")
 	http.HandleFunc("/api/register-key", b.handleRegisterKey)
+	http.HandleFunc("/api/validate-key/", b.handleValidateKey)
 	http.HandleFunc("/api/health", b.handleHealth)
 	http.HandleFunc("/api/heartbeat", b.handleHeartbeat)
 	http.HandleFunc("/api/redis/publish", b.handleRedisPublish)
@@ -104,6 +105,42 @@ func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 
 	b.writeJSONSuccess(w, map[string]string{
 		"message": "Key registered successfully",
+	})
+}
+
+// handleValidateKey handles key validation requests from ServerEye-Web
+func (b *Bot) handleValidateKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract key from URL path
+	path := r.URL.Path
+	secretKey := strings.TrimPrefix(path, "/api/validate-key/")
+
+	if secretKey == "" || !strings.HasPrefix(secretKey, "srv_") {
+		http.Error(w, "Invalid secret key format", http.StatusBadRequest)
+		return
+	}
+
+	// Check if key exists in database
+	exists, err := b.keyExists(secretKey)
+	if err != nil {
+		b.logger.Error("Error checking key existence", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if !exists {
+		http.Error(w, "Key not found", http.StatusNotFound)
+		return
+	}
+
+	// Key exists
+	b.writeJSONSuccess(w, map[string]interface{}{
+		"valid": true,
+		"key":   secretKey,
 	})
 }
 

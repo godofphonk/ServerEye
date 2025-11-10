@@ -380,6 +380,21 @@ type Command struct {
 	Timestamp int64                  `json:"timestamp"`
 }
 
+// keyExists checks if a server key exists in the database
+func (b *Bot) keyExists(secretKey string) (bool, error) {
+	var exists bool
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM generated_keys WHERE secret_key = $1
+		)
+	`
+	err := b.db.QueryRow(query, secretKey).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check key existence: %w", err)
+	}
+	return exists, nil
+}
+
 // updateKeyConnection updates key connection info when agent connects
 func (b *Bot) updateKeyConnection(secretKey, agentVersion, osInfo, hostname string) error {
 	query := `
