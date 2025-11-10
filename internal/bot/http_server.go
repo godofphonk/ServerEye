@@ -43,6 +43,9 @@ func (b *Bot) startHTTPServer() {
 	http.HandleFunc("/api/monitoring/uptime", b.handleUptimeRequest)
 	http.HandleFunc("/api/monitoring/processes", b.handleProcessesRequest)
 
+	// Statistics endpoints for ServerEye-Web integration
+	http.HandleFunc("/api/stats/users", b.handleUserStats)
+
 	b.logger.Info("Info message")
 
 	// Create HTTP server with proper timeouts for security
@@ -498,4 +501,55 @@ func (b *Bot) handleStreamAck(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+// handleUserStats returns user statistics for ServerEye-Web integration
+func (b *Bot) handleUserStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	b.logger.Info("User stats request received")
+
+	// Query total users count
+	var totalUsers int64
+	err := b.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&totalUsers)
+	if err != nil {
+		b.logger.Error("Failed to query total users", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Query active users today (updated in last 24 hours)
+	var activeToday int64
+	err = b.db.QueryRow(`
+		SELECT COUNT(*) FROM users 
+		WHERE updated_at > NOW() - INTERVAL '24 hours'
+	`).Scan(&activeToday)
+	if err != nil {
+		b.logger.Error("Failed to query active users today", err)
+		activeToday = 0 // Continue with 0 if query fails
+	}
+
+	// Query active users this week (updated in last 7 days)
+	var activeWeek int64
+	err = b.db.QueryRow(`
+		SELECT COUNT(*) FROM users 
+		WHERE updated_at > NOW() - INTERVAL '7 days'
+	`).Scan(&activeWeek)
+	if err != nil {
+		b.logger.Error("Failed to query active users this week", err)
+		activeWeek = 0 // Continue with 0 if query fails
+	}
+
+	b.logger.Info("User stats retrieved successfully")
+
+	// Return stats in JSON format
+	b.writeJSON(w, map[string]interface{}{
+		"total_users":  totalUsers,
+		"active_today": activeToday,
+		"active_week":  activeWeek,
+		"timestamp":    time.Now().Unix(),
+	})
 }

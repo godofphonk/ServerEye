@@ -82,4 +82,3 @@ func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 		a.logger.WithField("type", metricType).Debug("Metric sent successfully")
 	}
 }
-

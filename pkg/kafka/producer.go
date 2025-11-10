@@ -69,7 +69,7 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 		RequiredAcks: cfg.RequiredAcks,
 		Async:        false,
 	})
-	
+
 	// Создаем custom dialer который не использует DNS lookup
 	dialer := &kafka.Dialer{
 		Timeout:   10 * time.Second,
@@ -83,12 +83,12 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 			},
 		},
 	}
-	
+
 	// Устанавливаем transport с custom dialer
 	writer.Transport = &kafka.Transport{
 		Dial: dialer.DialFunc,
 	}
-	
+
 	// Устанавливаем compression через метод writer
 	switch cfg.Compression {
 	case "gzip":
