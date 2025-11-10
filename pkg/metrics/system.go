@@ -314,7 +314,7 @@ func (s *SystemMonitor) GetNetworkInfo() (*protocol.NetworkInfo, error) {
 		}
 
 		ifName := strings.TrimSpace(parts[0])
-		
+
 		// Skip loopback
 		if ifName == "lo" {
 			continue
@@ -341,7 +341,7 @@ func (s *SystemMonitor) GetNetworkInfo() (*protocol.NetworkInfo, error) {
 		if prev, exists := s.prevNetStats[ifName]; exists && timeDelta > 0 {
 			bytesRecvDelta := float64(bytesRecv - prev.bytesRecv)
 			bytesSentDelta := float64(bytesSent - prev.bytesSent)
-			
+
 			// Convert bytes/sec to Mbps: (bytes/sec * 8) / 1,000,000
 			ifDownloadSpeed = (bytesRecvDelta / timeDelta * 8) / 1000000
 			ifUploadSpeed = (bytesSentDelta / timeDelta * 8) / 1000000

@@ -209,6 +209,18 @@ func (b *Bot) getProcesses(serverKey string) (*protocol.ProcessesPayload, error)
 	)
 }
 
+// getNetworkInfo requests network information from agent via Streams
+func (b *Bot) getNetworkInfo(serverKey string) (*protocol.NetworkInfo, error) {
+	return sendCommandAndParse[protocol.NetworkInfo](
+		b,
+		serverKey,
+		protocol.TypeGetNetworkInfo,
+		nil,
+		protocol.TypeNetworkInfoResponse,
+		10*time.Second,
+	)
+}
+
 // updateAgent requests agent to update itself
 func (b *Bot) updateAgent(serverKey string, version string) (*protocol.UpdateAgentResponse, error) {
 	payload := &protocol.UpdateAgentPayload{

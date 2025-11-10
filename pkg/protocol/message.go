@@ -198,16 +198,16 @@ type ProcessesPayload struct {
 
 // NetworkInterfaceInfo represents network interface statistics
 type NetworkInterfaceInfo struct {
-	Name        string  `json:"name"`          // Interface name (eth0, wlan0, etc.)
-	BytesSent   uint64  `json:"bytes_sent"`    // Total bytes sent
-	BytesRecv   uint64  `json:"bytes_recv"`    // Total bytes received
-	PacketsSent uint64  `json:"packets_sent"`  // Total packets sent
-	PacketsRecv uint64  `json:"packets_recv"`  // Total packets received
-	ErrorsIn    uint64  `json:"errors_in"`     // Input errors
-	ErrorsOut   uint64  `json:"errors_out"`    // Output errors
-	DropIn      uint64  `json:"drop_in"`       // Dropped packets (input)
-	DropOut     uint64  `json:"drop_out"`      // Dropped packets (output)
-	SpeedMbps   float64 `json:"speed_mbps"`    // Link speed in Mbps (if available)
+	Name        string  `json:"name"`         // Interface name (eth0, wlan0, etc.)
+	BytesSent   uint64  `json:"bytes_sent"`   // Total bytes sent
+	BytesRecv   uint64  `json:"bytes_recv"`   // Total bytes received
+	PacketsSent uint64  `json:"packets_sent"` // Total packets sent
+	PacketsRecv uint64  `json:"packets_recv"` // Total packets received
+	ErrorsIn    uint64  `json:"errors_in"`    // Input errors
+	ErrorsOut   uint64  `json:"errors_out"`   // Output errors
+	DropIn      uint64  `json:"drop_in"`      // Dropped packets (input)
+	DropOut     uint64  `json:"drop_out"`     // Dropped packets (output)
+	SpeedMbps   float64 `json:"speed_mbps"`   // Link speed in Mbps (if available)
 }
 
 // NetworkInfo represents network statistics

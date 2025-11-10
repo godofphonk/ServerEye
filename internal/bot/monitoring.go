@@ -290,6 +290,71 @@ func (b *Bot) handleProcesses(message *tgbotapi.Message) string {
 	return response
 }
 
+// handleNetwork handles the /network command
+func (b *Bot) handleNetwork(message *tgbotapi.Message) string {
+	b.logger.Info("Operation completed")
+
+	servers, err := b.getUserServers(message.From.ID)
+	if err != nil {
+		b.logger.Error("Error occurred", err)
+		return "❌ Error retrieving your servers."
+	}
+
+	if len(servers) == 0 {
+		return "📭 No servers connected. Use /add to connect a server."
+	}
+
+	// For now, use the first server
+	serverKey := servers[0]
+	b.logger.Info("Operation completed")
+
+	networkInfo, err := b.getNetworkInfo(serverKey)
+	if err != nil {
+		b.logger.Error("Error occurred", err)
+		return fmt.Sprintf("❌ Failed to get network info: %v", err)
+	}
+
+	if len(networkInfo.Interfaces) == 0 {
+		return "🌐 No network information available"
+	}
+
+	// Format response with network statistics
+	response := "🌐 Network Statistics\n\n"
+
+	// Overall speed
+	response += "📊 Current Speed:\n"
+	response += fmt.Sprintf("⬇️ Download: %.2f Mbps\n", networkInfo.DownloadSpeed)
+	response += fmt.Sprintf("⬆️ Upload: %.2f Mbps\n", networkInfo.UploadSpeed)
+	response += "\n"
+
+	// Total traffic
+	response += "📈 Total Traffic:\n"
+	response += fmt.Sprintf("⬇️ Downloaded: %d GB\n", networkInfo.TotalDownload)
+	response += fmt.Sprintf("⬆️ Uploaded: %d GB\n", networkInfo.TotalUpload)
+	response += "\n"
+
+	// Interfaces details
+	response += "🔌 Interfaces:\n"
+	for _, iface := range networkInfo.Interfaces {
+		bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
+		bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
+
+		response += fmt.Sprintf("\n📡 %s:\n", iface.Name)
+		response += fmt.Sprintf("  ⬇️ Recv: %.2f GB (%d packets)\n", bytesRecvGB, iface.PacketsRecv)
+		response += fmt.Sprintf("  ⬆️ Sent: %.2f GB (%d packets)\n", bytesSentGB, iface.PacketsSent)
+
+		if iface.ErrorsIn > 0 || iface.ErrorsOut > 0 {
+			response += fmt.Sprintf("  ⚠️ Errors: %d in, %d out\n", iface.ErrorsIn, iface.ErrorsOut)
+		}
+		if iface.DropIn > 0 || iface.DropOut > 0 {
+			response += fmt.Sprintf("  ⚠️ Drops: %d in, %d out\n", iface.DropIn, iface.DropOut)
+		}
+	}
+
+	b.logger.Info("Информация о сети успешно получена")
+	return response
+}
+
 // handleStatus handles the /status command
 func (b *Bot) handleStatus(message *tgbotapi.Message) string {
 	servers, err := b.getUserServersWithInfo(message.From.ID)

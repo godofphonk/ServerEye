@@ -31,6 +31,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	case strings.HasPrefix(message.Text, "/processes"):
 		b.logger.Info("Info message")
 		response = b.handleProcesses(message)
+	case strings.HasPrefix(message.Text, "/network"):
+		b.logger.Info("Info message")
+		response = b.handleNetwork(message)
 	case strings.HasPrefix(message.Text, "/containers"):
 		b.logger.Info("Info message")
 		response = b.handleContainers(message)
@@ -99,6 +102,7 @@ Available commands:
 /disk - Get disk usage
 /uptime - Get system uptime
 /processes - Get top processes
+/network - Get network statistics
 /containers - Manage Docker containers
 /status - Get server status
 /servers - List your servers
@@ -115,6 +119,7 @@ func (b *Bot) handleHelp(message *tgbotapi.Message) string {
 /disk - Get disk usage
 /uptime - Get system uptime
 /processes - List running processes
+/network - Get network statistics
 
 🐳 **Docker Management:**
 /containers - Manage containers (start/stop/restart via buttons)

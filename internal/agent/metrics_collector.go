@@ -74,16 +74,16 @@ func (a *Agent) collectAndSendMetrics() {
 				tags := map[string]string{
 					"interface": iface.Name,
 				}
-				
+
 				// Bytes sent/recv в GB
 				bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
 				bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
-				
+
 				metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
 				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
 					a.logger.WithError(err).Error("Failed to send network metric")
 				}
-				
+
 				metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
 				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
 					a.logger.WithError(err).Error("Failed to send network metric")
