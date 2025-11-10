@@ -110,7 +110,10 @@ func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 
 // handleValidateKey handles key validation requests from ServerEye-Web
 func (b *Bot) handleValidateKey(w http.ResponseWriter, r *http.Request) {
+	b.logger.Info("Validate key request received", Field{"path", r.URL.Path}, Field{"method", r.Method})
+
 	if r.Method != http.MethodGet {
+		b.logger.Warn("Invalid method", Field{"method", r.Method})
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -133,11 +136,13 @@ func (b *Bot) handleValidateKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !exists {
+		b.logger.Warn("Key not found", Field{"key", secretKey})
 		http.Error(w, "Key not found", http.StatusNotFound)
 		return
 	}
 
 	// Key exists
+	b.logger.Info("Key validated successfully", Field{"key", secretKey})
 	b.writeJSONSuccess(w, map[string]interface{}{
 		"valid": true,
 		"key":   secretKey,
