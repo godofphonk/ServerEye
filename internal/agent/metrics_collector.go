@@ -91,6 +91,21 @@ func (a *Agent) collectAndSendMetrics() {
 			}
 		}
 	}
+
+	// Docker containers метрики
+	if a.dockerClient != nil {
+		if containersPayload, err := a.dockerClient.GetContainers(a.ctx); err == nil {
+			// Отправляем информацию о контейнерах как метрику
+			metric := a.CreateMetricFromData("containers", containersPayload, nil)
+			if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+				a.logger.WithError(err).Error("Failed to send containers metric")
+			} else {
+				a.logger.WithField("containers_count", containersPayload.Total).Debug("Containers metric sent successfully")
+			}
+		} else {
+			a.logger.WithError(err).Debug("Docker not available or no containers")
+		}
+	}
 }
 
 // sendMetric отправляет метрику в Kafka
