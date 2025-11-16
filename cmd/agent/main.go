@@ -23,7 +23,7 @@ import (
 const (
 	defaultConfigPath = "/etc/servereye/config.yaml"
 	defaultLogLevel   = "info"
-	defaultBotURL     = "http://192.168.0.105:8090" // ServerEye bot URL
+	defaultBotURL     = "http://localhost:8090" // ServerEye bot URL
 )
 
 // KeyRegistrationRequest represents a request to register a generated key

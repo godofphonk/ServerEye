@@ -3,7 +3,7 @@ package version
 // Version information
 const (
 	// Version is the current version of ServerEye
-	Version = "1.0.4"
+	Version = "1.0.5"
 
 	// BuildDate is set during build time
 	BuildDate = "dev"

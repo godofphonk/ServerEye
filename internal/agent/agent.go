@@ -208,6 +208,7 @@ func (a *Agent) Start() error {
 	// Запускаем сборщик метрик если Kafka включен
 	if a.config.Kafka.Enabled && a.metricPublisher != nil {
 		go a.startMetricsCollection()
+		go a.startTerminalHandler()
 	}
 
 	return nil
