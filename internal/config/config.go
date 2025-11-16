@@ -22,6 +22,7 @@ type BotConfig struct {
 	Telegram TelegramConfig `yaml:"telegram"`
 	Redis    RedisConfig    `yaml:"redis"`
 	Database DatabaseConfig `yaml:"database"`
+	Kafka    KafkaConfig    `yaml:"kafka,omitempty"`
 	Logging  LoggingConfig  `yaml:"logging"`
 }
 

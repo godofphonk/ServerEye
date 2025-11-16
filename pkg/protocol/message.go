@@ -48,6 +48,8 @@ type Message struct {
 	ID        string      `json:"id"`
 	Type      MessageType `json:"type"`
 	Timestamp time.Time   `json:"timestamp"`
+	ServerID  string      `json:"server_id,omitempty"`
+	ServerKey string      `json:"server_key,omitempty"`
 	Version   string      `json:"version"`
 	Payload   interface{} `json:"payload"`
 }

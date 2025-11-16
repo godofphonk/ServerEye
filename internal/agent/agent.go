@@ -36,12 +36,14 @@ type Agent struct {
 	redisClient     RedisClientInterface
 	streamsClient   streams.StreamClient // NEW: for Streams support
 	metricPublisher publisher.Publisher  // NEW: unified publisher (может быть multi-publisher)
+	commandConsumer *kafka.CommandConsumer // NEW: Kafka consumer for commands
 	cpuMetrics      *metrics.CPUMetrics
 	systemMonitor   *metrics.SystemMonitor
 	dockerClient    *docker.Client
 	ctx             context.Context
 	cancel          context.CancelFunc
 	useStreams      bool // Flag to use Streams instead of Pub/Sub
+	useKafka        bool // Flag to use Kafka for commands
 
 	// updateFunc allows mocking performUpdate in tests
 	updateFunc func(string) error
@@ -164,13 +166,49 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 		return nil, fmt.Errorf("не удалось инициализировать metric publisher: %v", err)
 	}
 
+	// Initialize Kafka command consumer if enabled
+	var commandConsumer *kafka.CommandConsumer
+	var useKafka bool
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		// Создаем временный agent для consumer initialization
+		tempAgent := &Agent{
+			config:        cfg,
+			logger:        logger,
+			cpuMetrics:    metrics.NewCPUMetrics(),
+			systemMonitor: metrics.NewSystemMonitor(logger),
+			dockerClient:  docker.NewClient(logger),
+		}
+		
+		consumerConfig := kafka.CommandConsumerConfig{
+			Brokers:        cfg.Kafka.Brokers,
+			GroupID:        fmt.Sprintf("agent-%s", cfg.Server.SecretKey),
+			ServerKey:      cfg.Server.SecretKey,
+			Topic:          "servereye.commands",
+			MinBytes:       10e3, // 10KB
+			MaxBytes:       10e6, // 10MB
+			CommitInterval: time.Second,
+		}
+		
+		consumer, err := kafka.NewCommandConsumer(consumerConfig, tempAgent, logger)
+		if err != nil {
+			cancel() // Cleanup context
+			return nil, fmt.Errorf("не удалось создать Kafka consumer: %v", err)
+		}
+		
+		commandConsumer = consumer
+		useKafka = true
+		logger.Info("Kafka command consumer initialized")
+	}
+
 	return &Agent{
 		config:          cfg,
 		logger:          logger,
 		redisClient:     redisClient,
 		streamsClient:   streamsClient,
 		metricPublisher: metricPublisher,
+		commandConsumer: commandConsumer,
 		useStreams:      useStreams,
+		useKafka:        useKafka,
 		cpuMetrics:      metrics.NewCPUMetrics(),
 		systemMonitor:   metrics.NewSystemMonitor(logger),
 		dockerClient:    docker.NewClient(logger),
@@ -186,8 +224,13 @@ func (a *Agent) Start() error {
 		"secret_key":  a.config.Server.SecretKey,
 	}).Info("Запуск агента ServerEye")
 
-	// Use Streams if available
-	if a.useStreams && a.streamsClient != nil {
+	// Start Kafka consumer if enabled
+	if a.useKafka && a.commandConsumer != nil {
+		a.logger.Info("Starting with Kafka mode")
+		if err := a.commandConsumer.Start(a.ctx); err != nil {
+			return fmt.Errorf("не удалось запустить Kafka consumer: %v", err)
+		}
+	} else if a.useStreams && a.streamsClient != nil {
 		a.logger.Info("Starting with Streams mode")
 		go a.handleCommandsViaStreams()
 	} else {

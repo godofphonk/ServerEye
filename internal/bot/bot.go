@@ -14,6 +14,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	_ "github.com/lib/pq"
 	"github.com/servereye/servereye/internal/config"
+	"github.com/servereye/servereye/pkg/kafka"
 	"github.com/servereye/servereye/pkg/redis"
 	"github.com/servereye/servereye/pkg/redis/streams"
 	"github.com/sirupsen/logrus"
@@ -41,6 +42,11 @@ type Bot struct {
 
 	// Streams client for new architecture
 	streamsClient *streams.Client
+
+	// Kafka components for unified messaging
+	commandProducer  *kafka.CommandProducer
+	responseConsumer *kafka.ResponseConsumer
+	useKafka         bool
 
 	// Context management
 	ctx    context.Context
@@ -184,12 +190,70 @@ func NewFromConfig(cfg *config.BotConfig, logger *logrus.Logger) (*Bot, error) {
 		logger.Info("Redis Streams client initialized")
 	}
 
+	// Initialize Kafka components if enabled
+	var useKafka bool
+	var commandProducer *kafka.CommandProducer
+	var responseConsumer *kafka.ResponseConsumer
+
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		// Initialize command producer
+		producerConfig := kafka.CommandProducerConfig{
+			Brokers:      cfg.Kafka.Brokers,
+			Topic:        "servereye.commands",
+			Compression:  cfg.Kafka.Compression,
+			BatchSize:    1, // Send commands immediately
+			BatchTimeout: 10 * time.Millisecond,
+		}
+
+		producer, err := kafka.NewCommandProducer(producerConfig, logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to create Kafka command producer")
+		} else {
+			commandProducer = producer
+			logger.Info("Kafka command producer initialized")
+		}
+
+		// Initialize response consumer
+		consumerConfig := kafka.ResponseConsumerConfig{
+			Brokers:        cfg.Kafka.Brokers,
+			GroupID:        "bot-response-handlers",
+			ServerKey:      "bot", // Bot receives responses for all servers
+			Topic:          "servereye.responses", // Базовый топик, будет использовать wildcard
+			MinBytes:       10e3, // 10KB
+			MaxBytes:       10e6, // 10MB
+			CommitInterval: time.Second,
+		}
+
+		consumer, err := kafka.NewResponseConsumer(consumerConfig, logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to create Kafka response consumer")
+		} else {
+			responseConsumer = consumer
+			useKafka = true
+			logger.Info("Kafka response consumer initialized")
+		}
+	}
+
+	// Set Kafka components
+	bot.commandProducer = commandProducer
+	bot.responseConsumer = responseConsumer
+	bot.useKafka = useKafka
+
 	return bot, nil
 }
 
 // Start starts the bot with graceful shutdown handling
 func (b *Bot) Start() error {
 	b.logger.Info("Starting ServerEye Telegram bot")
+
+	// Start Kafka response consumer if enabled
+	if b.useKafka && b.responseConsumer != nil {
+		if err := b.responseConsumer.Start(); err != nil {
+			b.logger.Error("Failed to start Kafka response consumer", err)
+			return fmt.Errorf("failed to start Kafka response consumer: %v", err)
+		}
+		b.logger.Info("Kafka response consumer started")
+	}
 
 	// Initialize database schema if database is available
 	if b.database != nil {
