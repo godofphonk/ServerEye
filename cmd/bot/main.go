@@ -20,8 +20,8 @@ const (
 
 func main() {
 	var (
-		configPath = flag.String("config", defaultConfigPath, "Path to configuration file")
-		logLevel   = flag.String("log-level", defaultLogLevel, "Log level (debug, info, warn, error)")
+		configPath  = flag.String("config", defaultConfigPath, "Path to configuration file")
+		logLevel    = flag.String("log-level", defaultLogLevel, "Log level (debug, info, warn, error)")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
