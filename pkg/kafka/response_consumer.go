@@ -14,22 +14,22 @@ import (
 
 // ResponseConsumer обрабатывает ответы из Kafka
 type ResponseConsumer struct {
-	reader     *kafka.Reader
-	logger     *logrus.Logger
-	serverKey  string
-	waiters    sync.Map // map[string]chan *protocol.Message
-	ctx        context.Context
-	cancel     context.CancelFunc
+	reader    *kafka.Reader
+	logger    *logrus.Logger
+	serverKey string
+	waiters   sync.Map // map[string]chan *protocol.Message
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // ResponseConsumerConfig конфигурация consumer
 type ResponseConsumerConfig struct {
-	Brokers      []string
-	GroupID      string
-	ServerKey    string
-	Topic        string
-	MinBytes     int
-	MaxBytes     int
+	Brokers        []string
+	GroupID        string
+	ServerKey      string
+	Topic          string
+	MinBytes       int
+	MaxBytes       int
 	CommitInterval time.Duration
 }
 
@@ -67,9 +67,9 @@ func NewResponseConsumer(cfg ResponseConsumerConfig, logger *logrus.Logger) (*Re
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger.WithFields(logrus.Fields{
-		"brokers":  cfg.Brokers,
-		"group_id": cfg.GroupID,
-		"topic":    cfg.Topic,
+		"brokers":    cfg.Brokers,
+		"group_id":   cfg.GroupID,
+		"topic":      cfg.Topic,
 		"server_key": cfg.ServerKey,
 	}).Info("Kafka response consumer initialized")
 
@@ -159,7 +159,7 @@ func (c *ResponseConsumer) consumeMessage() error {
 		} else {
 			c.logger.WithField("command_id", commandID).Error("Invalid waiter type in sync.Map")
 		}
-		
+
 		// Удаляем waiter после доставки
 		c.waiters.Delete(commandID)
 	} else {
@@ -173,10 +173,10 @@ func (c *ResponseConsumer) consumeMessage() error {
 func (c *ResponseConsumer) WaitForResponse(commandID string, timeout time.Duration) (*protocol.Message, error) {
 	// Создаем канал для ответа
 	responseChan := make(chan *protocol.Message, 1)
-	
+
 	// Регистрируем waiter
 	c.waiters.Store(commandID, responseChan)
-	
+
 	// Удаляем waiter после завершения
 	defer c.waiters.Delete(commandID)
 

@@ -62,7 +62,7 @@ func (a *Agent) handleTemperatureCommand(ctx context.Context, command *protocol.
 	response.Type = protocol.TypeCPUTempResponse
 	response.Payload = map[string]interface{}{
 		"temperature_celsius": temp,
-		"timestamp":          time.Now().Unix(),
+		"timestamp":           time.Now().Unix(),
 	}
 
 	return response, nil
@@ -115,9 +115,9 @@ func (a *Agent) handleUptimeCommand(ctx context.Context, command *protocol.Messa
 
 	response.Type = protocol.TypeUptimeResponse
 	response.Payload = map[string]interface{}{
-		"uptime_seconds": uptime.Uptime,
+		"uptime_seconds":   uptime.Uptime,
 		"uptime_formatted": formatUptime(int64(uptime.Uptime)),
-		"timestamp": time.Now().Unix(),
+		"timestamp":        time.Now().Unix(),
 	}
 
 	return response, nil

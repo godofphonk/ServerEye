@@ -34,8 +34,8 @@ type Agent struct {
 	config          *config.AgentConfig
 	logger          *logrus.Logger
 	redisClient     RedisClientInterface
-	streamsClient   streams.StreamClient // NEW: for Streams support
-	metricPublisher publisher.Publisher  // NEW: unified publisher (может быть multi-publisher)
+	streamsClient   streams.StreamClient   // NEW: for Streams support
+	metricPublisher publisher.Publisher    // NEW: unified publisher (может быть multi-publisher)
 	commandConsumer *kafka.CommandConsumer // NEW: Kafka consumer for commands
 	cpuMetrics      *metrics.CPUMetrics
 	systemMonitor   *metrics.SystemMonitor
@@ -178,7 +178,7 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 			systemMonitor: metrics.NewSystemMonitor(logger),
 			dockerClient:  docker.NewClient(logger),
 		}
-		
+
 		consumerConfig := kafka.CommandConsumerConfig{
 			Brokers:        cfg.Kafka.Brokers,
 			GroupID:        fmt.Sprintf("agent-%s", cfg.Server.SecretKey),
@@ -188,13 +188,13 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 			MaxBytes:       10e6, // 10MB
 			CommitInterval: time.Second,
 		}
-		
+
 		consumer, err := kafka.NewCommandConsumer(consumerConfig, tempAgent, logger)
 		if err != nil {
 			cancel() // Cleanup context
 			return nil, fmt.Errorf("не удалось создать Kafka consumer: %v", err)
 		}
-		
+
 		commandConsumer = consumer
 		useKafka = true
 		logger.Info("Kafka command consumer initialized")

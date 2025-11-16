@@ -13,10 +13,10 @@ import (
 
 // CommandConsumer обрабатывает команды из Kafka
 type CommandConsumer struct {
-	reader     *kafka.Reader
-	handler    CommandHandler
-	logger     *logrus.Logger
-	serverKey  string
+	reader    *kafka.Reader
+	handler   CommandHandler
+	logger    *logrus.Logger
+	serverKey string
 }
 
 // CommandHandler интерфейс для обработки команд
@@ -26,12 +26,12 @@ type CommandHandler interface {
 
 // CommandConsumerConfig конфигурация consumer
 type CommandConsumerConfig struct {
-	Brokers      []string
-	GroupID      string
-	ServerKey    string
-	Topic        string
-	MinBytes     int
-	MaxBytes     int
+	Brokers        []string
+	GroupID        string
+	ServerKey      string
+	Topic          string
+	MinBytes       int
+	MaxBytes       int
 	CommitInterval time.Duration
 }
 
@@ -70,9 +70,9 @@ func NewCommandConsumer(cfg CommandConsumerConfig, handler CommandHandler, logge
 	})
 
 	logger.WithFields(logrus.Fields{
-		"brokers":  cfg.Brokers,
-		"group_id": cfg.GroupID,
-		"topic":    cfg.Topic,
+		"brokers":    cfg.Brokers,
+		"group_id":   cfg.GroupID,
+		"topic":      cfg.Topic,
 		"server_key": cfg.ServerKey,
 	}).Info("Kafka command consumer initialized")
 
@@ -138,7 +138,7 @@ func (c *CommandConsumer) consumeMessage(ctx context.Context) error {
 	response, err := c.handler.HandleCommand(ctx, &command)
 	if err != nil {
 		c.logger.WithError(err).WithField("command_id", command.ID).Error("Failed to handle command")
-		
+
 		// Отправляем error response
 		errorResponse := &protocol.Message{
 			ID:        command.ID,
@@ -148,7 +148,7 @@ func (c *CommandConsumer) consumeMessage(ctx context.Context) error {
 			ServerKey: command.ServerKey,
 			Payload:   map[string]string{"error": err.Error()},
 		}
-		
+
 		if sendErr := c.sendResponse(ctx, errorResponse); sendErr != nil {
 			c.logger.WithError(sendErr).Error("Failed to send error response")
 		}
@@ -167,7 +167,7 @@ func (c *CommandConsumer) consumeMessage(ctx context.Context) error {
 func (c *CommandConsumer) sendResponse(ctx context.Context, response *protocol.Message) error {
 	// Создаем writer для ответов
 	responseTopic := "servereye.responses" // Единый топик для всех ответов
-	
+
 	writer := &kafka.Writer{
 		Addr:     kafka.TCP(c.reader.Config().Brokers...),
 		Topic:    responseTopic,

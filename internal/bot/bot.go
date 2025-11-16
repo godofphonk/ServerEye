@@ -217,10 +217,10 @@ func NewFromConfig(cfg *config.BotConfig, logger *logrus.Logger) (*Bot, error) {
 		consumerConfig := kafka.ResponseConsumerConfig{
 			Brokers:        cfg.Kafka.Brokers,
 			GroupID:        "bot-response-handlers",
-			ServerKey:      "bot", // Bot receives responses for all servers
+			ServerKey:      "bot",                 // Bot receives responses for all servers
 			Topic:          "servereye.responses", // Базовый топик, будет использовать wildcard
-			MinBytes:       10e3, // 10KB
-			MaxBytes:       10e6, // 10MB
+			MinBytes:       10e3,                  // 10KB
+			MaxBytes:       10e6,                  // 10MB
 			CommitInterval: time.Second,
 		}
 

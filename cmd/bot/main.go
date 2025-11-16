@@ -9,6 +9,7 @@ import (
 
 	"github.com/servereye/servereye/internal/bot"
 	"github.com/servereye/servereye/internal/config"
+	"github.com/servereye/servereye/internal/version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,13 +22,13 @@ func main() {
 	var (
 		configPath = flag.String("config", defaultConfigPath, "Path to configuration file")
 		logLevel   = flag.String("log-level", defaultLogLevel, "Log level (debug, info, warn, error)")
-		version    = flag.Bool("version", false, "Show version information")
+		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
 
 	// Show version
-	if *version {
-		fmt.Println("ServerEye Bot v1.0.0")
+	if *showVersion {
+		fmt.Printf("ServerEye Bot %s\n", version.GetFullVersion())
 		return
 	}
 

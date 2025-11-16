@@ -33,12 +33,6 @@ type TerminalSession struct {
 	Cancel    context.CancelFunc
 }
 
-type terminalHandler struct {
-	agent     *Agent
-	sessions  map[string]*TerminalSession
-	mu        sync.RWMutex
-}
-
 // startTerminalHandler запускает обработчик терминальных команд
 func (a *Agent) startTerminalHandler() {
 	a.logger.Info("Terminal handler started")
@@ -67,7 +61,7 @@ func (a *Agent) startTerminalHandler() {
 
 		case cmdData := <-commandsChan:
 			a.logger.WithField("data", string(cmdData)).Info("Processing terminal command")
-			
+
 			var msg TerminalMessage
 			if err := json.Unmarshal(cmdData, &msg); err != nil {
 				a.logger.WithError(err).Error("Failed to unmarshal terminal message")
@@ -148,12 +142,12 @@ func (a *Agent) initTerminalSession(msg *TerminalMessage, sessions map[string]*T
 		"cols":       msg.Cols,
 		"rows":       msg.Rows,
 	}).Info("Initializing PTY terminal session")
-	
+
 	ctx, cancel := context.WithCancel(a.ctx)
 
 	// Create PTY with interactive bash
 	cmd := exec.CommandContext(ctx, "/bin/bash", "-i")
-	cmd.Env = append(os.Environ(), 
+	cmd.Env = append(os.Environ(),
 		"TERM=xterm-256color",
 		"PS1=$ ",
 	)
@@ -169,7 +163,7 @@ func (a *Agent) initTerminalSession(msg *TerminalMessage, sessions map[string]*T
 		cancel()
 		return
 	}
-	
+
 	a.logger.WithField("session_id", msg.SessionID).Info("PTY session created successfully")
 
 	// Set initial size
@@ -193,7 +187,7 @@ func (a *Agent) initTerminalSession(msg *TerminalMessage, sessions map[string]*T
 	mu.Lock()
 	sessions[msg.SessionID] = session
 	mu.Unlock()
-	
+
 	a.logger.WithField("session_id", msg.SessionID).Info("Session registered, starting output reader")
 
 	// Send welcome message immediately to test output path
@@ -216,7 +210,7 @@ func (a *Agent) initTerminalSession(msg *TerminalMessage, sessions map[string]*T
 
 		reader := bufio.NewReader(ptmx)
 		buf := make([]byte, 1024)
-		
+
 		a.logger.WithField("session_id", msg.SessionID).Info("PTY reader started, waiting for output...")
 
 		for {
@@ -235,7 +229,7 @@ func (a *Agent) initTerminalSession(msg *TerminalMessage, sessions map[string]*T
 					"bytes":      n,
 					"output":     output,
 				}).Debug("Sending PTY output to Kafka")
-				
+
 				a.sendTerminalOutput(msg.SessionID, TerminalMessage{
 					Type:      "output",
 					Data:      output,
@@ -332,7 +326,7 @@ func (a *Agent) sendTerminalOutput(sessionID string, msg TerminalMessage) {
 		Key:   []byte(sessionID),
 		Value: data,
 	})
-	
+
 	if err != nil {
 		a.logger.WithError(err).Error("Failed to send terminal output to Kafka")
 	} else {
