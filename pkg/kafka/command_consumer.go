@@ -49,7 +49,7 @@ func NewCommandConsumer(cfg CommandConsumerConfig, handler CommandHandler, logge
 
 	// Устанавливаем значения по умолчанию
 	if cfg.MinBytes == 0 {
-		cfg.MinBytes = 10e3 // 10KB
+		cfg.MinBytes = 1 // 1 байт для немедленного чтения
 	}
 	if cfg.MaxBytes == 0 {
 		cfg.MaxBytes = 10e6 // 10MB
@@ -66,7 +66,7 @@ func NewCommandConsumer(cfg CommandConsumerConfig, handler CommandHandler, logge
 		MinBytes:       cfg.MinBytes,
 		MaxBytes:       cfg.MaxBytes,
 		CommitInterval: cfg.CommitInterval,
-		StartOffset:    kafka.LastOffset,
+		StartOffset:    kafka.FirstOffset, // Читать с начала для тестирования
 	})
 
 	logger.WithFields(logrus.Fields{
@@ -109,7 +109,7 @@ func (c *CommandConsumer) Start(ctx context.Context) error {
 // consumeMessage обрабатывает одно сообщение
 func (c *CommandConsumer) consumeMessage(ctx context.Context) error {
 	// Устанавливаем таймаут для чтения
-	readCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	readCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	msg, err := c.reader.ReadMessage(readCtx)
@@ -166,7 +166,7 @@ func (c *CommandConsumer) consumeMessage(ctx context.Context) error {
 // sendResponse отправляет response в отдельный топик
 func (c *CommandConsumer) sendResponse(ctx context.Context, response *protocol.Message) error {
 	// Создаем writer для ответов
-	responseTopic := "servereye.responses" // Единый топик для всех ответов
+	responseTopic := fmt.Sprintf("resp.%s", c.serverKey) // Персональный топик для ответов этого сервера
 
 	writer := &kafka.Writer{
 		Addr:     kafka.TCP(c.reader.Config().Brokers...),

@@ -181,9 +181,9 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 
 		consumerConfig := kafka.CommandConsumerConfig{
 			Brokers:        cfg.Kafka.Brokers,
-			GroupID:        fmt.Sprintf("agent-%s", cfg.Server.SecretKey),
+			GroupID:        fmt.Sprintf("agent-new-%s", cfg.Server.SecretKey),
 			ServerKey:      cfg.Server.SecretKey,
-			Topic:          "servereye.commands",
+			Topic:          fmt.Sprintf("cmd.%s", cfg.Server.SecretKey),
 			MinBytes:       10e3, // 10KB
 			MaxBytes:       10e6, // 10MB
 			CommitInterval: time.Second,
