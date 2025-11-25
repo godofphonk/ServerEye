@@ -84,6 +84,17 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
+# Copy Linux binaries to downloads folder
+downloads: release
+	@echo "Copying Linux binaries to downloads folder..."
+	@mkdir -p downloads
+	@cp $(BUILD_DIR)/$(AGENT_BINARY)-linux-amd64 downloads/
+	@cp $(BUILD_DIR)/$(AGENT_BINARY)-linux-arm64 downloads/
+	@chmod +x downloads/$(AGENT_BINARY)-linux-amd64
+	@chmod +x downloads/$(AGENT_BINARY)-linux-arm64
+	@echo "✅ Linux binaries copied to downloads/"
+	@ls -la downloads/
+
 # Format code
 fmt:
 	@echo "Formatting code..."
@@ -178,6 +189,7 @@ help:
 	@echo "  build-agent   - Build agent only"
 	@echo "  build-bot     - Build bot only"
 	@echo "  release       - Build optimized release binaries"
+	@echo "  downloads     - Copy Linux binaries to downloads folder"
 	@echo ""
 	@echo "Tests:"
 	@echo "  test          - Run all tests (287+ tests)"

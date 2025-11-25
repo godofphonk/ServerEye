@@ -59,7 +59,9 @@ private/
 
 # Built binaries (exclude from root)
 servereye-*
-!downloads/servereye-*
+
+# Downloads directory with distribution binaries
+downloads/
 
 
 # Test coverage files

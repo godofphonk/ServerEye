@@ -1,7 +1,7 @@
 package version
 
 // Version information
-const (
+var (
 	// Version is the current version of ServerEye
 	Version = "1.1.0"
 

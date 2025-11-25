@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"syscall"
@@ -41,13 +42,23 @@ func main() {
 		configPath  = flag.String("config", defaultConfigPath, "Path to configuration file")
 		logLevel    = flag.String("log-level", defaultLogLevel, "Log level (debug, info, warn, error)")
 		install     = flag.Bool("install", false, "Install agent and generate secret key")
+		uninstall   = flag.Bool("uninstall", false, "Uninstall agent completely")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
 
 	// Show version
 	if *showVersion {
-		fmt.Printf("ServerEye Agent v%s\n", version.GetFullVersion())
+		fmt.Printf("ServerEye Agent %s\n", version.GetFullVersion())
+		return
+	}
+
+	// Handle uninstall
+	if *uninstall {
+		if err := handleUninstall(); err != nil {
+			fmt.Printf("Uninstall failed: %v\n", err)
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -114,7 +125,7 @@ func setupLogger(level string) *logrus.Logger {
 
 // handleInstall handles the installation process
 func handleInstall() error {
-	fmt.Println("🚀 Installing ServerEye Agent...")
+	fmt.Printf("🚀 Installing ServerEye Agent %s\n", version.GetFullVersion())
 
 	// Generate secret key
 	secretKey, err := generateSecretKey()
@@ -302,5 +313,48 @@ func registerKeyInDatabase(secretKey, agentVersion, osInfo, hostname string) err
 	}
 
 	fmt.Printf("✅ Key successfully registered in database: %s\n", secretKey)
+	return nil
+}
+
+// handleUninstall handles the complete uninstallation of the agent
+func handleUninstall() error {
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("uninstall requires root privileges. Run with sudo: sudo servereye-agent --uninstall")
+	}
+
+	fmt.Println("🗑️  Uninstalling ServerEye Agent...")
+	
+	// Try to find and execute the uninstall script
+	scriptPaths := []string{
+		"./uninstall-servereye.sh",
+		"/opt/servereye/uninstall-servereye.sh",
+	}
+
+	var scriptPath string
+	for _, path := range scriptPaths {
+		if _, err := os.Stat(path); err == nil {
+			scriptPath = path
+			break
+		}
+	}
+
+	if scriptPath == "" {
+		return fmt.Errorf("uninstall script not found. Please locate uninstall-servereye.sh and run it manually with sudo")
+	}
+
+	fmt.Printf("📋 Running uninstall script: %s\n", scriptPath)
+	
+	// Execute the uninstall script
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("uninstall script execution failed: %v", err)
+	}
+
+	fmt.Println("✅ ServerEye Agent uninstalled successfully!")
 	return nil
 }
