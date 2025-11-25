@@ -174,6 +174,30 @@ chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR/servereye-agent"
 if [ "$UPDATE_MODE" = true ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
     echo "[*] Keeping existing configuration..."
     SECRET_KEY=$(grep 'secret_key:' "$CONFIG_DIR/config.yaml" | awk '{print $2}' | tr -d '"')
+    
+    # Update agent version in bot database
+    echo "[*] Updating agent version in bot database..."
+    AGENT_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'ServerEye Agent v\K[0-9.]+' || echo "unknown")
+    OS_INFO=$(uname -s)" "$(uname -m)
+    HOSTNAME=$(hostname)
+
+    JSON_PAYLOAD=$(cat << EOF
+{
+  "secret_key": "$SECRET_KEY",
+  "agent_version": "$AGENT_VERSION",
+  "os_info": "$OS_INFO",
+  "hostname": "$HOSTNAME"
+}
+EOF
+)
+
+    if curl -s -X POST "$BOT_URL/api/register-key" \
+       -H "Content-Type: application/json" \
+       -d "$JSON_PAYLOAD" > /dev/null; then
+        echo "[OK] Agent version updated in bot database!"
+    else
+        echo "[WARNING] Could not update version in bot database"
+    fi
 else
     # Generate secret key and config for new installation
     echo "[*] Generating secret key..."
