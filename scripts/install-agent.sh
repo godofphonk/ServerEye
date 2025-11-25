@@ -206,7 +206,7 @@ EOF
 
     # Register key with bot
     echo "[*] Registering key with ServerEye bot..."
-    AGENT_VERSION="1.0.0"
+    AGENT_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'ServerEye Agent v\K[0-9.]+' || echo "unknown")
     OS_INFO=$(uname -s)" "$(uname -m)
     HOSTNAME=$(hostname)
 
