@@ -68,7 +68,7 @@ func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (
 
 		// Установка дефолтных значений если не указаны
 		if kafkaConfig.TopicPrefix == "" {
-			kafkaConfig.TopicPrefix = "metrics"
+			kafkaConfig.TopicPrefix = "metrics" // Backward compatibility
 		}
 		if kafkaConfig.Compression == "" {
 			kafkaConfig.Compression = "snappy"
