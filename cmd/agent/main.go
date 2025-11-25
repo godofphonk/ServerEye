@@ -324,7 +324,7 @@ func handleUninstall() error {
 	}
 
 	fmt.Println("🗑️  Uninstalling ServerEye Agent...")
-	
+
 	// Try to find and execute the uninstall script
 	scriptPaths := []string{
 		"./uninstall-servereye.sh",
@@ -344,13 +344,13 @@ func handleUninstall() error {
 	}
 
 	fmt.Printf("📋 Running uninstall script: %s\n", scriptPath)
-	
+
 	// Execute the uninstall script
 	cmd := exec.Command("bash", scriptPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("uninstall script execution failed: %v", err)
 	}
