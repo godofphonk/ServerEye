@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -18,6 +19,7 @@ import (
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/internal/version"
 	"github.com/sirupsen/logrus"
+	_ "github.com/lib/pq"
 )
 
 const (
@@ -151,6 +153,16 @@ redis:
   password: ""
   db: 0
 
+kafka:
+  enabled: true
+  brokers:
+    - "localhost:9092"
+  topic_prefix: "metrics"  # Change to "prod" or "dev" for environment isolation
+  compression: "snappy"
+  max_attempts: 3
+  batch_size: 100
+  required_acks: 1
+
 metrics:
   cpu_temperature: true
   interval: "30s"
@@ -177,7 +189,16 @@ logging:
 		return fmt.Errorf("failed to create log directory: %v", err)
 	}
 
-	// Try to register key with bot
+	// Try to register key in database first (primary method)
+	fmt.Println("🔄 Registering key in database...")
+	hostname, _ := os.Hostname()
+	if err := registerKeyInDatabase(secretKey, version.GetVersion(), runtime.GOOS+" "+runtime.GOARCH, hostname); err != nil {
+		fmt.Printf("⚠️  Database registration failed: %v\n", err)
+	} else {
+		fmt.Println("✅ Key successfully registered in database!")
+	}
+
+	// Try to register key with bot (fallback method)
 	fmt.Println("🔄 Registering key with ServerEye bot...")
 	if err := registerKeyWithBot(secretKey); err != nil {
 		fmt.Printf("⚠️  Key registration failed: %v\n", err)
@@ -246,5 +267,40 @@ func registerKeyWithBot(secretKey string) error {
 		fmt.Printf("⚠️  Key registration failed - Status: %d, Response: %s\n", resp.StatusCode, string(body[:n]))
 	}
 
+	return nil
+}
+
+// registerKeyInDatabase inserts the generated key directly into the database
+func registerKeyInDatabase(secretKey, agentVersion, osInfo, hostname string) error {
+	dbURL := os.Getenv("SERVEREYE_DB_URL")
+	if dbURL == "" {
+		return fmt.Errorf("SERVEREYE_DB_URL environment variable not set")
+	}
+
+	// Open database connection
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Test connection
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("failed to ping database: %v", err)
+	}
+
+	// Insert key with all metadata
+	query := `
+		INSERT INTO public.generated_keys (secret_key, agent_version, os_info, hostname, status)
+		VALUES ($1, $2, $3, $4, 'generated')
+		ON CONFLICT (secret_key) DO NOTHING
+	`
+
+	_, err = db.Exec(query, secretKey, agentVersion, osInfo, hostname)
+	if err != nil {
+		return fmt.Errorf("failed to insert key into database: %v", err)
+	}
+
+	fmt.Printf("✅ Key successfully registered in database: %s\n", secretKey)
 	return nil
 }
