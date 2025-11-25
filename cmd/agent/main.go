@@ -15,11 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/servereye/servereye/internal/agent"
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/internal/version"
 	"github.com/sirupsen/logrus"
-	_ "github.com/lib/pq"
 )
 
 const (
