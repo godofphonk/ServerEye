@@ -3,6 +3,7 @@ package bot
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -50,8 +51,12 @@ func (b *Bot) startHTTPServer() {
 	b.logger.Info("Info message")
 
 	// Create HTTP server with proper timeouts for security
+	port := os.Getenv("HTTP_PORT")
+	if port == "" {
+		port = "8080"
+	}
 	server := &http.Server{
-		Addr:         ":8080",
+		Addr:         ":" + port,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
