@@ -256,11 +256,17 @@ func registerKeyWithBot(secretKey string) error {
 		return fmt.Errorf("failed to marshal request: %v", err)
 	}
 
+	// Get bot URL from environment variable or use default
+	botURL := os.Getenv("SERVEREYE_BOT_URL")
+	if botURL == "" {
+		botURL = defaultBotURL
+	}
+
 	// Try to register with bot (non-blocking)
-	fmt.Printf("🔗 Connecting to bot at: %s\n", defaultBotURL+"/api/register-key")
+	fmt.Printf("🔗 Connecting to bot at: %s\n", botURL+"/api/register-key")
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Post(defaultBotURL+"/api/register-key", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := client.Post(botURL+"/api/register-key", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		// Don't fail installation if bot is not available
 		fmt.Printf("⚠️  Could not register key with bot: %v\n", err)
