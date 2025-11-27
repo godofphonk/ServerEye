@@ -441,61 +441,6 @@ func (d *DirectClientAdapter) Close() error {
 	return d.client.Close()
 }
 
-// handleCommandsViaStreams reads commands from Streams
-func (a *Agent) handleCommandsViaStreams() {
-	a.logger.Info("Streams command handler started")
-	cmdStream := fmt.Sprintf("stream:cmd:%s", a.config.Server.SecretKey)
-
-	lastID := "0" // Start from beginning, then use "$" for new messages
-	firstRead := true
-
-	for {
-		select {
-		case <-a.ctx.Done():
-			a.logger.Info("Streams handler stopped")
-			return
-		default:
-			// Read from stream
-			id := lastID
-			if !firstRead {
-				id = "$" // Only new messages after first read
-			}
-
-			messages, err := a.streamsClient.ReadMessages(a.ctx, cmdStream, id, 10, 5*time.Second)
-			if err != nil {
-				if err.Error() != "XREAD failed: context deadline exceeded" {
-					a.logger.WithError(err).Error("Failed to read from stream")
-				}
-				time.Sleep(1 * time.Second)
-				continue
-			}
-
-			firstRead = false
-
-			// Process messages
-			for _, msg := range messages {
-				lastID = msg.ID
-
-				// Parse command
-				payloadJSON := msg.Values["payload"]
-				command, err := protocol.FromJSON([]byte(payloadJSON))
-				if err != nil {
-					a.logger.WithError(err).Error("Failed to parse command")
-					continue
-				}
-
-				a.logger.WithFields(logrus.Fields{
-					"command_id":   command.ID,
-					"command_type": command.Type,
-				}).Info("Получена команда via Streams")
-
-				// Process command (processCommand expects []byte)
-				cmdData, _ := command.ToJSON()
-				a.processCommand(cmdData)
-			}
-		}
-	}
-}
 
 // DirectSubscriptionAdapter адаптер для прямой Redis подписки
 type DirectSubscriptionAdapter struct {
