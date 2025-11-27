@@ -1,0 +1,25 @@
+# ServerEye Agent Development Configuration
+server:
+  name: "test-agent-001"
+  secret_key: "srv_34300d5bb2b4e978e805851877f33907"
+
+# Kafka Configuration
+kafka:
+  brokers: ["localhost:9094"]
+  topic: "metrics"
+
+# API Configuration  
+api:
+  base_url: "http://localhost:8082"
+
+# Metrics Configuration
+metrics:
+  cpu_usage: true
+  memory_usage: true
+  disk_usage: true
+  interval: "30s"
+
+# Redis Configuration (for commands)
+redis:
+  address: "localhost:6381"
+  password: "redis123"

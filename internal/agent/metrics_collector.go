@@ -39,8 +39,8 @@ func (a *Agent) collectAndSendMetrics() {
 		}
 	}
 
-	// Memory метрики (if systemMonitor available)
-	if a.systemMonitor != nil {
+	// Memory метрики (if enabled and systemMonitor available)
+	if a.config.Metrics.MemoryUsage && a.systemMonitor != nil {
 		if memInfo, err := a.systemMonitor.GetMemoryInfo(); err == nil {
 			a.sendMetric("memory_usage", memInfo.UsedPercent, "%")
 			a.sendMetric("memory_total", float64(memInfo.Total)/1024/1024/1024, "GB")
@@ -48,8 +48,9 @@ func (a *Agent) collectAndSendMetrics() {
 			a.sendMetric("memory_available", float64(memInfo.Available)/1024/1024/1024, "GB")
 		}
 
-		// Disk метрики
-		if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
+		// Disk метрики (if enabled)
+		if a.config.Metrics.DiskUsage {
+			if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
 			for _, disk := range diskInfo.Disks {
 				// Отправляем информацию о каждом диске
 				tags := map[string]string{
@@ -61,36 +62,40 @@ func (a *Agent) collectAndSendMetrics() {
 				}
 			}
 		}
+		}
+	}
 
-		// Network метрики
-		if networkInfo, err := a.systemMonitor.GetNetworkInfo(); err == nil {
-			a.sendMetric("network_download_speed", networkInfo.DownloadSpeed, "Mbps")
-			a.sendMetric("network_upload_speed", networkInfo.UploadSpeed, "Mbps")
-			a.sendMetric("network_total_download", float64(networkInfo.TotalDownload), "GB")
-			a.sendMetric("network_total_upload", float64(networkInfo.TotalUpload), "GB")
+	// Network метрики (временно отключены для dev тестирования)
+	// TODO: Добавить NetworkUsage поле в конфигурацию
+	/*
+	if networkInfo, err := a.systemMonitor.GetNetworkInfo(); err == nil {
+		a.sendMetric("network_download_speed", networkInfo.DownloadSpeed, "Mbps")
+		a.sendMetric("network_upload_speed", networkInfo.UploadSpeed, "Mbps")
+		a.sendMetric("network_total_download", float64(networkInfo.TotalDownload), "GB")
+		a.sendMetric("network_total_upload", float64(networkInfo.TotalUpload), "GB")
 
-			// Отправляем метрики для каждого интерфейса
-			for _, iface := range networkInfo.Interfaces {
-				tags := map[string]string{
-					"interface": iface.Name,
-				}
+		// Отправляем метрики для каждого интерфейса
+		for _, iface := range networkInfo.Interfaces {
+			tags := map[string]string{
+				"interface": iface.Name,
+			}
 
-				// Bytes sent/recv в GB
-				bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
-				bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
+			// Bytes sent/recv в GB
+			bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
+			bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
 
-				metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
-				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
-					a.logger.WithError(err).Error("Failed to send network metric")
-				}
+			metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
+			if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+				a.logger.WithError(err).Error("Failed to send network metric")
+			}
 
-				metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
-				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
-					a.logger.WithError(err).Error("Failed to send network metric")
-				}
+			metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
+			if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+				a.logger.WithError(err).Error("Failed to send network metric")
 			}
 		}
 	}
+	*/
 
 	// Docker containers метрики
 	if a.dockerClient != nil {
