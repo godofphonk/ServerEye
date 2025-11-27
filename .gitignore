@@ -68,4 +68,7 @@ downloads/
 coverage
 coverage.txt
 coverage.out
-coverage.htmlAGENT_INFRASTRUCTURE_ISSUES.md
+coverage.html
+
+# Documentation files (exclude from git root)
+*.md
