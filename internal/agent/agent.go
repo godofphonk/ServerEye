@@ -437,7 +437,6 @@ func (d *DirectClientAdapter) Close() error {
 	return d.client.Close()
 }
 
-
 // DirectSubscriptionAdapter адаптер для прямой Redis подписки
 type DirectSubscriptionAdapter struct {
 	sub *redis.Subscription
