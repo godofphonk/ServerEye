@@ -232,7 +232,8 @@ func (a *Agent) Start() error {
 		}
 	} else if a.useStreams && a.streamsClient != nil {
 		a.logger.Info("Starting with Streams mode")
-		go a.handleCommandsViaStreams()
+		// TODO: Temporarily disabled for testing
+		// go a.handleCommandsViaStreams()
 	} else {
 		// Fallback to Pub/Sub
 		a.logger.Info("Starting with Pub/Sub mode")

@@ -352,14 +352,19 @@ func (b *Bot) connectServerWithName(userID int64, serverKey, serverName string) 
 }
 
 // recordGeneratedKey records a newly generated server key
-func (b *Bot) recordGeneratedKey(secretKey string) error {
+func (b *Bot) recordGeneratedKey(secretKey string, hostname string) error {
+	if hostname == "" {
+		hostname = "Unknown Server"
+	}
+
 	query := `
-		INSERT INTO generated_keys (secret_key, status)
-		VALUES ($1, 'generated')
-		ON CONFLICT (secret_key) DO NOTHING
+		INSERT INTO servers (secret_key, name, status, created_at, updated_at, last_seen)
+		VALUES ($1, $2, 'online', NOW(), NOW(), NOW())
+		ON CONFLICT (secret_key) DO UPDATE
+		SET last_seen = NOW(), status = 'online', updated_at = NOW(), name = $2
 	`
 
-	_, err := b.db.Exec(query, secretKey)
+	_, err := b.db.Exec(query, secretKey, hostname)
 	if err != nil {
 		return fmt.Errorf("failed to record generated key: %v", err)
 	}

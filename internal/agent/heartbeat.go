@@ -37,7 +37,9 @@ func (a *Agent) sendHeartbeat() {
 	}
 
 	heartbeat := map[string]interface{}{
-		"api_key": a.config.Server.SecretKey,
+		"server_id": "d20f50f2-a311-4d02-9c22-18567031dead",
+		"api_key":   a.config.Server.SecretKey,
+		"status":    "online",
 	}
 
 	data, err := json.Marshal(heartbeat)

@@ -31,6 +31,7 @@ func (b *Bot) startHTTPServer() {
 	http.HandleFunc("/api/validate-key/", b.handleValidateKey)
 	http.HandleFunc("/api/health", b.handleHealth)
 	http.HandleFunc("/api/heartbeat", b.handleHeartbeat)
+	http.HandleFunc("/api/v1/servers/heartbeat", b.handleHeartbeatV1)
 	http.HandleFunc("/api/redis/publish", b.handleRedisPublish)
 	http.HandleFunc("/api/redis/subscribe", b.handleRedisSubscribe)
 
@@ -93,7 +94,7 @@ func (b *Bot) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record the key
-	if err := b.recordGeneratedKey(req.SecretKey); err != nil {
+	if err := b.recordGeneratedKey(req.SecretKey, req.Hostname); err != nil {
 		b.logger.Error("Error occurred", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -183,6 +184,69 @@ func (b *Bot) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	b.writeJSON(w, map[string]string{
 		"status":     "ok",
 		"server_key": req.ServerKey,
+	})
+}
+
+// handleHeartbeatV1 handles heartbeat requests from agents (v1 API with database integration)
+func (b *Bot) handleHeartbeatV1(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		APIKey string `json:"api_key"`
+		Status string `json:"status,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		b.logger.Error("Failed to decode heartbeat JSON", err)
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Validate API key format
+	if !strings.HasPrefix(req.APIKey, "srv_") {
+		http.Error(w, "Invalid API key format", http.StatusBadRequest)
+		return
+	}
+
+	// Set default status if not provided
+	if req.Status == "" {
+		req.Status = "online"
+	}
+
+	// Update server in database
+	result, err := b.db.Exec(
+		"UPDATE servers SET last_seen = NOW(), status = $1, updated_at = NOW() WHERE secret_key = $2",
+		req.Status, req.APIKey,
+	)
+
+	if err != nil {
+		b.logger.Error("Failed to update server heartbeat", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if any rows were affected (valid API key)
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		b.logger.Error("Failed to get rows affected", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	if rowsAffected == 0 {
+		b.logger.Warn("Heartbeat received for unknown API key", Field{"api_key", req.APIKey})
+		http.Error(w, "Invalid API key", http.StatusUnauthorized)
+		return
+	}
+
+	b.logger.Info("Server heartbeat updated successfully", Field{"api_key", req.APIKey}, Field{"status", req.Status})
+
+	b.writeJSON(w, map[string]string{
+		"status":  "ok",
+		"api_key": req.APIKey,
 	})
 }
 
