@@ -230,10 +230,6 @@ func (a *Agent) Start() error {
 		if err := a.commandConsumer.Start(a.ctx); err != nil {
 			return fmt.Errorf("не удалось запустить Kafka consumer: %v", err)
 		}
-	} else if a.useStreams && a.streamsClient != nil {
-		a.logger.Info("Starting with Streams mode")
-		// TODO: Temporarily disabled for testing
-		// go a.handleCommandsViaStreams()
 	} else {
 		// Fallback to Pub/Sub
 		a.logger.Info("Starting with Pub/Sub mode")
