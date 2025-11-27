@@ -48,6 +48,9 @@ type APIConfig struct {
 
 // MetricsConfig конфигурация метрик
 type MetricsConfig struct {
+	CPUUsage      bool   `yaml:"cpu_usage"`
+	MemoryUsage   bool   `yaml:"memory_usage"`
+	DiskUsage     bool   `yaml:"disk_usage"`
 	CPUTemperature bool   `yaml:"cpu_temperature"`
 	Interval       string `yaml:"interval"`
 }
