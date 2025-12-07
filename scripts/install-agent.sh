@@ -285,7 +285,7 @@ server:
   secret_key: "$SECRET_KEY"
 
 api:
-  base_url: "${API_URL:-https://api.servereye.dev}"
+  base_url: "$SERVEREYE_API_URL"
   timeout: "30s"
 
 metrics:
