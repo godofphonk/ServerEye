@@ -34,11 +34,10 @@ func New(cfg *config.Config, storage storage.Storage, logger *logrus.Logger) *Se
 
 	router := s.setupRoutes()
 	
-	// Apply middleware
+	// Apply global middleware (not auth)
 	router.Use(s.loggingMiddleware)
 	router.Use(rateLimiter.Middleware)
 	router.Use(s.corsMiddleware)
-	router.Use(s.authMiddleware)
 	
 	s.server = &http.Server{
 		Addr:         cfg.GetAddr(),
