@@ -232,7 +232,8 @@ func (p *Producer) Name() string {
 
 // getTopicName формирует имя топика
 func (p *Producer) getTopicName(metricType string) string {
-	return fmt.Sprintf("%s.%s", p.config.TopicPrefix, metricType)
+	// Используем единый топик для всех метрик чтобы избежать проблем с созданием топиков
+	return p.config.TopicPrefix
 }
 
 // Stats возвращает статистику Kafka producer

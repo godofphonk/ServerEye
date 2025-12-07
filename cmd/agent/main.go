@@ -26,7 +26,6 @@ import (
 const (
 	defaultConfigPath = "/etc/servereye/config.yaml"
 	defaultLogLevel   = "info"
-	defaultBotURL     = "http://localhost:8090" // ServerEye bot URL
 )
 
 // KeyRegistrationRequest represents a request to register a generated key
@@ -256,10 +255,10 @@ func registerKeyWithBot(secretKey string) error {
 		return fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	// Get bot URL from environment variable or use default
+	// Get bot URL from environment variable
 	botURL := os.Getenv("SERVEREYE_BOT_URL")
 	if botURL == "" {
-		botURL = defaultBotURL
+		return fmt.Errorf("SERVEREYE_BOT_URL environment variable not set")
 	}
 
 	// Try to register with bot (non-blocking)

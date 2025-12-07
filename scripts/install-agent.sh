@@ -13,6 +13,40 @@ SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
 AGENT_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/servereye-agent-linux-amd64"
 CHECKSUM_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/checksums.txt"
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
+AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
+
+ensure_db_env() {
+    # Load existing env file if present
+    if [ -f "$AGENT_ENV_FILE" ]; then
+        # shellcheck disable=SC1090
+        source "$AGENT_ENV_FILE"
+    fi
+
+    if [ -z "$SERVEREYE_DB_URL" ]; then
+        if [ -t 0 ]; then
+            echo "[*] SERVEREYE_DB_URL not set."
+            read -r -p "Enter SERVEREYE_DB_URL (PostgreSQL URI for key registration): " user_db_url
+            SERVEREYE_DB_URL="$user_db_url"
+        fi
+    fi
+
+    if [ -z "$SERVEREYE_DB_URL" ]; then
+        cat <<EOF
+[ERROR] SERVEREYE_DB_URL is required for key registration.
+  - Option 1: export it before running the installer
+      SERVEREYE_DB_URL=postgres://... bash install-agent.sh
+  - Option 2: rerun this installer from an interactive shell and enter the value when prompted
+EOF
+        exit 1
+    fi
+
+    mkdir -p "$CONFIG_DIR"
+    cat > "$AGENT_ENV_FILE" <<EOF
+SERVEREYE_DB_URL="$SERVEREYE_DB_URL"
+EOF
+    chmod 600 "$AGENT_ENV_FILE"
+    echo "[*] Stored SERVEREYE_DB_URL in $AGENT_ENV_FILE"
+}
 
 echo "[*] Installing ServerEye Agent..."
 
@@ -69,6 +103,10 @@ echo "[*] Creating directories..."
 mkdir -p "$AGENT_DIR" "$CONFIG_DIR" "$LOG_DIR"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR" "$LOG_DIR"
 chmod 755 "$CONFIG_DIR"
+
+# Ensure key registration database URL is available
+ensure_db_env
+export SERVEREYE_DB_URL
 
 # Check version if updating
 if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
@@ -267,6 +305,7 @@ Type=simple
 User=servereye
 Group=servereye
 WorkingDirectory=/opt/servereye
+EnvironmentFile=/etc/servereye/agent.env
 ExecStart=/opt/servereye/servereye-agent -config /etc/servereye/config.yaml
 Restart=always
 RestartSec=10

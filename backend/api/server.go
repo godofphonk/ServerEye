@@ -1,0 +1,95 @@
+package api
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/servereye/servereye-backend/config"
+	"github.com/servereye/servereye-backend/storage"
+	"github.com/sirupsen/logrus"
+)
+
+type Server struct {
+	config   *config.Config
+	storage  storage.Storage
+	logger   *logrus.Logger
+	server   *http.Server
+	wsServer *WebSocketServer
+}
+
+func New(cfg *config.Config, storage storage.Storage, logger *logrus.Logger) *Server {
+	s := &Server{
+		config:  cfg,
+		storage: storage,
+		logger:  logger,
+	}
+
+	// Initialize WebSocket server
+	s.wsServer = NewWebSocketServer(s, logger)
+
+	// Initialize rate limiter (100 requests per minute)
+	rateLimiter := NewRateLimiter(100, 20, logger)
+
+	router := s.setupRoutes()
+	
+	// Apply middleware
+	router.Use(s.loggingMiddleware)
+	router.Use(rateLimiter.Middleware)
+	router.Use(s.corsMiddleware)
+	router.Use(s.authMiddleware)
+	
+	s.server = &http.Server{
+		Addr:         cfg.GetAddr(),
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	return s
+}
+
+func (s *Server) setupRoutes() *mux.Router {
+	router := mux.NewRouter()
+
+	// API routes
+	api := router.PathPrefix("/api/v1").Subrouter()
+	
+	// Metrics endpoints
+	api.HandleFunc("/metrics", s.handleGetMetrics).Methods("GET")
+	api.HandleFunc("/metrics/{serverID}", s.handleGetServerMetrics).Methods("GET")
+	api.HandleFunc("/metrics/{serverID}/history", s.handleGetMetricsHistory).Methods("GET")
+	
+	// Servers endpoints
+	api.HandleFunc("/servers", s.handleGetServers).Methods("GET")
+	api.HandleFunc("/servers/{serverID}", s.handleGetServer).Methods("GET")
+	
+	// Health endpoints
+	api.HandleFunc("/health", s.handleHealth).Methods("GET")
+	api.HandleFunc("/health/kafka", s.handleKafkaHealth).Methods("GET")
+	
+	// WebSocket for live updates
+	api.HandleFunc("/ws", s.wsServer.handleWebSocket).Methods("GET")
+	
+	// Static files for web UI (optional)
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/dist/"))).Methods("GET")
+
+	// Middleware
+	router.Use(s.loggingMiddleware)
+	router.Use(s.corsMiddleware)
+	router.Use(s.authMiddleware)
+
+	return router
+}
+
+func (s *Server) Start() error {
+	s.logger.WithField("addr", s.server.Addr).Info("Starting API server")
+	return s.server.ListenAndServe()
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.logger.Info("Shutting down API server")
+	return s.server.Shutdown(ctx)
+}

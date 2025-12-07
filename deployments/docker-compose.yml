@@ -1,0 +1,44 @@
+# ServerEye Production Environment
+# Stable releases only (triggered by git tags)
+# Updates only when you create a new release
+#
+# Setup:
+# 1. Fill in TELEGRAM_TOKEN, DB_PASSWORD, REDIS_PASSWORD in .env
+# 2. Run: docker-compose --env-file .env up -d
+# 3. Check logs: docker-compose logs -f servereye-bot
+#
+# Auto-update: git tag v1.0.0 → new :stable image → Watchtower updates in ~5 min
+
+version: '3.8'
+
+services:
+  # Dedicated PostgreSQL for key registration
+  pg-registered-keys:
+    image: postgres:15-alpine
+    container_name: PGRegisteredKeysServerEye
+    environment:
+      - POSTGRES_DB=PgRegisteredKeys
+      - POSTGRES_USER=${KEYS_DB_USER}
+      - POSTGRES_PASSWORD=${KEYS_DB_PASSWORD}
+    volumes:
+      - pg_keys_data:/var/lib/postgresql/data
+      - ./init-keys-db.sql:/docker-entrypoint-initdb.d/init-keys-db.sql:ro
+    networks:
+      - servereye-shared
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYS_DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    ports:
+      - "5433:5432"  # Different port to avoid conflict with main postgres
+
+volumes:
+  pg_keys_data:
+    driver: local
+
+networks:
+  servereye-shared:
+    driver: bridge

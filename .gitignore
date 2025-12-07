@@ -72,3 +72,4 @@ coverage.html
 
 # Documentation files (exclude from git root)
 *.md
+.env
