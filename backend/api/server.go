@@ -66,6 +66,9 @@ func (s *Server) setupRoutes() *mux.Router {
 	api.HandleFunc("/servers", s.handleGetServers).Methods("GET")
 	api.HandleFunc("/servers/{serverID}", s.handleGetServer).Methods("GET")
 	
+	// Key registration endpoint (no auth required for agent registration)
+	api.HandleFunc("/register-key", s.handleRegisterKey).Methods("POST")
+	
 	// Health endpoints
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
 	api.HandleFunc("/health/kafka", s.handleKafkaHealth).Methods("GET")

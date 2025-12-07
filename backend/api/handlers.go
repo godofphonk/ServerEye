@@ -30,6 +30,18 @@ type HealthResponse struct {
 	Services  map[string]interface{} `json:"services"`
 }
 
+type KeyRegistrationRequest struct {
+	SecretKey    string `json:"secret_key"`
+	AgentVersion string `json:"agent_version"`
+	OSInfo       string `json:"os_info"`
+	Hostname     string `json:"hostname"`
+}
+
+type KeyRegistrationResponse struct {
+	Status    string `json:"status"`
+	SecretKey string `json:"secret_key"`
+}
+
 func (s *Server) handleGetMetrics(w http.ResponseWriter, r *http.Request) {
 	// Get query parameters
 	from := r.URL.Query().Get("from")
@@ -223,6 +235,42 @@ func (s *Server) handleGetServer(w http.ResponseWriter, r *http.Request) {
 		"last_seen": time.Now(), // Should be stored in DB
 	}
 
+	s.writeJSON(w, response)
+}
+
+func (s *Server) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
+	var req KeyRegistrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if req.SecretKey == "" {
+		s.writeError(w, "secret_key is required", http.StatusBadRequest)
+		return
+	}
+	if req.Hostname == "" {
+		req.Hostname = "unknown"
+	}
+	if req.AgentVersion == "" {
+		req.AgentVersion = "unknown"
+	}
+	if req.OSInfo == "" {
+		req.OSInfo = "unknown"
+	}
+
+	// Insert into database
+	if err := s.storage.InsertGeneratedKey(r.Context(), req.SecretKey, req.AgentVersion, req.OSInfo, req.Hostname); err != nil {
+		s.logger.WithError(err).WithField("secret_key", req.SecretKey).Error("Failed to insert generated key")
+		s.writeError(w, "Failed to register key", http.StatusInternalServerError)
+		return
+	}
+
+	response := KeyRegistrationResponse{
+		Status:    "ok",
+		SecretKey: req.SecretKey,
+	}
 	s.writeJSON(w, response)
 }
 

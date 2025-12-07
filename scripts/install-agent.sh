@@ -17,31 +17,33 @@ AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
 DEFAULT_SECRET_ENDPOINT="https://summer-sound-668d.patimeiker1999.workers.dev/"
 AGENT_SECRET_ENDPOINT="${SERVEREYE_SECRET_ENDPOINT:-$DEFAULT_SECRET_ENDPOINT}"
 AGENT_INSTALLER_KEY="${SERVEREYE_INSTALLER_KEY:-servereye-install-123}"
+DEFAULT_API_URL="https://api.servereye.dev"
+SERVEREYE_API_URL="${SERVEREYE_API_URL:-$DEFAULT_API_URL}"
 
-ensure_db_env() {
+ensure_api_env() {
     # Load existing env file if present
     if [ -f "$AGENT_ENV_FILE" ]; then
         # shellcheck disable=SC1090
         source "$AGENT_ENV_FILE"
     fi
 
-    if [ -z "$SERVEREYE_DB_URL" ]; then
+    if [ -z "$SERVEREYE_API_URL" ]; then
         fetch_env_from_secret_endpoint || true
     fi
 
-    if [ -z "$SERVEREYE_DB_URL" ]; then
+    if [ -z "$SERVEREYE_API_URL" ]; then
         if [ -t 0 ]; then
-            echo "[*] SERVEREYE_DB_URL not set."
-            read -r -p "Enter SERVEREYE_DB_URL (PostgreSQL URI for key registration): " user_db_url
-            SERVEREYE_DB_URL="$user_db_url"
+            echo "[*] SERVEREYE_API_URL not set."
+            read -r -p "Enter SERVEREYE_API_URL (ServerEye API endpoint): " user_api_url
+            SERVEREYE_API_URL="$user_api_url"
         fi
     fi
 
-    if [ -z "$SERVEREYE_DB_URL" ]; then
+    if [ -z "$SERVEREYE_API_URL" ]; then
         cat <<EOF
-[ERROR] SERVEREYE_DB_URL is required for key registration.
+[ERROR] SERVEREYE_API_URL is required for key registration.
   - Option 1: export it before running the installer
-      SERVEREYE_DB_URL=postgres://... bash install-agent.sh
+      SERVEREYE_API_URL=https://api.servereye.dev bash install-agent.sh
   - Option 2: rerun this installer from an interactive shell and enter the value when prompted
   - Option 3: Set SERVEREYE_SECRET_ENDPOINT and SERVEREYE_INSTALLER_KEY to fetch from a secure endpoint
 EOF
@@ -50,10 +52,10 @@ EOF
 
     mkdir -p "$CONFIG_DIR"
     cat > "$AGENT_ENV_FILE" <<EOF
-SERVEREYE_DB_URL="$SERVEREYE_DB_URL"
+SERVEREYE_API_URL="$SERVEREYE_API_URL"
 EOF
     chmod 600 "$AGENT_ENV_FILE"
-    echo "[*] Stored SERVEREYE_DB_URL in $AGENT_ENV_FILE"
+    echo "[*] Stored SERVEREYE_API_URL in $AGENT_ENV_FILE"
 }
 
 fetch_env_from_secret_endpoint() {
@@ -136,9 +138,9 @@ mkdir -p "$AGENT_DIR" "$CONFIG_DIR" "$LOG_DIR"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR" "$LOG_DIR"
 chmod 755 "$CONFIG_DIR"
 
-# Ensure key registration database URL is available
-ensure_db_env
-export SERVEREYE_DB_URL
+# Ensure API endpoint is available
+ensure_api_env
+export SERVEREYE_API_URL
 
 # Check version if updating
 if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then

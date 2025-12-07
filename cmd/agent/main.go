@@ -199,19 +199,13 @@ logging:
 		return fmt.Errorf("failed to create log directory: %v", err)
 	}
 
-	// Try to register key in database first (primary method)
-	fmt.Println("🔄 Registering key in database...")
+	// Try to register key via API
+	fmt.Println("🔄 Registering key with ServerEye API...")
 	hostname, _ := os.Hostname()
-	if err := registerKeyInDatabase(secretKey, version.GetVersion(), runtime.GOOS+" "+runtime.GOARCH, hostname); err != nil {
-		fmt.Printf("⚠️  Database registration failed: %v\n", err)
+	if err := registerKeyWithAPI(secretKey, version.GetVersion(), runtime.GOOS+" "+runtime.GOARCH, hostname); err != nil {
+		fmt.Printf("⚠️  API registration failed: %v\n", err)
 	} else {
-		fmt.Println("✅ Key successfully registered in database!")
-	}
-
-	// Try to register key with bot (fallback method)
-	fmt.Println("🔄 Registering key with ServerEye bot...")
-	if err := registerKeyWithBot(secretKey); err != nil {
-		fmt.Printf("⚠️  Key registration failed: %v\n", err)
+		fmt.Println("✅ Key successfully registered with ServerEye API!")
 	}
 
 	// Display success message
@@ -237,6 +231,40 @@ func generateSecretKey() (string, error) {
 		return "", err
 	}
 	return "srv_" + hex.EncodeToString(bytes), nil
+}
+
+// registerKeyWithAPI registers the key via HTTP API
+func registerKeyWithAPI(secretKey, agentVersion, osInfo, hostname string) error {
+	apiURL := os.Getenv("SERVEREYE_API_URL")
+	if apiURL == "" {
+		return fmt.Errorf("SERVEREYE_API_URL environment variable not set")
+	}
+
+	req := KeyRegistrationRequest{
+		SecretKey:    secretKey,
+		AgentVersion: agentVersion,
+		OSInfo:       osInfo,
+		Hostname:     hostname,
+	}
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(apiURL+"/api/v1/register-key", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to register key: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
 
 // registerKeyWithBot registers the generated key with the bot via HTTP API
