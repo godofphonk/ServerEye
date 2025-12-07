@@ -167,4 +167,3 @@ func (s *PostgresStorage) Ping() error {
 func (s *PostgresStorage) Close() error {
 	return s.db.Close()
 }
-EOF'
