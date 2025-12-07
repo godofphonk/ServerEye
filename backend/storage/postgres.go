@@ -379,3 +379,25 @@ func (s *PostgresStorage) Ping() error {
 func (s *PostgresStorage) Close() error {
 	return s.db.Close()
 }
+
+func (s *PostgresStorage) InsertGeneratedKey(ctx context.Context, secretKey, agentVersion, osInfo, hostname string) error {
+	query := `
+		INSERT INTO generated_keys (secret_key, agent_version, os_info, hostname, status)
+		VALUES ($1, $2, $3, $4, 'generated')
+		ON CONFLICT (secret_key) DO NOTHING
+	`
+
+	_, err := s.db.ExecContext(ctx, query, secretKey, agentVersion, osInfo, hostname)
+	if err != nil {
+		return fmt.Errorf("failed to insert generated key: %w", err)
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"secret_key":     secretKey,
+		"agent_version":  agentVersion,
+		"os_info":        osInfo,
+		"hostname":       hostname,
+	}).Info("Generated key inserted successfully")
+
+	return nil
+}
