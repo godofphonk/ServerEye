@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -226,7 +227,7 @@ func (c *KafkaConsumer) ensureTopics() error {
 		return fmt.Errorf("failed to get controller: %w", err)
 	}
 
-	controllerConn, err := kafka.Dial("tcp", controller.Addr)
+	controllerConn, err := kafka.Dial("tcp", controller.Host + ":" + strconv.Itoa(controller.Port))
 	if err != nil {
 		return fmt.Errorf("failed to connect to controller: %w", err)
 	}

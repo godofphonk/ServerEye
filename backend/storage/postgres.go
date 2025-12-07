@@ -18,6 +18,7 @@ type Storage interface {
 	GetMetricsHistory(ctx context.Context, serverID string, metricType string, from, to time.Time) ([]*types.Metric, error)
 	GetServers(ctx context.Context) ([]string, error)
 	StoreDLQMessage(ctx context.Context, topic string, partition int, offset int64, message []byte, errorMsg string) error
+	InsertGeneratedKey(ctx context.Context, secretKey, agentVersion, osInfo, hostname string) error
 	Ping() error
 	Close() error
 }
