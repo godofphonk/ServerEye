@@ -14,12 +14,19 @@ AGENT_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/serv
 CHECKSUM_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/checksums.txt"
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
 AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
+DEFAULT_SECRET_ENDPOINT="https://summer-sound-668d.patimeiker1999.workers.dev/"
+AGENT_SECRET_ENDPOINT="${SERVEREYE_SECRET_ENDPOINT:-$DEFAULT_SECRET_ENDPOINT}"
+AGENT_INSTALLER_KEY="${SERVEREYE_INSTALLER_KEY:-servereye-install-123}"
 
 ensure_db_env() {
     # Load existing env file if present
     if [ -f "$AGENT_ENV_FILE" ]; then
         # shellcheck disable=SC1090
         source "$AGENT_ENV_FILE"
+    fi
+
+    if [ -z "$SERVEREYE_DB_URL" ]; then
+        fetch_env_from_secret_endpoint || true
     fi
 
     if [ -z "$SERVEREYE_DB_URL" ]; then
@@ -36,6 +43,7 @@ ensure_db_env() {
   - Option 1: export it before running the installer
       SERVEREYE_DB_URL=postgres://... bash install-agent.sh
   - Option 2: rerun this installer from an interactive shell and enter the value when prompted
+  - Option 3: Set SERVEREYE_SECRET_ENDPOINT and SERVEREYE_INSTALLER_KEY to fetch from a secure endpoint
 EOF
         exit 1
     fi
@@ -46,6 +54,30 @@ SERVEREYE_DB_URL="$SERVEREYE_DB_URL"
 EOF
     chmod 600 "$AGENT_ENV_FILE"
     echo "[*] Stored SERVEREYE_DB_URL in $AGENT_ENV_FILE"
+}
+
+fetch_env_from_secret_endpoint() {
+    if [ -z "$AGENT_SECRET_ENDPOINT" ] || [ -z "$AGENT_INSTALLER_KEY" ]; then
+        return 1
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "[WARNING] curl is required to fetch secrets automatically"
+        return 1
+    fi
+
+    echo "[*] Fetching secrets from secure endpoint..."
+    if ! response=$(curl -fsSL -H "X-Installer-Key: $AGENT_INSTALLER_KEY" "$AGENT_SECRET_ENDPOINT"); then
+        echo "[WARNING] Could not fetch secrets from endpoint"
+        return 1
+    fi
+
+    mkdir -p "$CONFIG_DIR"
+    echo "$response" > "$AGENT_ENV_FILE"
+    chmod 600 "$AGENT_ENV_FILE"
+    # shellcheck disable=SC1090
+    source "$AGENT_ENV_FILE"
+    echo "[OK] Secrets pulled successfully"
 }
 
 echo "[*] Installing ServerEye Agent..."
