@@ -63,7 +63,12 @@ func (s *PostgresStorage) initSchema() error {
 	// Create metrics table with TimescaleDB hypertable
 	schema := `
 	-- Enable TimescaleDB extension
-	CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+    DO $$
+    BEGIN
+        CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE "TimescaleDB extension not available, using regular PostgreSQL";
+    END $$;
 
 	-- Create metrics table
 	CREATE TABLE IF NOT EXISTS metrics (
@@ -95,32 +100,49 @@ func (s *PostgresStorage) initSchema() error {
 				if_not_exists => TRUE
 			);
 		END IF;
+	EXCEPTION WHEN OTHERS THEN
+		RAISE NOTICE 'Hypertable creation skipped (TimescaleDB not available)';
 	END $$;
 
 	-- Create retention policy (keep data for 30 days)
-	SELECT add_retention_policy('metrics', INTERVAL '30 days');
+	DO $$
+	BEGIN
+		SELECT add_retention_policy('metrics', INTERVAL '30 days');
+	EXCEPTION WHEN OTHERS THEN
+		RAISE NOTICE 'Retention policy skipped (TimescaleDB not available)';
+	END $$;
 
 	-- Create continuous aggregates for faster queries
-	CREATE MATERIALIZED VIEW IF NOT EXISTS metrics_1h
-	WITH (timescaledb.continuous) AS
-	SELECT 
-		time_bucket('1 hour', timestamp) AS bucket,
-		server_id,
-		metric_type,
-		AVG(value) as avg_value,
-		MIN(value) as min_value,
-		MAX(value) as max_value,
-		COUNT(*) as count
-	FROM metrics
-	GROUP BY bucket, server_id, metric_type;
+	DO $$
+	BEGIN
+		CREATE MATERIALIZED VIEW IF NOT EXISTS metrics_1h
+		WITH (timescaledb.continuous) AS
+		SELECT 
+			time_bucket('1 hour', timestamp) AS bucket,
+			server_id,
+			metric_type,
+			AVG(value) as avg_value,
+			MIN(value) as min_value,
+			MAX(value) as max_value,
+			COUNT(*) as count
+		FROM metrics
+		GROUP BY bucket, server_id, metric_type;
+	EXCEPTION WHEN OTHERS THEN
+		RAISE NOTICE 'Continuous aggregate creation skipped (TimescaleDB not available)';
+	END $$;
 
 	-- Refresh policy for continuous aggregate
-	SELECT add_continuous_aggregate_policy('metrics_1h',
-		start_offset => INTERVAL '1 hour',
-		end_offset => INTERVAL '1 hour',
-		schedule_interval => INTERVAL '1 hour',
-		if_not_exists => TRUE
-	);
+	DO $$
+	BEGIN
+		SELECT add_continuous_aggregate_policy('metrics_1h',
+			start_offset => INTERVAL '1 hour',
+			end_offset => INTERVAL '1 hour',
+			schedule_interval => INTERVAL '1 hour',
+			if_not_exists => TRUE
+		);
+	EXCEPTION WHEN OTHERS THEN
+		RAISE NOTICE 'Continuous aggregate policy skipped (TimescaleDB not available)';
+	END $$;
 
 	-- Create servers table for metadata
 	CREATE TABLE IF NOT EXISTS servers (
@@ -138,7 +160,7 @@ func (s *PostgresStorage) initSchema() error {
 		id BIGSERIAL PRIMARY KEY,
 		topic TEXT NOT NULL,
 		partition INTEGER,
-		offset BIGINT,
+		"offset" BIGINT,
 		message JSONB NOT NULL,
 		error TEXT NOT NULL,
 		attempts INTEGER DEFAULT 0,
