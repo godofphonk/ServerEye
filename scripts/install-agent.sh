@@ -58,6 +58,50 @@ EOF
     echo "[*] Stored SERVEREYE_API_URL in $AGENT_ENV_FILE"
 }
 
+register_key_with_api() {
+    local secret_key="$1"
+    local agent_version="$2"
+    local os_info="$3"
+    local hostname="$4"
+
+    if [ -z "$SERVEREYE_API_URL" ]; then
+        echo "[WARNING] SERVEREYE_API_URL not set - skipping backend API registration"
+        return 1
+    fi
+
+    local payload
+    payload=$(cat << EOF
+{
+  "secret_key": "$secret_key",
+  "agent_version": "$agent_version",
+  "os_info": "$os_info",
+  "hostname": "$hostname"
+}
+EOF
+)
+
+    local response_file
+    response_file=$(mktemp)
+    local http_code
+    http_code=$(curl -s -o "$response_file" -w "%{http_code}" \
+        -X POST "$SERVEREYE_API_URL/api/v1/register-key" \
+        -H "Content-Type: application/json" \
+        -d "$payload")
+
+    if [ "$http_code" = "200" ]; then
+        echo "[OK] Key registered with ServerEye backend API!"
+        rm -f "$response_file"
+        return 0
+    fi
+
+    echo "[WARNING] Backend API registration failed (status $http_code)"
+    if [ -s "$response_file" ]; then
+        echo "          Response: $(cat "$response_file")"
+    fi
+    rm -f "$response_file"
+    return 1
+}
+
 fetch_env_from_secret_endpoint() {
     if [ -z "$AGENT_SECRET_ENDPOINT" ] || [ -z "$AGENT_INSTALLER_KEY" ]; then
         return 1
@@ -270,6 +314,13 @@ EOF
     else
         echo "[WARNING] Could not update version in bot database"
     fi
+
+    echo "[*] Ensuring key is registered in backend database..."
+    if register_key_with_api "$SECRET_KEY" "$AGENT_VERSION" "$OS_INFO" "$HOSTNAME"; then
+        echo "[OK] Backend registration ensured"
+    else
+        echo "[WARNING] Could not register key in backend"
+    fi
 else
     # Generate secret key and config for new installation
     echo "[*] Generating secret key..."
@@ -323,6 +374,13 @@ EOF
     else
         echo "[WARNING] Could not register key with bot (bot may be offline)"
         echo "   You can still use the key manually: $SECRET_KEY"
+    fi
+
+    echo "[*] Registering key with backend API..."
+    if register_key_with_api "$SECRET_KEY" "$AGENT_VERSION" "$OS_INFO" "$HOSTNAME"; then
+        echo "[OK] Key registered with backend"
+    else
+        echo "[WARNING] Backend registration failed; agent will retry on start"
     fi
 fi
 
