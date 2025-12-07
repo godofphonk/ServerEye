@@ -54,7 +54,13 @@ func New(cfg *config.Config, storage storage.Storage, logger *logrus.Logger) *Se
 func (s *Server) setupRoutes() *mux.Router {
 	router := mux.NewRouter()
 
-	// API routes
+	// Public routes (no auth required)
+	public := router.PathPrefix("/api/v1").Subrouter()
+	public.HandleFunc("/register-key", s.handleRegisterKey).Methods("POST")
+	public.HandleFunc("/health", s.handleHealth).Methods("GET")
+	public.HandleFunc("/health/kafka", s.handleKafkaHealth).Methods("GET")
+
+	// Authenticated routes
 	api := router.PathPrefix("/api/v1").Subrouter()
 	
 	// Metrics endpoints
@@ -66,23 +72,16 @@ func (s *Server) setupRoutes() *mux.Router {
 	api.HandleFunc("/servers", s.handleGetServers).Methods("GET")
 	api.HandleFunc("/servers/{serverID}", s.handleGetServer).Methods("GET")
 	
-	// Key registration endpoint (no auth required for agent registration)
-	api.HandleFunc("/register-key", s.handleRegisterKey).Methods("POST")
-	
-	// Health endpoints
-	api.HandleFunc("/health", s.handleHealth).Methods("GET")
-	api.HandleFunc("/health/kafka", s.handleKafkaHealth).Methods("GET")
-	
 	// WebSocket for live updates
 	api.HandleFunc("/ws", s.wsServer.handleWebSocket).Methods("GET")
 	
 	// Static files for web UI (optional)
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/dist/"))).Methods("GET")
 
-	// Middleware
+	// Middleware - apply auth only to authenticated routes
 	router.Use(s.loggingMiddleware)
 	router.Use(s.corsMiddleware)
-	router.Use(s.authMiddleware)
+	api.Use(s.authMiddleware)
 
 	return router
 }
