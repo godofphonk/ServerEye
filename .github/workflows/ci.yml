@@ -1,33 +1,28 @@
-# Имя workflow - будет показываться на GitHub
+# ServerEye Agent CI Pipeline
+
 name: CI
 
-# Когда запускать этот workflow?
 on:
   push:
-    branches: [ master, main ]  # При push в master или main
-    tags: [ 'v*' ]  # При создании тегов v*
+    branches: [ master, main ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ master, main ]  # При создании Pull Request
+    branches: [ master, main ]
 
-# Какие задачи (jobs) выполнять?
 jobs:
-  # Job 1: Сборка и тестирование
   build:
-    name: Build and Test
-    runs-on: ubuntu-latest  # На какой ОС запускать (GitHub предоставляет бесплатно)
+    name: Build and Test Agent
+    runs-on: ubuntu-latest
     
     steps:
-      # Шаг 1: Скачать код из репозитория
       - name: Checkout code
         uses: actions/checkout@v4
       
-      # Шаг 2: Установить Go
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'  # Обновлено для исправления уязвимостей
+          go-version: '1.24'
       
-      # Шаг 3: Кэшировать зависимости (чтобы быстрее работало)
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -39,41 +34,32 @@ jobs:
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-
             ${{ runner.os }}-go-
       
-      # Шаг 4: Скачать зависимости
       - name: Download dependencies
         run: go mod download
-      
-      # Шаг 5: Проверить что код компилируется
-      - name: Build bot
-        run: go build -v ./cmd/bot
       
       - name: Build agent
         run: go build -v ./cmd/agent
       
-      # Шаг 6: Запустить все юнит-тесты (287 тестов для agent + bot)
       - name: Run unit tests
         run: |
-          echo "🧪 Running unit tests..."
+          echo "🧪 Running agent tests..."
           rm -f coverage.txt
           go test -short -race -coverprofile=coverage.txt -covermode=atomic ./...
       
-      # Шаг 6.1: Детальное покрытие по модулям
       - name: Show detailed coverage
         run: |
           echo "📊 Coverage Report by Module:"
           echo "=============================="
-          go tool cover -func=coverage.txt | grep -E "internal/agent|internal/bot" || true
+          go tool cover -func=coverage.txt | grep -E "internal/agent|^total:" || true
           echo ""
           echo "📈 Total Coverage:"
           go tool cover -func=coverage.txt | grep "^total:" || echo "Coverage report generated"
       
-      # Шаг 6.2: Проверка минимального покрытия (необязательно)
       - name: Check coverage threshold
         continue-on-error: true
         run: |
           COVERAGE=$(go tool cover -func=coverage.txt | grep "^total:" | awk '{print $3}' | sed 's/%//' || echo "0")
           echo "Current coverage: ${COVERAGE}%"
-          # Желаемое покрытие 40%
           THRESHOLD=40
           RESULT=$(awk -v cov="$COVERAGE" -v thr="$THRESHOLD" 'BEGIN { print (cov >= thr) ? "OK" : "FAIL" }')
           if [ "$RESULT" = "FAIL" ]; then
@@ -82,14 +68,12 @@ jobs:
             echo "✅ Coverage ${COVERAGE}% meets threshold"
           fi
       
-      # Шаг 7: Загрузить coverage report (показывает какая часть кода покрыта тестами)
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.txt
-          fail_ci_if_error: false  # Не провалить CI если codecov не работает
-  
-  # Job 2: Детальное тестирование модулей
+          fail_ci_if_error: false
+
   module-tests:
     name: Module Tests
     runs-on: ubuntu-latest
@@ -98,9 +82,14 @@ jobs:
       matrix:
         module:
           - internal/agent
-          - internal/bot
+          - internal/config
+          - internal/version
           - pkg/protocol
           - pkg/metrics
+          - pkg/docker
+          - pkg/redis
+          - pkg/kafka
+          - pkg/publisher
     
     steps:
       - name: Checkout code
@@ -115,8 +104,7 @@ jobs:
         run: |
           echo "🧪 Testing ${{ matrix.module }}..."
           go test -v -short -cover ./${{ matrix.module }}/...
-  
-  # Job 3: Проверка качества кода (Linting)
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -130,14 +118,12 @@ jobs:
         with:
           go-version: '1.24'
       
-      # Запускаем golangci-lint - проверяет код на ошибки и стиль
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: latest
-          args: --timeout=5m  # Таймаут 5 минут
-  
-  # Job 4: Проверка безопасности кода (Security Scan)
+          args: --timeout=5m
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -156,8 +142,7 @@ jobs:
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           echo "🔒 Running security scan..."
           gosec -fmt=text ./... || echo "⚠️ Security issues found (non-blocking)"
-  
-  # Job 5: Проверка уязвимостей в зависимостях
+
   vulnerability-check:
     name: Vulnerability Check
     runs-on: ubuntu-latest
@@ -185,9 +170,8 @@ jobs:
           echo "📦 Checking dependencies..."
           go list -u -m all
 
-  # Job 6: Build DEV images (на каждый push в master)
   docker-build-dev:
-    name: Build DEV Images
+    name: Build DEV Agent Image
     runs-on: ubuntu-latest
     needs: [build, lint]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
@@ -210,18 +194,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Build and push DEV Bot image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./deployments/Dockerfile.bot
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/servereye-bot:dev
-            ghcr.io/${{ github.repository_owner }}/servereye-bot:dev-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
       - name: Build and push DEV Agent image
         uses: docker/build-push-action@v5
         with:
@@ -236,15 +208,11 @@ jobs:
       
       - name: DEV Summary
         run: |
-          echo "🧪 DEV images published:"
-          echo "🤖 Bot: ghcr.io/${{ github.repository_owner }}/servereye-bot:dev"
+          echo "🧪 DEV agent image published:"
           echo "🖥️ Agent: ghcr.io/${{ github.repository_owner }}/servereye-agent:dev"
-          echo ""
-          echo "⚡ DEV bot will auto-update in ~1 minute!"
-  
-  # Job 7: Build PROD images (только для релизов)
+
   docker-build-prod:
-    name: Build PROD Images
+    name: Build PROD Agent Image
     runs-on: ubuntu-latest
     needs: [build, lint]
     if: startsWith(github.ref, 'refs/tags/v')
@@ -271,19 +239,6 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
       
-      - name: Build and push PROD Bot image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./deployments/Dockerfile.bot
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/servereye-bot:stable
-            ghcr.io/${{ github.repository_owner }}/servereye-bot:latest
-            ghcr.io/${{ github.repository_owner }}/servereye-bot:${{ steps.version.outputs.VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
       - name: Build and push PROD Agent image
         uses: docker/build-push-action@v5
         with:
@@ -299,9 +254,7 @@ jobs:
       
       - name: PROD Summary
         run: |
-          echo "🚀 PRODUCTION images published:"
-          echo "🤖 Bot: ghcr.io/${{ github.repository_owner }}/servereye-bot:stable"
-          echo "🤖 Bot: ghcr.io/${{ github.repository_owner }}/servereye-bot:latest"
-          echo "🤖 Bot: ghcr.io/${{ github.repository_owner }}/servereye-bot:${{ steps.version.outputs.VERSION }}"
-          echo ""
-          echo "✅ PROD bot will update to stable version!"
+          echo "🚀 PRODUCTION agent image published:"
+          echo "🖥️ Agent: ghcr.io/${{ github.repository_owner }}/servereye-agent:stable"
+          echo "🖥️ Agent: ghcr.io/${{ github.repository_owner }}/servereye-agent:latest"
+          echo "🖥️ Agent: ghcr.io/${{ github.repository_owner }}/servereye-agent:${{ steps.version.outputs.VERSION }}"

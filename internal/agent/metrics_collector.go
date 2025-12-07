@@ -22,6 +22,7 @@ func (a *Agent) startMetricsCollection() {
 	for {
 		select {
 		case <-ticker.C:
+			a.logger.Info("Ticker fired - calling collectAndSendMetrics()")
 			a.collectAndSendMetrics()
 		case <-a.ctx.Done():
 			a.logger.Info("Metrics collection stopped")
@@ -32,6 +33,8 @@ func (a *Agent) startMetricsCollection() {
 
 // collectAndSendMetrics собирает и отправляет все метрики
 func (a *Agent) collectAndSendMetrics() {
+	a.logger.Info("collectAndSendMetrics() called - starting metrics collection")
+
 	// CPU Temperature (if enabled and cpuMetrics available)
 	if a.config.Metrics.CPUTemperature && a.cpuMetrics != nil {
 		if temp, err := a.cpuMetrics.GetTemperature(); err == nil {
@@ -51,65 +54,70 @@ func (a *Agent) collectAndSendMetrics() {
 		// Disk метрики (if enabled)
 		if a.config.Metrics.DiskUsage {
 			if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
-			for _, disk := range diskInfo.Disks {
-				// Отправляем информацию о каждом диске
-				tags := map[string]string{
-					"path": disk.Path,
-				}
-				metric := a.CreateMetricFromData("disk_usage", disk.UsedPercent, tags)
-				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
-					a.logger.WithError(err).Error("Failed to send disk metric")
+				for _, disk := range diskInfo.Disks {
+					// Отправляем информацию о каждом диске
+					tags := map[string]string{
+						"path": disk.Path,
+					}
+					metric := a.CreateMetricFromData("disk_usage", disk.UsedPercent, tags)
+					if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+						a.logger.WithError(err).Error("Failed to send disk metric")
+					}
 				}
 			}
-		}
 		}
 	}
 
 	// Network метрики (временно отключены для dev тестирования)
 	// TODO: Добавить NetworkUsage поле в конфигурацию
 	/*
-	if networkInfo, err := a.systemMonitor.GetNetworkInfo(); err == nil {
-		a.sendMetric("network_download_speed", networkInfo.DownloadSpeed, "Mbps")
-		a.sendMetric("network_upload_speed", networkInfo.UploadSpeed, "Mbps")
-		a.sendMetric("network_total_download", float64(networkInfo.TotalDownload), "GB")
-		a.sendMetric("network_total_upload", float64(networkInfo.TotalUpload), "GB")
+		if networkInfo, err := a.systemMonitor.GetNetworkInfo(); err == nil {
+			a.sendMetric("network_download_speed", networkInfo.DownloadSpeed, "Mbps")
+			a.sendMetric("network_upload_speed", networkInfo.UploadSpeed, "Mbps")
+			a.sendMetric("network_total_download", float64(networkInfo.TotalDownload), "GB")
+			a.sendMetric("network_total_upload", float64(networkInfo.TotalUpload), "GB")
 
-		// Отправляем метрики для каждого интерфейса
-		for _, iface := range networkInfo.Interfaces {
-			tags := map[string]string{
-				"interface": iface.Name,
-			}
+			// Отправляем метрики для каждого интерфейса
+			for _, iface := range networkInfo.Interfaces {
+				tags := map[string]string{
+					"interface": iface.Name,
+				}
 
-			// Bytes sent/recv в GB
-			bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
-			bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
+				// Bytes sent/recv в GB
+				bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
+				bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
 
-			metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
-			if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
-				a.logger.WithError(err).Error("Failed to send network metric")
-			}
+				metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
+				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+					a.logger.WithError(err).Error("Failed to send network metric")
+				}
 
-			metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
-			if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
-				a.logger.WithError(err).Error("Failed to send network metric")
+				metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
+				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+					a.logger.WithError(err).Error("Failed to send network metric")
+				}
 			}
 		}
-	}
 	*/
 
 	// Docker containers метрики
+	a.logger.Info("Checking docker client for containers metrics")
 	if a.dockerClient != nil {
+		a.logger.Info("Docker client is not nil, getting containers")
 		if containersPayload, err := a.dockerClient.GetContainers(a.ctx); err == nil {
+			a.logger.WithField("containers_count", containersPayload.Total).Info("Got containers payload, attempting to publish")
 			// Отправляем информацию о контейнерах как метрику
 			metric := a.CreateMetricFromData("containers", containersPayload, nil)
 			if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
 				a.logger.WithError(err).Error("Failed to send containers metric")
 			} else {
-				a.logger.WithField("containers_count", containersPayload.Total).Debug("Containers metric sent successfully")
+				a.logger.WithField("containers_count", containersPayload.Total).Info("Containers metric sent successfully")
 			}
 		} else {
-			a.logger.WithError(err).Debug("Docker not available or no containers")
+			a.logger.WithError(err).Info("Docker not available or no containers")
 		}
+	} else {
+		a.logger.Info("Docker client is nil, skipping containers metrics")
 	}
 }
 

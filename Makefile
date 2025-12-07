@@ -1,6 +1,6 @@
-# ServerEye Makefile
+# ServerEye Agent Makefile
 
-.PHONY: build build-agent build-bot test clean docker-build docker-up docker-down install-agent
+.PHONY: build build-agent test clean docker-build docker-up docker-down install-agent
 
 # Go parameters
 GOCMD=go
@@ -10,9 +10,8 @@ GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 
-# Binary names
+# Binary name
 AGENT_BINARY=servereye-agent
-BOT_BINARY=servereye-bot
 
 # Build directories
 BUILD_DIR=build
@@ -20,8 +19,8 @@ BUILD_DIR=build
 # Default target
 all: build
 
-# Build both agent and bot
-build: build-agent build-bot
+# Build agent only
+build: build-agent
 
 # Версия и build info (определяется выше для release, но дублируем для clarity)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -39,13 +38,6 @@ build-agent:
 	$(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(AGENT_BINARY) ./cmd/agent
 	@echo "✅ Agent built: $(BUILD_DIR)/$(AGENT_BINARY)"
 
-# Build bot
-build-bot:
-	@echo "Building bot $(VERSION)..."
-	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BOT_BINARY) ./cmd/bot
-	@echo "✅ Bot built: $(BUILD_DIR)/$(BOT_BINARY)"
-
 # Run all tests
 test:
 	@echo "Running all tests..."
@@ -57,16 +49,12 @@ test-coverage:
 	$(GOTEST) -short -coverprofile=coverage.txt -covermode=atomic ./...
 	@echo ""
 	@echo "📊 Coverage Report:"
-	go tool cover -func=coverage.txt | grep -E "internal/agent|internal/bot|^total:"
+	go tool cover -func=coverage.txt | grep -E "internal/agent|^total:"
 
 # Test specific module
 test-agent:
-	@echo "Testing internal/agent (287 tests, 46.6% coverage)..."
+	@echo "Testing internal/agent..."
 	$(GOTEST) -v -short -cover ./internal/agent/...
-
-test-bot:
-	@echo "Testing internal/bot..."
-	$(GOTEST) -v -short -cover ./internal/bot/...
 
 test-pkg:
 	@echo "Testing pkg modules..."
@@ -138,10 +126,6 @@ dev-agent:
 	@echo "Running agent in development mode..."
 	$(GOCMD) run ./cmd/agent --log-level=debug
 
-dev-bot:
-	@echo "Running bot in development mode..."
-	$(GOCMD) run ./cmd/bot --log-level=debug
-
 # Generate mocks (requires mockgen)
 mocks:
 	@echo "Generating mocks..."
@@ -170,7 +154,6 @@ release: clean
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags="$(RELEASE_LDFLAGS)" -o $(BUILD_DIR)/$(AGENT_BINARY)-linux-amd64 ./cmd/agent
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) -ldflags="$(RELEASE_LDFLAGS)" -o $(BUILD_DIR)/$(AGENT_BINARY)-linux-arm64 ./cmd/agent
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags="$(RELEASE_LDFLAGS)" -o $(BUILD_DIR)/$(BOT_BINARY)-linux-amd64 ./cmd/bot
 	@echo "✅ Release build complete!"
 	@$(BUILD_DIR)/$(AGENT_BINARY)-linux-amd64 --version
 
@@ -185,17 +168,15 @@ help:
 	@echo "Available targets:"
 	@echo ""
 	@echo "Build:"
-	@echo "  build         - Build both agent and bot"
+	@echo "  build         - Build agent"
 	@echo "  build-agent   - Build agent only"
-	@echo "  build-bot     - Build bot only"
 	@echo "  release       - Build optimized release binaries"
 	@echo "  downloads     - Copy Linux binaries to downloads folder"
 	@echo ""
 	@echo "Tests:"
-	@echo "  test          - Run all tests (287+ tests)"
+	@echo "  test          - Run all tests"
 	@echo "  test-coverage - Run tests with coverage report"
-	@echo "  test-agent    - Test agent module only (287 tests)"
-	@echo "  test-bot      - Test bot module only"
+	@echo "  test-agent    - Test agent module only"
 	@echo "  test-pkg      - Test pkg modules only"
 	@echo ""
 	@echo "Code Quality:"
@@ -205,15 +186,13 @@ help:
 	@echo "  vuln-check    - Check for vulnerabilities"
 	@echo ""
 	@echo "Docker:"
-	@echo "  docker-build  - Build Docker images"
+	@echo "  docker-build  - Build Docker image"
 	@echo "  docker-up     - Start services with Docker Compose"
 	@echo "  docker-down   - Stop services"
 	@echo "  docker-logs   - View service logs"
 	@echo ""
 	@echo "Development:"
 	@echo "  dev-agent     - Run agent in development mode"
-	@echo "  dev-bot       - Run bot in development mode"
-	@echo "  install-agent - Install agent to system (Linux)"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  clean         - Clean build artifacts"
