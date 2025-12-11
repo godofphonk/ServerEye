@@ -163,10 +163,10 @@ func (c *CommandConsumer) consumeMessage(ctx context.Context) error {
 	return nil
 }
 
-// sendResponse отправляет response в отдельный топик
+// sendResponse отправляет response в общий топик servereye.responses
 func (c *CommandConsumer) sendResponse(ctx context.Context, response *protocol.Message) error {
-	// Создаем writer для ответов
-	responseTopic := fmt.Sprintf("resp.%s", c.serverKey) // Персональный топик для ответов этого сервера
+	// Создаем writer для ответов в общий топик
+	responseTopic := "servereye.responses"
 
 	writer := &kafka.Writer{
 		Addr:     kafka.TCP(c.reader.Config().Brokers...),
