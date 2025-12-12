@@ -58,17 +58,19 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 
 	// Создаем writer config
 	writer := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:                cfg.Brokers,
-		Balancer:               &kafka.Hash{},
-		MaxAttempts:            cfg.MaxAttempts,
-		BatchSize:              cfg.BatchSize,
-		BatchTimeout:           cfg.BatchTimeout,
-		ReadTimeout:            cfg.WriteTimeout,
-		WriteTimeout:           cfg.WriteTimeout,
-		RequiredAcks:           cfg.RequiredAcks,
-		Async:                  false,
-		AllowAutoTopicCreation: true,
+		Brokers:      cfg.Brokers,
+		Balancer:     &kafka.Hash{},
+		MaxAttempts:  cfg.MaxAttempts,
+		BatchSize:    cfg.BatchSize,
+		BatchTimeout: cfg.BatchTimeout,
+		ReadTimeout:  cfg.WriteTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+		RequiredAcks: cfg.RequiredAcks,
+		Async:        false,
 	})
+
+	// Включаем автоматическое создание топиков
+	writer.AllowAutoTopicCreation = true
 
 	// Устанавливаем compression через метод writer
 	switch cfg.Compression {
