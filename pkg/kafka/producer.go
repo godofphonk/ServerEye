@@ -27,7 +27,7 @@ type Config struct {
 // DefaultConfig возвращает конфигурацию по умолчанию
 func DefaultConfig() Config {
 	return Config{
-		Brokers:       []string{"localhost:9092"},
+		Brokers:       []string{"192.168.0.104:9093"},
 		TopicPrefix:   "metrics",
 		Compression:   "snappy",
 		MaxAttempts:   3,

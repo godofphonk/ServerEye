@@ -61,8 +61,8 @@ func (a *Agent) handleTemperatureCommand(ctx context.Context, command *protocol.
 
 	response.Type = protocol.TypeCPUTempResponse
 	response.Payload = map[string]interface{}{
-		"temperature_celsius": temp,
-		"timestamp":           time.Now().Unix(),
+		"temperature": temp,
+		"timestamp":   time.Now().Unix(),
 	}
 
 	return response, nil

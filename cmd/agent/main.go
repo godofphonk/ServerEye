@@ -166,7 +166,7 @@ redis:
 kafka:
   enabled: true
   brokers:
-    - "localhost:9092"
+    - "192.168.0.104:9093"
   topic_prefix: "metrics"  # Change to "prod" or "dev" for environment isolation
   compression: "snappy"
   max_attempts: 3
