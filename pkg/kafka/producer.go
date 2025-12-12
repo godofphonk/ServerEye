@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -59,35 +58,17 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 
 	// Создаем writer config
 	writer := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:      cfg.Brokers, // Используем напрямую список брокеров
-		Balancer:     &kafka.Hash{},
-		MaxAttempts:  cfg.MaxAttempts,
-		BatchSize:    cfg.BatchSize,
-		BatchTimeout: cfg.BatchTimeout,
-		ReadTimeout:  cfg.WriteTimeout,
-		WriteTimeout: cfg.WriteTimeout,
-		RequiredAcks: cfg.RequiredAcks,
-		Async:        false,
+		Brokers:                cfg.Brokers,
+		Balancer:               &kafka.Hash{},
+		MaxAttempts:            cfg.MaxAttempts,
+		BatchSize:              cfg.BatchSize,
+		BatchTimeout:           cfg.BatchTimeout,
+		ReadTimeout:            cfg.WriteTimeout,
+		WriteTimeout:           cfg.WriteTimeout,
+		RequiredAcks:           cfg.RequiredAcks,
+		Async:                  false,
+		AllowAutoTopicCreation: true,
 	})
-
-	// Создаем custom dialer который не использует DNS lookup
-	dialer := &kafka.Dialer{
-		Timeout:   10 * time.Second,
-		DualStack: true,
-		Resolver: &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				// Игнорируем address из аргумента и используем прямой брокер
-				d := net.Dialer{Timeout: 5 * time.Second}
-				return d.DialContext(ctx, "tcp", cfg.Brokers[0])
-			},
-		},
-	}
-
-	// Устанавливаем transport с custom dialer
-	writer.Transport = &kafka.Transport{
-		Dial: dialer.DialFunc,
-	}
 
 	// Устанавливаем compression через метод writer
 	switch cfg.Compression {
@@ -101,10 +82,6 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 		writer.Compression = kafka.Zstd
 	default:
 		writer.Compression = kafka.Compression(0) // None
-	}
-
-	if cfg.EnableIdempot {
-		writer.AllowAutoTopicCreation = true
 	}
 
 	logger.WithFields(logrus.Fields{
