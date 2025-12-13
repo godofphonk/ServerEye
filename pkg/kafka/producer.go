@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -59,7 +58,7 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 
 	// Создаем writer config
 	writer := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:      cfg.Brokers, // Используем напрямую список брокеров
+		Brokers:      cfg.Brokers,
 		Balancer:     &kafka.Hash{},
 		MaxAttempts:  cfg.MaxAttempts,
 		BatchSize:    cfg.BatchSize,
@@ -70,24 +69,8 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 		Async:        false,
 	})
 
-	// Создаем custom dialer который не использует DNS lookup
-	dialer := &kafka.Dialer{
-		Timeout:   10 * time.Second,
-		DualStack: true,
-		Resolver: &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				// Игнорируем address из аргумента и используем прямой брокер
-				d := net.Dialer{Timeout: 5 * time.Second}
-				return d.DialContext(ctx, "tcp", cfg.Brokers[0])
-			},
-		},
-	}
-
-	// Устанавливаем transport с custom dialer
-	writer.Transport = &kafka.Transport{
-		Dial: dialer.DialFunc,
-	}
+	// Включаем автоматическое создание топиков
+	writer.AllowAutoTopicCreation = true
 
 	// Устанавливаем compression через метод writer
 	switch cfg.Compression {
@@ -101,10 +84,6 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 		writer.Compression = kafka.Zstd
 	default:
 		writer.Compression = kafka.Compression(0) // None
-	}
-
-	if cfg.EnableIdempot {
-		writer.AllowAutoTopicCreation = true
 	}
 
 	logger.WithFields(logrus.Fields{
@@ -232,8 +211,7 @@ func (p *Producer) Name() string {
 
 // getTopicName формирует имя топика
 func (p *Producer) getTopicName(metricType string) string {
-	// Используем единый топик для всех метрик чтобы избежать проблем с созданием топиков
-	return p.config.TopicPrefix
+	return fmt.Sprintf("%s.%s", p.config.TopicPrefix, metricType)
 }
 
 // Stats возвращает статистику Kafka producer
