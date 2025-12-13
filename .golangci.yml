@@ -20,47 +20,49 @@ linters:
     - errcheck      # Запускается отдельно в CI
     - gosec         # Запускается отдельно в CI
 
-# Настройки для конкретных линтеров
-linters-settings:
-  gocyclo:
-    min-complexity: 25  # Максимальная сложность функции (увеличено для bot handlers)
-  
-  dupl:
-    threshold: 100  # Минимум строк для определения дубликата
-  
-  errcheck:
-    check-blank: false  # Разрешить игнорировать ошибки через _
-    exclude-functions:
-      - os.Remove
-      - (*os.File).Close
-      - (*http.Response).Body.Close
-      - (*os.File).Chmod
-      - (*github.com/go-redis/redis/v9).PubSub.Close
-      - (*github.com/segmentio/kafka-go).Writer.Close
-  
-  gosec:
-    excludes:
-      - G301  # Expect directory permissions to be 0750 or less
-      - G302  # Expect file permissions to be 0600 or less
-      - G304  # Potential file inclusion via variable
-      - G115  # integer overflow conversion
-      - G204  # Subprocess launched with variable
+  # Настройки для конкретных линтеров
+  settings:
+    gocyclo:
+      min-complexity: 25  # Максимальная сложность функции (увеличено для bot handlers)
+    
+    dupl:
+      threshold: 100  # Минимум строк для определения дубликата
+    
+    errcheck:
+      check-blank: false  # Разрешить игнорировать ошибки через _
+      exclude-functions:
+        - os.Remove
+        - (*os.File).Close
+        - (*http.Response).Body.Close
+        - (*os.File).Chmod
+        - (*github.com/go-redis/redis/v9).PubSub.Close
+        - (*github.com/segmentio/kafka-go).Writer.Close
+    
+    gosec:
+      excludes:
+        - G301  # Expect directory permissions to be 0750 or less
+        - G302  # Expect file permissions to be 0600 or less
+        - G304  # Potential file inclusion via variable
+        - G115  # integer overflow conversion
+        - G204  # Subprocess launched with variable
 
-# Какие файлы/папки пропустить?
+  # Какие файлы/папки пропустить?
+  exclusions:
+    rules:
+      # Разрешить длинные строки в тестах
+      - path: _test\.go
+        linters:
+          - lll
+      
+      # Игнорировать некоторые ошибки в vendor
+      - path: vendor/
+        linters:
+          - all
+      
+      # Не показывать эти конкретные ошибки
+      - text: "ST1005: error strings should not be capitalized"  # Docker error message is OK
+        linters:
+          - staticcheck
+
 issues:
-  exclude-rules:
-    # Разрешить длинные строки в тестах
-    - path: _test\.go
-      linters:
-        - lll
-    
-    # Игнорировать некоторые ошибки в vendor
-    - path: vendor/
-      linters:
-        - all
-  
-  # Не показывать эти конкретные ошибки
-  exclude:
-    - "ST1005: error strings should not be capitalized"  # Docker error message is OK
-    
   max-same-issues: 0  # Показывать все найденные проблемы
