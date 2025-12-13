@@ -29,6 +29,8 @@ func (a *Agent) HandleCommand(ctx context.Context, command *protocol.Message) (*
 	switch command.Type {
 	case protocol.TypeGetCPUTemp:
 		return a.handleTemperatureCommand(ctx, command, response)
+	case protocol.TypeGetMemoryInfo:
+		return a.handleMemoryCommand(ctx, command, response)
 	case protocol.TypeGetSystemInfo:
 		return a.handleMemoryCommand(ctx, command, response)
 	case protocol.TypeGetDiskInfo:
@@ -79,7 +81,7 @@ func (a *Agent) handleMemoryCommand(ctx context.Context, command *protocol.Messa
 		return response, nil
 	}
 
-	response.Type = protocol.TypeSystemInfoResponse
+	response.Type = protocol.TypeMemoryInfoResponse
 	response.Payload = memInfo
 
 	return response, nil
@@ -97,7 +99,9 @@ func (a *Agent) handleDiskCommand(ctx context.Context, command *protocol.Message
 	}
 
 	response.Type = protocol.TypeDiskInfoResponse
-	response.Payload = diskInfo
+	response.Payload = map[string]interface{}{
+		"disks": diskInfo.Disks,
+	}
 
 	return response, nil
 }
@@ -115,9 +119,9 @@ func (a *Agent) handleUptimeCommand(ctx context.Context, command *protocol.Messa
 
 	response.Type = protocol.TypeUptimeResponse
 	response.Payload = map[string]interface{}{
-		"uptime_seconds":   uptime.Uptime,
-		"uptime_formatted": formatUptime(int64(uptime.Uptime)),
-		"timestamp":        time.Now().Unix(),
+		"uptime":    uptime.Uptime,
+		"boot_time": uptime.BootTime,
+		"formatted": formatUptime(int64(uptime.Uptime)),
 	}
 
 	return response, nil
@@ -148,8 +152,7 @@ func (a *Agent) handleContainersCommand(ctx context.Context, command *protocol.M
 	response.Type = protocol.TypeContainersResponse
 	response.Payload = map[string]interface{}{
 		"containers": containers.Containers,
-		"count":      len(containers.Containers),
-		"timestamp":  time.Now().Unix(),
+		"total":      len(containers.Containers),
 	}
 
 	return response, nil
