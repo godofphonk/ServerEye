@@ -13,13 +13,13 @@ import (
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		
+
 		// Create response writer wrapper to capture status code
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-		
+
 		// Process request
 		next.ServeHTTP(wrapped, r)
-		
+
 		// Log after processing
 		duration := time.Since(start)
 		s.logger.WithFields(logrus.Fields{
@@ -51,12 +51,39 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Get client IP
+		clientIP := r.RemoteAddr
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			clientIP = strings.Split(forwarded, ",")[0]
+		}
+
+		// Check rate limit (10 requests per minute for register-key, 100 per minute for others)
+		var limit int
+		if strings.Contains(r.URL.Path, "/api/register-key") {
+			limit = 10
+		} else {
+			limit = 100
+		}
+
+		limiter := NewRateLimiter(limit, time.Minute)
+		if !limiter.Allow(clientIP) {
+			s.logger.WithField("ip", clientIP).Warn("Rate limit exceeded")
+			s.writeError(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip auth for health endpoints and WebSocket
-		if strings.HasPrefix(r.URL.Path, "/api/v1/health") || 
-		   strings.HasPrefix(r.URL.Path, "/ws") ||
-		   strings.HasPrefix(r.URL.Path, "/api/v1/metrics") && r.Method == "GET" {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/health") ||
+			strings.HasPrefix(r.URL.Path, "/ws") ||
+			strings.HasPrefix(r.URL.Path, "/api/v1/metrics") && r.Method == "GET" {
 			next.ServeHTTP(w, r)
 			return
 		}
