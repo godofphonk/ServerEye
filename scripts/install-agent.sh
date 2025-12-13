@@ -339,6 +339,10 @@ api:
   base_url: "$SERVEREYE_API_URL"
   timeout: "30s"
 
+# Disable Kafka for external deployments
+kafka:
+  enabled: false
+
 metrics:
   cpu_temperature: true
   interval: "30s"
