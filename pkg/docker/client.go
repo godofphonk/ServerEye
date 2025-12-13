@@ -40,7 +40,7 @@ func (c *Client) GetContainers(ctx context.Context) (*protocol.ContainersPayload
 
 	// Check if Docker is available
 	if err := c.checkDockerAvailable(); err != nil {
-		return nil, fmt.Errorf("Docker not available: %v", err)
+		return nil, fmt.Errorf("docker not available: %v", err)
 	}
 
 	// Execute docker ps command with JSON format

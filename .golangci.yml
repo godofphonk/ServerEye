@@ -1,5 +1,6 @@
 # Конфигурация golangci-lint
 # Это как "правила проверки" для твоего кода
+version: "2"
 
 run:
   timeout: 5m  # Максимальное время работы
@@ -8,18 +9,16 @@ run:
 # Какие линтеры включить?
 linters:
   enable:
-    - gofmt         # Проверка форматирования
     - govet         # Поиск подозрительных конструкций
-    - errcheck      # Проверка обработки ошибок
     - staticcheck   # Множество проверок
     - unused        # Неиспользуемый код
-    - gosimple      # Упрощение кода
     - ineffassign   # Неэффективные присваивания
-    - typecheck     # Проверка типов
     - misspell      # Опечатки в комментариях
     - gocyclo       # Сложность функций
     # - dupl        # Дублирование кода (отключено - для pet project OK)
-    - gosec         # Security issues
+  disable:
+    - errcheck      # Запускается отдельно в CI
+    - gosec         # Запускается отдельно в CI
 
 # Настройки для конкретных линтеров
 linters-settings:
@@ -31,6 +30,21 @@ linters-settings:
   
   errcheck:
     check-blank: false  # Разрешить игнорировать ошибки через _
+    exclude-functions:
+      - os.Remove
+      - (*os.File).Close
+      - (*http.Response).Body.Close
+      - (*os.File).Chmod
+      - (*github.com/go-redis/redis/v9).PubSub.Close
+      - (*github.com/segmentio/kafka-go).Writer.Close
+  
+  gosec:
+    excludes:
+      - G301  # Expect directory permissions to be 0750 or less
+      - G302  # Expect file permissions to be 0600 or less
+      - G304  # Potential file inclusion via variable
+      - G115  # integer overflow conversion
+      - G204  # Subprocess launched with variable
 
 # Какие файлы/папки пропустить?
 issues:
@@ -47,13 +61,6 @@ issues:
   
   # Не показывать эти конкретные ошибки
   exclude:
-    - "G104: Errors unhandled"  # Иногда можно игнорировать ошибки
-    - "G115: integer overflow conversion"  # We use safe bounds checking where needed
-    - "Error return value of `a.sendResponse` is not checked"  # В panic handler это OK
-    - "Error return value of `\\(\\*encoding/json.Encoder\\).Encode` is not checked"  # JSON encoding errors handled at HTTP level
-    - "Error return value of `tx.Rollback` is not checked"  # Rollback in defer is OK
-    - "Error return value of `b.Stop` is not checked"  # Shutdown already logged
-    - "Error return value of `rows.Scan` is not checked"  # Database query errors handled separately
-    - "Error return value of `\\(\\*database/sql.Row\\).Scan` is not checked"  # Scan errors handled at query level
+    - "ST1005: error strings should not be capitalized"  # Docker error message is OK
     
   max-same-issues: 0  # Показывать все найденные проблемы

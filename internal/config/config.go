@@ -75,6 +75,9 @@ func LoadAgentConfig(filepath string) (*AgentConfig, error) {
 		return nil, fmt.Errorf("не удалось парсить конфигурацию: %v", err)
 	}
 
+	// Debug: Print loaded Kafka brokers
+	fmt.Printf("DEBUG: Loaded Kafka brokers: %v\n", config.Kafka.Brokers)
+
 	// Валидация конфигурации
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("некорректная конфигурация: %v", err)

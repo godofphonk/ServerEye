@@ -163,6 +163,16 @@ func (c *CommandConsumer) consumeMessage(ctx context.Context) error {
 	return nil
 }
 
+// SendResponse публичный метод для отправки response в Kafka
+func (c *CommandConsumer) SendResponse(ctx context.Context, commandID string, response *protocol.Message) error {
+	// Убедимся, что ID ответа совпадает с ID команды
+	if response.ID != commandID {
+		response.ID = commandID
+	}
+
+	return c.sendResponse(ctx, response)
+}
+
 // sendResponse отправляет response в общий топик servereye.responses
 func (c *CommandConsumer) sendResponse(ctx context.Context, response *protocol.Message) error {
 	// Создаем writer для ответов в общий топик
