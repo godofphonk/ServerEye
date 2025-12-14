@@ -67,8 +67,8 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 			limit = 100
 		}
 
-		limiter := NewRateLimiter(limit, time.Minute)
-		if !limiter.Allow(clientIP) {
+		limiter := NewRateLimiter(limit, 20, s.logger)
+		if !limiter.allow(clientIP) {
 			s.logger.WithField("ip", clientIP).Warn("Rate limit exceeded")
 			s.writeError(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			return
