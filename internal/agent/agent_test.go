@@ -9,16 +9,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func TestNew_DirectRedis(t *testing.T) {
-	t.Skip("Skipping test that requires Redis connection")
-
+func TestNew_KafkaRequired(t *testing.T) {
 	cfg := &config.AgentConfig{
 		Server: config.ServerConfig{
 			Name:      "test-server",
 			SecretKey: "test-key-123",
 		},
-		Redis: config.RedisConfig{
-			Address: "localhost:6379",
+		Kafka: config.KafkaConfig{
+			Enabled: true,
+			Brokers: []string{"localhost:9092"},
 		},
 	}
 
@@ -135,9 +134,6 @@ func TestAgentStop(t *testing.T) {
 		Server: config.ServerConfig{
 			Name:      "test-server",
 			SecretKey: "test-key",
-		},
-		Redis: config.RedisConfig{
-			Address: "localhost:6379",
 		},
 	}
 

@@ -10,7 +10,6 @@ import (
 // AgentConfig конфигурация агента
 type AgentConfig struct {
 	Server  ServerConfig  `yaml:"server"`
-	Redis   RedisConfig   `yaml:"redis,omitempty"`
 	API     APIConfig     `yaml:"api,omitempty"`
 	Kafka   KafkaConfig   `yaml:"kafka,omitempty"`
 	Metrics MetricsConfig `yaml:"metrics"`
@@ -22,13 +21,6 @@ type ServerConfig struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 	SecretKey   string `yaml:"secret_key"`
-}
-
-// RedisConfig конфигурация Redis
-type RedisConfig struct {
-	Address  string `yaml:"address"`
-	Password string `yaml:"password"`
-	DB       int    `yaml:"db"`
 }
 
 // APIConfig конфигурация HTTP API
@@ -95,9 +87,9 @@ func (c *AgentConfig) validate() error {
 		return fmt.Errorf("секретный ключ не может быть пустым")
 	}
 
-	// Проверяем, что есть либо Redis, либо HTTP API конфигурация
-	if c.Redis.Address == "" && c.API.BaseURL == "" {
-		return fmt.Errorf("должен быть указан либо адрес Redis, либо базовый URL API")
+	// Проверяем, что есть либо Kafka, либо HTTP API конфигурация
+	if !c.Kafka.Enabled && c.API.BaseURL == "" {
+		return fmt.Errorf("должен быть включен Kafka либо указан базовый URL API")
 	}
 
 	return nil

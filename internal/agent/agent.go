@@ -11,38 +11,20 @@ import (
 	"github.com/servereye/servereye/pkg/metrics"
 	"github.com/servereye/servereye/pkg/protocol"
 	"github.com/servereye/servereye/pkg/publisher"
-	"github.com/servereye/servereye/pkg/redis"
-	"github.com/servereye/servereye/pkg/redis/streams"
 	"github.com/sirupsen/logrus"
 )
-
-// RedisClientInterface общий интерфейс для Redis клиентов
-type RedisClientInterface interface {
-	Subscribe(ctx context.Context, channel string) (SubscriptionInterface, error)
-	Publish(ctx context.Context, channel string, message []byte) error
-	Close() error
-}
-
-// SubscriptionInterface общий интерфейс для подписок
-type SubscriptionInterface interface {
-	Channel() <-chan []byte
-	Close() error
-}
 
 // Agent представляет агент ServerEye
 type Agent struct {
 	config          *config.AgentConfig
 	logger          *logrus.Logger
-	redisClient     RedisClientInterface
-	streamsClient   streams.StreamClient   // NEW: for Streams support
-	metricPublisher publisher.Publisher    // NEW: unified publisher (может быть multi-publisher)
-	commandConsumer *kafka.CommandConsumer // NEW: Kafka consumer for commands
+	metricPublisher publisher.Publisher    // unified publisher
+	commandConsumer *kafka.CommandConsumer // Kafka consumer for commands
 	cpuMetrics      *metrics.CPUMetrics
 	systemMonitor   *metrics.SystemMonitor
 	dockerClient    *docker.Client
 	ctx             context.Context
 	cancel          context.CancelFunc
-	useStreams      bool // Flag to use Streams instead of Pub/Sub
 	useKafka        bool // Flag to use Kafka for commands
 
 	// updateFunc allows mocking performUpdate in tests
@@ -92,10 +74,9 @@ func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (
 		logger.Info("Kafka publisher инициализирован")
 	}
 
-	// Если нет publishers, возвращаем nil (агент работает только через Redis Streams)
+	// Если нет publishers, возвращаем ошибку (требуется Kafka)
 	if len(publishers) == 0 {
-		logger.Info("Metric publishers не настроены, используется только Redis Streams")
-		return nil, nil
+		return nil, fmt.Errorf("не настроен ни один publisher (требуется Kafka)")
 	}
 
 	// Если один publisher, возвращаем его напрямую
@@ -113,51 +94,7 @@ func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (
 
 // New создает новый агент
 func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
-	var redisClient RedisClientInterface
-
-	// Выбираем тип клиента на основе конфигурации
-	if cfg.API.BaseURL != "" {
-		// Используем HTTP клиент
-		timeout := 30 * time.Second
-		if cfg.API.Timeout != "" {
-			if parsedTimeout, err := time.ParseDuration(cfg.API.Timeout); err == nil {
-				timeout = parsedTimeout
-			}
-		}
-
-		httpClient, err := redis.NewHTTPClient(redis.HTTPConfig{
-			BaseURL: cfg.API.BaseURL,
-			Timeout: timeout,
-		}, logger)
-		if err != nil {
-			return nil, fmt.Errorf("не удалось создать HTTP клиент: %v", err)
-		}
-		redisClient = &HTTPClientAdapter{client: httpClient}
-		logger.Info("Используется HTTP клиент для связи с сервером")
-	} else {
-		// Используем прямой Redis клиент
-		directClient, err := redis.NewClient(redis.Config{
-			Address:  cfg.Redis.Address,
-			Password: cfg.Redis.Password,
-			DB:       cfg.Redis.DB,
-		}, logger)
-		if err != nil {
-			return nil, fmt.Errorf("не удалось создать Redis клиент: %v", err)
-		}
-		redisClient = &DirectClientAdapter{client: directClient}
-		logger.Info("Используется прямой Redis клиент")
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Initialize Streams client if using HTTP API
-	var streamsClient streams.StreamClient
-	var useStreams bool
-	if cfg.API.BaseURL != "" {
-		streamsClient = streams.NewHTTPStreamClient(cfg.API.BaseURL, logger)
-		useStreams = true
-		logger.Info("Streams support enabled via HTTP API")
-	}
 
 	// Initialize metric publisher(s)
 	metricPublisher, err := initializeMetricPublisher(cfg, logger)
@@ -203,11 +140,8 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 	return &Agent{
 		config:          cfg,
 		logger:          logger,
-		redisClient:     redisClient,
-		streamsClient:   streamsClient,
 		metricPublisher: metricPublisher,
 		commandConsumer: commandConsumer,
-		useStreams:      useStreams,
 		useKafka:        useKafka,
 		cpuMetrics:      metrics.NewCPUMetrics(),
 		systemMonitor:   metrics.NewSystemMonitor(logger),
@@ -231,15 +165,7 @@ func (a *Agent) Start() error {
 			return fmt.Errorf("не удалось запустить Kafka consumer: %v", err)
 		}
 	} else {
-		// Fallback to Pub/Sub
-		a.logger.Info("Starting with Pub/Sub mode")
-		cmdChannel := redis.GetCommandChannel(a.config.Server.SecretKey)
-		msgChan, err := a.redisClient.Subscribe(a.ctx, cmdChannel)
-		if err != nil {
-			return fmt.Errorf("не удалось подписаться на канал команд: %v", err)
-		}
-		a.logger.WithField("channel", cmdChannel).Info("Подписались на канал команд")
-		go a.handleCommands(msgChan.Channel())
+		return fmt.Errorf("Kafka не настроен - требуется для работы агента")
 	}
 
 	// Запускаем heartbeat
@@ -266,7 +192,14 @@ func (a *Agent) Stop() error {
 		}
 	}
 
-	return a.redisClient.Close()
+	// Закрываем Kafka consumer
+	if a.commandConsumer != nil {
+		if err := a.commandConsumer.Close(); err != nil {
+			a.logger.WithError(err).Error("Ошибка при закрытии Kafka consumer")
+		}
+	}
+
+	return nil
 }
 
 // handleCommands обрабатывает входящие команды
@@ -381,71 +314,3 @@ func (a *Agent) processCommand(data []byte) {
 // - update.go: Agent update functionality
 // - heartbeat.go: Heartbeat functionality
 // - helpers.go: Utility functions (ping, sendResponse, etc.)
-
-// HTTPClientAdapter адаптер для HTTP клиента
-type HTTPClientAdapter struct {
-	client *redis.HTTPClient
-}
-
-func (h *HTTPClientAdapter) Subscribe(ctx context.Context, channel string) (SubscriptionInterface, error) {
-	sub, err := h.client.Subscribe(ctx, channel)
-	if err != nil {
-		return nil, err
-	}
-	return &HTTPSubscriptionAdapter{sub: sub}, nil
-}
-
-func (h *HTTPClientAdapter) Publish(ctx context.Context, channel string, message []byte) error {
-	return h.client.Publish(ctx, channel, message)
-}
-
-func (h *HTTPClientAdapter) Close() error {
-	return h.client.Close()
-}
-
-// HTTPSubscriptionAdapter адаптер для HTTP подписки
-type HTTPSubscriptionAdapter struct {
-	sub *redis.HTTPSubscription
-}
-
-func (h *HTTPSubscriptionAdapter) Channel() <-chan []byte {
-	return h.sub.Channel()
-}
-
-func (h *HTTPSubscriptionAdapter) Close() error {
-	return h.sub.Close()
-}
-
-// DirectClientAdapter адаптер для прямого Redis клиента
-type DirectClientAdapter struct {
-	client *redis.Client
-}
-
-func (d *DirectClientAdapter) Subscribe(ctx context.Context, channel string) (SubscriptionInterface, error) {
-	sub, err := d.client.Subscribe(ctx, channel)
-	if err != nil {
-		return nil, err
-	}
-	return &DirectSubscriptionAdapter{sub: sub}, nil
-}
-
-func (d *DirectClientAdapter) Publish(ctx context.Context, channel string, message []byte) error {
-	return d.client.Publish(ctx, channel, message)
-}
-
-func (d *DirectClientAdapter) Close() error {
-	return d.client.Close()
-}
-
-// DirectSubscriptionAdapter адаптер для прямой Redis подписки
-type DirectSubscriptionAdapter struct {
-	sub *redis.Subscription
-}
-
-func (d *DirectSubscriptionAdapter) Channel() <-chan []byte {
-	return d.sub.Channel()
-}
-
-func (d *DirectSubscriptionAdapter) Close() error {
-	return d.sub.Close()
-}

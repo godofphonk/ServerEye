@@ -155,9 +155,6 @@ func TestAgentNew_Success(t *testing.T) {
 			Name:      "test-server",
 			SecretKey: "test-key",
 		},
-		Redis: config.RedisConfig{
-			Address: "localhost:6379",
-		},
 	}
 
 	logger := logrus.New()

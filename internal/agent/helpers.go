@@ -2,10 +2,8 @@ package agent
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/servereye/servereye/pkg/protocol"
-	"github.com/servereye/servereye/pkg/redis"
 )
 
 // handlePing обрабатывает ping команду
@@ -32,47 +30,22 @@ func (a *Agent) handleUnknownCommand(msg *protocol.Message) *protocol.Message {
 	return response
 }
 
-// sendResponse отправляет ответ в канал ответов (legacy Pub/Sub)
+// sendResponse отправляет ответ через Kafka
 func (a *Agent) sendResponse(msg *protocol.Message) error {
-	data, err := msg.ToJSON()
-	if err != nil {
-		return fmt.Errorf("не удалось сериализовать ответ: %w", err)
+	// В Kafka-only архитектуре ответы отправляются через commandConsumer
+	if a.useKafka && a.commandConsumer != nil {
+		return a.commandConsumer.SendResponse(a.ctx, msg.ID, msg)
 	}
 
-	respChannel := redis.GetResponseChannel(a.config.Server.SecretKey)
-	return a.redisClient.Publish(a.ctx, respChannel, data)
+	return fmt.Errorf("Kafka не доступен для отправки ответа")
 }
 
-// sendResponseToCommand отправляет ответ в Stream или Pub/Sub
+// sendResponseToCommand отправляет ответ через Kafka
 func (a *Agent) sendResponseToCommand(msg *protocol.Message, commandID string) error {
-	data, err := msg.ToJSON()
-	if err != nil {
-		return fmt.Errorf("не удалось сериализовать ответ: %w", err)
+	// В Kafka-only архитектуре ответы отправляются через commandConsumer
+	if a.useKafka && a.commandConsumer != nil {
+		return a.commandConsumer.SendResponse(a.ctx, commandID, msg)
 	}
 
-	// Use Streams if available
-	if a.useStreams && a.streamsClient != nil {
-		respStream := fmt.Sprintf("stream:resp:%s", a.config.Server.SecretKey)
-
-		values := map[string]string{
-			"type":       string(msg.Type),
-			"id":         msg.ID,
-			"command_id": commandID,
-			"payload":    string(data),
-			"timestamp":  time.Now().Format(time.RFC3339),
-		}
-
-		if _, err := a.streamsClient.AddMessage(a.ctx, respStream, values); err != nil {
-			a.logger.WithError(err).Error("Failed to send via Streams")
-			return err
-		}
-
-		a.logger.WithField("stream", respStream).Debug("Response sent via Streams")
-		return nil
-	}
-
-	// Fallback to Pub/Sub
-	respChannel := fmt.Sprintf("resp:%s:%s", a.config.Server.SecretKey, commandID)
-	a.logger.WithField("response_channel", respChannel).Debug("Отправка ответа в уникальный канал")
-	return a.redisClient.Publish(a.ctx, respChannel, data)
+	return fmt.Errorf("Kafka не доступен для отправки ответа")
 }

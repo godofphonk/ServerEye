@@ -217,14 +217,11 @@ func TestAgent_Initialization(t *testing.T) {
 			},
 		},
 		{
-			name: "with Redis config",
+			name: "without Redis config",
 			config: &config.AgentConfig{
 				Server: config.ServerConfig{
 					Name:      "test",
 					SecretKey: "key",
-				},
-				Redis: config.RedisConfig{
-					Address: "localhost:6379",
 				},
 			},
 		},

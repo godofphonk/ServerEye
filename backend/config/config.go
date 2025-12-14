@@ -17,9 +17,6 @@ type Config struct {
 	// Database
 	DatabaseURL string
 
-	// Redis (for cache)
-	RedisURL string
-
 	// Kafka
 	KafkaBrokers []string
 	KafkaGroupID string
@@ -44,7 +41,6 @@ func Load() (*Config, error) {
 		Port: getEnvInt("PORT", 8080),
 
 		DatabaseURL: getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/servereye?sslmode=disable"),
-		RedisURL:    getEnv("REDIS_URL", "redis://localhost:6379"),
 
 		KafkaBrokers: getEnvSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
 		KafkaGroupID: getEnv("KAFKA_GROUP_ID", "servereye-backend"),

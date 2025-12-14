@@ -138,14 +138,11 @@ func TestAgentConfigValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid config with Redis",
+			name: "valid config without Redis",
 			config: AgentConfig{
 				Server: ServerConfig{
 					Name:      "TestServer",
 					SecretKey: "srv_test123",
-				},
-				Redis: RedisConfig{
-					Address: "localhost:6379",
 				},
 			},
 			wantErr: false,
@@ -195,4 +192,3 @@ func TestAgentConfigValidation(t *testing.T) {
 		})
 	}
 }
-

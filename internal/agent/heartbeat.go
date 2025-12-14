@@ -31,8 +31,8 @@ func (a *Agent) sendHeartbeat() {
 	// Check if Web API base URL is configured
 	webAPIURL := a.config.API.BaseURL
 	if webAPIURL == "" {
-		// Fallback to Redis if Web API not configured
-		a.sendHeartbeatRedis()
+		// In Kafka-only mode, we don't send heartbeat via Redis
+		a.logger.Warn("Heartbeat skipped: Web API not configured and Redis removed")
 		return
 	}
 
@@ -67,26 +67,5 @@ func (a *Agent) sendHeartbeat() {
 
 	if resp.StatusCode != http.StatusOK {
 		a.logger.WithField("status", resp.StatusCode).Warn("Heartbeat вернул не-OK статус")
-	}
-}
-
-// sendHeartbeatRedis отправляет heartbeat в Redis (legacy/fallback)
-func (a *Agent) sendHeartbeatRedis() {
-	heartbeat := map[string]interface{}{
-		"server_key":  a.config.Server.SecretKey,
-		"server_name": a.config.Server.Name,
-		"timestamp":   time.Now(),
-		"status":      "online",
-	}
-
-	data, err := json.Marshal(heartbeat)
-	if err != nil {
-		a.logger.WithError(err).Error("Не удалось сериализовать heartbeat")
-		return
-	}
-
-	heartbeatChannel := fmt.Sprintf("heartbeat:%s", a.config.Server.SecretKey)
-	if err := a.redisClient.Publish(a.ctx, heartbeatChannel, data); err != nil {
-		a.logger.WithError(err).Error("Не удалось отправить heartbeat")
 	}
 }

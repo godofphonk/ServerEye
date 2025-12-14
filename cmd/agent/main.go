@@ -158,11 +158,6 @@ func handleInstall() error {
   description: "ServerEye monitored server"
   secret_key: "%s"
 
-redis:
-  address: "localhost:6379"
-  password: ""
-  db: 0
-
 kafka:
   enabled: true
   brokers:
