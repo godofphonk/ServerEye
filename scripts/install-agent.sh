@@ -23,7 +23,7 @@ SERVEREYE_API_URL="${SERVEREYE_API_URL:-$DEFAULT_API_URL}"
 
 # Worker API configuration
 USE_WORKER_API="${USE_WORKER_API:-true}"  # Use Cloudflare Worker by default
-AGENT_INSTALLER_KEY="${AGENT_INSTALLER_KEY:-}"
+AGENT_INSTALLER_KEY="${AGENT_INSTALLER_KEY:-301210}"
 
 ensure_api_env() {
     # Load existing env file if present
