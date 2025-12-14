@@ -521,6 +521,13 @@ if systemctl is-active --quiet servereye-agent; then
         echo "  - Enable: sudo systemctl enable servereye-agent"
         echo "  - Disable: sudo systemctl disable servereye-agent"
         echo ""
+        echo "Complete uninstallation:"
+        echo "  sudo systemctl stop servereye-agent"
+        echo "  sudo systemctl disable servereye-agent"
+        echo "  sudo rm -f /etc/systemd/system/servereye-agent.service"
+        echo "  sudo systemctl daemon-reload"
+        echo "  sudo rm -rf /opt/servereye /etc/servereye /var/log/servereye"
+        echo ""
         echo "Installation complete!"
     fi
 else
