@@ -42,6 +42,66 @@ type KeyRegistrationResponse struct {
 	SecretKey string `json:"secret_key"`
 }
 
+type InternalWebhookRequest struct {
+	SecretKey    string `json:"secret_key"`
+	AgentVersion string `json:"agent_version"`
+	OSInfo       string `json:"os_info"`
+	Hostname     string `json:"hostname"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+func (s *Server) handleInternalWebhook(w http.ResponseWriter, r *http.Request) {
+	// Verify webhook secret
+	webhookSecret := r.Header.Get("X-Webhook-Secret")
+	if webhookSecret != s.config.WebhookSecret {
+		s.writeError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req InternalWebhookRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if req.SecretKey == "" {
+		s.writeError(w, "secret_key is required", http.StatusBadRequest)
+		return
+	}
+
+	// Set defaults
+	if req.AgentVersion == "" {
+		req.AgentVersion = "unknown"
+	}
+	if req.OSInfo == "" {
+		req.OSInfo = "unknown"
+	}
+	if req.Hostname == "" {
+		req.Hostname = "unknown"
+	}
+	if req.Status == "" {
+		req.Status = "generated"
+	}
+
+	// Insert into database
+	if err := s.storage.InsertGeneratedKey(r.Context(), req.SecretKey, req.AgentVersion, req.OSInfo, req.Hostname); err != nil {
+		s.logger.WithError(err).WithField("secret_key", req.SecretKey).Error("Failed to insert key from webhook")
+		s.writeError(w, "Failed to store key", http.StatusInternalServerError)
+		return
+	}
+
+	s.logger.WithField("secret_key", req.SecretKey).Info("Key synced from D1 webhook")
+	
+	response := KeyRegistrationResponse{
+		Status:    "ok",
+		SecretKey: req.SecretKey,
+	}
+	s.writeJSON(w, response)
+}
+
 func (s *Server) handleGetMetrics(w http.ResponseWriter, r *http.Request) {
 	// Get query parameters
 	from := r.URL.Query().Get("from")

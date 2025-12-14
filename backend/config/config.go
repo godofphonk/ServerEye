@@ -28,7 +28,8 @@ type Config struct {
 	MetricsTopic string
 
 	// Security
-	JWTSecret string
+	JWTSecret     string
+	WebhookSecret string
 
 	// Telegram
 	TelegramBotToken string
@@ -39,8 +40,8 @@ type Config struct {
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		Host:    getEnv("HOST", "0.0.0.0"),
-		Port:    getEnvInt("PORT", 8080),
+		Host: getEnv("HOST", "0.0.0.0"),
+		Port: getEnvInt("PORT", 8080),
 
 		DatabaseURL: getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/servereye?sslmode=disable"),
 		RedisURL:    getEnv("REDIS_URL", "redis://localhost:6379"),
@@ -50,10 +51,11 @@ func Load() (*Config, error) {
 
 		MetricsTopic: getEnv("METRICS_TOPIC", "metrics"),
 
-		JWTSecret: getEnv("JWT_SECRET", "change-me-in-production"),
+		JWTSecret:     getEnv("JWT_SECRET", "change-me-in-production"),
+		WebhookSecret: getEnv("WEBHOOK_SECRET", "change-me-in-production"),
 
 		TelegramBotToken: getEnv("TELEGRAM_BOT_TOKEN", ""),
-		WebURL:          getEnv("WEB_URL", "http://localhost:3000"),
+		WebURL:           getEnv("WEB_URL", "http://localhost:3000"),
 	}
 
 	// Validate required fields
