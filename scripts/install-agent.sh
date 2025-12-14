@@ -18,7 +18,7 @@ DEFAULT_SECRET_ENDPOINT="https://servereye-secret-endpoint.servereye.workers.dev
 AGENT_SECRET_ENDPOINT="${SERVEREYE_SECRET_ENDPOINT:-$DEFAULT_SECRET_ENDPOINT}"
 AGENT_INSTALLER_KEY="${SERVEREYE_INSTALLER_KEY:-}"
 AGENT_SECRET_TOKEN="${SERVEREYE_SECRET_TOKEN:-}"
-DEFAULT_API_URL="https://api.servereye.dev"
+DEFAULT_API_URL="https://servereye-registration-worker.servereye.workers.dev"
 SERVEREYE_API_URL="${SERVEREYE_API_URL:-$DEFAULT_API_URL}"
 
 # Worker API configuration
