@@ -1,0 +1,15 @@
+{
+  "name": "servereye-secret-endpoint",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "publish": "npm run deploy"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "wrangler": "4.54.0"
+  }
+}
