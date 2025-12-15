@@ -26,6 +26,7 @@ type ServerConfig struct {
 // APIConfig конфигурация HTTP API
 type APIConfig struct {
 	BaseURL string `yaml:"base_url"`
+	APIKey  string `yaml:"api_key"`
 	Timeout string `yaml:"timeout,omitempty"`
 }
 
@@ -66,9 +67,6 @@ func LoadAgentConfig(filepath string) (*AgentConfig, error) {
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("не удалось парсить конфигурацию: %v", err)
 	}
-
-	// Debug: Print loaded Kafka brokers
-	fmt.Printf("DEBUG: Loaded Kafka brokers: %v\n", config.Kafka.Brokers)
 
 	// Валидация конфигурации
 	if err := config.validate(); err != nil {

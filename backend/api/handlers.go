@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/servereye/servereye-backend/types"
+	"github.com/servereye/servereye/pkg/publisher"
 )
 
 type MetricsResponse struct {
-	ServerID string             `json:"server_id"`
-	Metrics  []*types.Metric    `json:"metrics"`
-	Count    int                `json:"count"`
-	From     time.Time          `json:"from,omitempty"`
-	To       time.Time          `json:"to,omitempty"`
+	ServerID string              `json:"server_id"`
+	Metrics  []*publisher.Metric `json:"metrics"`
+	Count    int                 `json:"count"`
+	From     time.Time           `json:"from,omitempty"`
+	To       time.Time           `json:"to,omitempty"`
 }
 
 type ErrorResponse struct {
@@ -94,7 +94,7 @@ func (s *Server) handleInternalWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logger.WithField("secret_key", req.SecretKey).Info("Key synced from D1 webhook")
-	
+
 	response := KeyRegistrationResponse{
 		Status:    "ok",
 		SecretKey: req.SecretKey,
@@ -134,7 +134,7 @@ func (s *Server) handleGetMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get metrics
-	var metrics []*types.Metric
+	var metrics []*publisher.Metric
 	if serverID != "" {
 		metrics, err = s.storage.GetMetricsHistory(r.Context(), serverID, metricType, fromTime, toTime)
 	} else {
@@ -375,7 +375,7 @@ func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
 func (s *Server) writeError(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	
+
 	response := ErrorResponse{
 		Error:   message,
 		Code:    code,

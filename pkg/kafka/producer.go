@@ -104,6 +104,13 @@ func (p *Producer) Publish(ctx context.Context, metric *publisher.Metric) error 
 	// Определяем топик на основе типа метрики
 	topic := p.getTopicName(metric.Type)
 
+	// Log the actual topic and brokers being used
+	p.logger.WithFields(map[string]interface{}{
+		"topic":     topic,
+		"brokers":   p.config.Brokers,
+		"server_id": metric.ServerID,
+	}).Info("Publishing metric to Kafka")
+
 	// Сериализуем метрику в JSON
 	value, err := json.Marshal(metric)
 	if err != nil {
@@ -127,6 +134,17 @@ func (p *Producer) Publish(ctx context.Context, metric *publisher.Metric) error 
 	// Отправляем сообщение
 	start := time.Now()
 	err = p.writer.WriteMessages(ctx, msg)
+
+	// Log the result of WriteMessages
+	if err != nil {
+		p.logger.WithError(err).WithField("topic", topic).Error("Failed to write message to Kafka")
+	} else {
+		p.logger.WithFields(map[string]interface{}{
+			"topic":       topic,
+			"duration_ms": time.Since(start).Milliseconds(),
+		}).Info("Message written to Kafka successfully")
+	}
+
 	if err != nil {
 		p.logger.WithFields(logrus.Fields{
 			"topic":       topic,

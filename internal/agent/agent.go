@@ -3,10 +3,12 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/servereye/servereye/internal/config"
 	"github.com/servereye/servereye/pkg/docker"
+	"github.com/servereye/servereye/pkg/http"
 	"github.com/servereye/servereye/pkg/kafka"
 	"github.com/servereye/servereye/pkg/metrics"
 	"github.com/servereye/servereye/pkg/protocol"
@@ -36,6 +38,25 @@ type Agent struct {
 // initializeMetricPublisher создает publisher на основе конфигурации
 func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (publisher.Publisher, error) {
 	var publishers []publisher.Publisher
+
+	// HTTP publisher (если настроен)
+	if cfg.API.BaseURL != "" {
+		timeout := 30
+		if cfg.API.Timeout != "" {
+			if t, err := strconv.Atoi(cfg.API.Timeout); err == nil {
+				timeout = t
+			}
+		}
+
+		httpConfig := http.Config{
+			BaseURL: cfg.API.BaseURL,
+			APIKey:  cfg.API.APIKey,
+			Timeout: timeout,
+		}
+
+		httpClient := http.New(httpConfig, logger)
+		publishers = append(publishers, httpClient)
+	}
 
 	// Kafka publisher (если включен)
 	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
@@ -165,14 +186,15 @@ func (a *Agent) Start() error {
 			return fmt.Errorf("не удалось запустить Kafka consumer: %v", err)
 		}
 	} else {
-		return fmt.Errorf("Kafka не настроен - требуется для работы агента")
+		a.logger.Warn("Command consumer disabled - Kafka not configured")
 	}
 
 	// Запускаем heartbeat
 	go a.startHeartbeat()
 
-	// Запускаем сборщик метрик если Kafka включен
-	if a.config.Kafka.Enabled && a.metricPublisher != nil {
+	// Запускаем сборщик метрик если есть publisher
+	if a.metricPublisher != nil {
+		a.logger.Info("Starting metrics collection")
 		go a.startMetricsCollection()
 		go a.startTerminalHandler()
 	}

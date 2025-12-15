@@ -6,15 +6,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	_ "github.com/lib/pq"
-	"github.com/servereye/servereye-backend/types"
+	"github.com/sirupsen/logrus"
 )
 
 type Storage interface {
-	StoreMetric(ctx context.Context, metric *types.Metric) error
-	GetLatestMetrics(ctx context.Context, serverID string) ([]*types.Metric, error)
-	GetMetricsHistory(ctx context.Context, serverID string, metricType string, from, to time.Time) ([]*types.Metric, error)
+	StoreMetric(ctx context.Context, metric *publisher.Metric) error
+	GetLatestMetrics(ctx context.Context, serverID string) ([]*publisher.Metric, error)
+	GetMetricsHistory(ctx context.Context, serverID string, metricType string, from, to time.Time) ([]*publisher.Metric, error)
 	GetServers(ctx context.Context) ([]string, error)
 	StoreDLQMessage(ctx context.Context, topic string, partition int, offset int64, message []byte, errorMsg string) error
 	InsertGeneratedKey(ctx context.Context, secretKey, agentVersion, osInfo, hostname string) error
@@ -123,29 +122,29 @@ func (s *PostgresStorage) InsertGeneratedKey(ctx context.Context, secretKey, age
 	}
 
 	s.logger.WithFields(logrus.Fields{
-		"secret_key":     secretKey,
-		"agent_version":  agentVersion,
-		"os_info":        osInfo,
-		"hostname":       hostname,
+		"secret_key":    secretKey,
+		"agent_version": agentVersion,
+		"os_info":       osInfo,
+		"hostname":      hostname,
 	}).Info("Generated key inserted successfully")
 
 	return nil
 }
 
 // Stub implementations for other methods
-func (s *PostgresStorage) StoreMetric(ctx context.Context, metric *types.Metric) error {
+func (s *PostgresStorage) StoreMetric(ctx context.Context, metric *publisher.Metric) error {
 	s.logger.Warn("StoreMetric called but not implemented")
 	return nil
 }
 
-func (s *PostgresStorage) GetLatestMetrics(ctx context.Context, serverID string) ([]*types.Metric, error) {
+func (s *PostgresStorage) GetLatestMetrics(ctx context.Context, serverID string) ([]*publisher.Metric, error) {
 	s.logger.Warn("GetLatestMetrics called but not implemented")
-	return []*types.Metric{}, nil
+	return []*publisher.Metric{}, nil
 }
 
-func (s *PostgresStorage) GetMetricsHistory(ctx context.Context, serverID string, metricType string, from, to time.Time) ([]*types.Metric, error) {
+func (s *PostgresStorage) GetMetricsHistory(ctx context.Context, serverID string, metricType string, from, to time.Time) ([]*publisher.Metric, error) {
 	s.logger.Warn("GetMetricsHistory called but not implemented")
-	return []*types.Metric{}, nil
+	return []*publisher.Metric{}, nil
 }
 
 func (s *PostgresStorage) GetServers(ctx context.Context) ([]string, error) {

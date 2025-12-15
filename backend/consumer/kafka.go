@@ -8,19 +8,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/servereye/servereye-backend/config"
-	"github.com/servereye/servereye-backend/storage"
-	"github.com/servereye/servereye-backend/types"
 	"github.com/segmentio/kafka-go"
+	"github.com/servereye/servereye/backend/internal/config"
+	"github.com/servereye/servereye/backend/internal/storage"
 	"github.com/sirupsen/logrus"
 )
 
 type KafkaConsumer struct {
-	config   config.ConsumerConfig
-	reader   *kafka.Reader
-	storage  storage.Storage
-	logger   *logrus.Logger
-	health   *HealthChecker
+	config  config.ConsumerConfig
+	reader  *kafka.Reader
+	storage storage.Storage
+	logger  *logrus.Logger
+	health  *HealthChecker
 
 	// Control
 	ctx    context.Context
@@ -50,17 +49,17 @@ func New(cfg *config.Config, storage storage.Storage, logger *logrus.Logger) (*K
 
 	// Create reader with explicit topic configuration
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:          consumerConfig.Brokers,
-		GroupID:          consumerConfig.GroupID,
-		Topic:            consumerConfig.Topic,
-		MinBytes:         10e3, // 10KB
-		MaxBytes:         10e6, // 10MB
-		CommitInterval:   consumerConfig.CommitInterval,
-		StartOffset:      consumerConfig.StartOffset,
-		MaxWait:          consumerConfig.BatchTimeout,
-		ReadBackoffMin:   100 * time.Millisecond,
-		ReadBackoffMax:   1 * time.Second,
-		RebalanceTimeout: consumerConfig.RebalanceTimeout,
+		Brokers:               consumerConfig.Brokers,
+		GroupID:               consumerConfig.GroupID,
+		Topic:                 consumerConfig.Topic,
+		MinBytes:              10e3, // 10KB
+		MaxBytes:              10e6, // 10MB
+		CommitInterval:        consumerConfig.CommitInterval,
+		StartOffset:           consumerConfig.StartOffset,
+		MaxWait:               consumerConfig.BatchTimeout,
+		ReadBackoffMin:        100 * time.Millisecond,
+		ReadBackoffMax:        1 * time.Second,
+		RebalanceTimeout:      consumerConfig.RebalanceTimeout,
 		WatchPartitionChanges: true,
 	})
 
@@ -164,12 +163,12 @@ func (c *KafkaConsumer) processBatch(batch []kafka.Message) {
 				"partition": msg.Partition,
 				"error":     err,
 			}).Error("Failed to process message")
-			
+
 			// Store in DLQ for failed messages
 			if dlqErr := c.storage.StoreDLQMessage(c.ctx, c.config.Topic, int(msg.Partition), msg.Offset, msg.Value, err.Error()); dlqErr != nil {
 				c.logger.WithError(dlqErr).Error("Failed to store message in DLQ")
 			}
-			
+
 			c.metrics.MessagesFailed++
 		} else {
 			successCount++
@@ -188,14 +187,14 @@ func (c *KafkaConsumer) processBatch(batch []kafka.Message) {
 	c.metrics.ProcessingTime = time.Since(start)
 
 	c.logger.WithFields(logrus.Fields{
-		"batch_size":     len(batch),
-		"success_count":  successCount,
-		"processing_ms":  c.metrics.ProcessingTime.Milliseconds(),
+		"batch_size":    len(batch),
+		"success_count": successCount,
+		"processing_ms": c.metrics.ProcessingTime.Milliseconds(),
 	}).Debug("Processed batch")
 }
 
 func (c *KafkaConsumer) processMessage(msg kafka.Message) error {
-	var metric types.Metric
+	var metric publisher.Metric
 	if err := json.Unmarshal(msg.Value, &metric); err != nil {
 		return fmt.Errorf("failed to unmarshal metric: %w", err)
 	}
@@ -227,7 +226,7 @@ func (c *KafkaConsumer) ensureTopics() error {
 		return fmt.Errorf("failed to get controller: %w", err)
 	}
 
-	controllerConn, err := kafka.Dial("tcp", controller.Host + ":" + strconv.Itoa(controller.Port))
+	controllerConn, err := kafka.Dial("tcp", controller.Host+":"+strconv.Itoa(controller.Port))
 	if err != nil {
 		return fmt.Errorf("failed to connect to controller: %w", err)
 	}

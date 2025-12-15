@@ -16,8 +16,11 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Change to backend directory for build
+WORKDIR /app/backend
+
 # Build binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o servereye-backend ./backend
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/servereye-backend ./main-prod.go
 
 # Final stage
 FROM alpine:latest
@@ -43,7 +46,7 @@ USER servereye
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/api/v1/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Expose port
 EXPOSE 8080

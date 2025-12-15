@@ -35,11 +35,37 @@ func (a *Agent) startMetricsCollection() {
 func (a *Agent) collectAndSendMetrics() {
 	a.logger.Info("collectAndSendMetrics() called - starting metrics collection")
 
+	// Debug: выводим конфигурацию метрик
+	a.logger.WithFields(map[string]interface{}{
+		"CPUUsage":       a.config.Metrics.CPUUsage,
+		"MemoryUsage":    a.config.Metrics.MemoryUsage,
+		"DiskUsage":      a.config.Metrics.DiskUsage,
+		"CPUTemperature": a.config.Metrics.CPUTemperature,
+		"Interval":       a.config.Metrics.Interval,
+	}).Info("Metrics configuration loaded")
+
+	// Debug: проверяем metricPublisher
+	if a.metricPublisher == nil {
+		a.logger.Error("metricPublisher is nil - cannot publish metrics")
+		return
+	}
+
+	a.logger.Info("metricPublisher is available, proceeding with metrics collection")
+
 	// CPU Temperature (if enabled and cpuMetrics available)
 	if a.config.Metrics.CPUTemperature && a.cpuMetrics != nil {
+		a.logger.Info("Attempting to collect CPU temperature")
 		if temp, err := a.cpuMetrics.GetTemperature(); err == nil {
+			a.logger.WithField("temperature", temp).Info("CPU temperature collected")
 			a.sendMetric("cpu_temperature", temp, "°C")
+		} else {
+			a.logger.WithError(err).Error("Failed to get CPU temperature")
 		}
+	} else {
+		a.logger.WithFields(map[string]interface{}{
+			"enabled":    a.config.Metrics.CPUTemperature,
+			"cpuMetrics": a.cpuMetrics != nil,
+		}).Info("CPU temperature collection skipped")
 	}
 
 	// Memory метрики (if enabled and systemMonitor available)
@@ -124,6 +150,7 @@ func (a *Agent) collectAndSendMetrics() {
 // sendMetric отправляет метрику в Kafka
 func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 	if a.metricPublisher == nil {
+		a.logger.Error("metricPublisher is nil - cannot send metric")
 		return
 	}
 
@@ -133,9 +160,17 @@ func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 
 	metric := a.CreateMetricFromData(metricType, value, tags)
 
+	// Log the actual topic and metric data before publishing
+	a.logger.WithFields(map[string]interface{}{
+		"type":       metric.Type,
+		"server_id":  metric.ServerID,
+		"server_key": metric.ServerKey,
+		"value":      metric.Value,
+	}).Info("Publishing metric to Kafka")
+
 	if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
 		a.logger.WithError(err).WithField("type", metricType).Error("Failed to send metric")
 	} else {
-		a.logger.WithField("type", metricType).Debug("Metric sent successfully")
+		a.logger.WithField("type", metricType).Info("Metric sent successfully")
 	}
 }

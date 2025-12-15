@@ -7,10 +7,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/servereye/servereye-backend/api"
-	"github.com/servereye/servereye-backend/config"
-	"github.com/servereye/servereye-backend/consumer"
-	"github.com/servereye/servereye-backend/storage"
+	"github.com/servereye/servereye/backend/internal/api"
+	"github.com/servereye/servereye/backend/internal/config"
+	"github.com/servereye/servereye/backend/internal/consumer"
+	"github.com/servereye/servereye/backend/internal/storage"
 	"github.com/sirupsen/logrus"
 )
 
@@ -32,7 +32,30 @@ func main() {
 	defer storage.Close()
 
 	// Initialize API server
-	apiServer := api.New(cfg, storage, logger)
+	apiServer, err := api.New(&api.Config{
+		Server: struct {
+			Host string
+			Port string
+		}{
+			Host: "0.0.0.0",
+			Port: "8080",
+		},
+		Kafka: struct {
+			Brokers     []string
+			TopicPrefix string
+		}{
+			Brokers:     cfg.Kafka.Brokers,
+			TopicPrefix: cfg.Kafka.TopicPrefix,
+		},
+		Auth: struct {
+			APIKey string
+		}{
+			APIKey: cfg.Auth.APIKey,
+		},
+	}, logger)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize API server")
+	}
 
 	// Initialize Kafka consumer
 	kafkaConsumer, err := consumer.New(cfg, storage, logger)

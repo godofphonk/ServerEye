@@ -43,7 +43,7 @@ func Load() (*Config, error) {
 		DatabaseURL: getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/servereye?sslmode=disable"),
 
 		KafkaBrokers: getEnvSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
-		KafkaGroupID: getEnv("KAFKA_GROUP_ID", "servereye-backend"),
+		KafkaGroupID: getEnv("KAFKA_GROUP_ID", "servereye"),
 
 		MetricsTopic: getEnv("METRICS_TOPIC", "metrics"),
 
