@@ -1,8 +1,6 @@
 package agent
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -36,27 +34,13 @@ func (a *Agent) sendHeartbeat() {
 		return
 	}
 
-	heartbeat := map[string]interface{}{
-		"server_id": "d20f50f2-a311-4d02-9c22-18567031dead",
-		"api_key":   a.config.Server.SecretKey,
-		"status":    "online",
-	}
-
-	data, err := json.Marshal(heartbeat)
-	if err != nil {
-		a.logger.WithError(err).Error("Не удалось сериализовать heartbeat")
-		return
-	}
-
 	// Send to Web API
-	url := fmt.Sprintf("%s/api/v1/servers/heartbeat", webAPIURL)
-	req, err := http.NewRequestWithContext(a.ctx, "POST", url, bytes.NewBuffer(data))
+	url := fmt.Sprintf("%s/health", webAPIURL)
+	req, err := http.NewRequestWithContext(a.ctx, "GET", url, nil)
 	if err != nil {
 		a.logger.WithError(err).Error("Не удалось создать heartbeat запрос")
 		return
 	}
-
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
