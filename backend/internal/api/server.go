@@ -157,6 +157,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip auth for health endpoints
+		if r.URL.Path == "/health" || r.URL.Path == "/health/kafka" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		apiKey := r.Header.Get("X-API-Key")
 		if apiKey != s.config.Auth.APIKey {
 			s.writeError(w, http.StatusUnauthorized, "Unauthorized", "Invalid API key")
