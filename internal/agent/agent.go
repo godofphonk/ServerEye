@@ -37,10 +37,16 @@ type Agent struct {
 
 // initializeMetricPublisher создает publisher на основе конфигурации
 func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (publisher.Publisher, error) {
+	// Определяем режим publisher
+	publisherMode := cfg.PublisherMode
+	if publisherMode == "" {
+		publisherMode = "hybrid" // По умолчанию hybrid для обратной совместимости
+	}
+
 	var publishers []publisher.Publisher
 
-	// HTTP publisher (если настроен)
-	if cfg.API.BaseURL != "" {
+	// HTTP publisher (если настроен и режим позволяет)
+	if cfg.API.BaseURL != "" && (publisherMode == "http" || publisherMode == "hybrid") {
 		timeout := 30
 		if cfg.API.Timeout != "" {
 			if t, err := strconv.Atoi(cfg.API.Timeout); err == nil {
@@ -58,8 +64,8 @@ func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (
 		publishers = append(publishers, httpClient)
 	}
 
-	// Kafka publisher (если включен)
-	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+	// Kafka publisher (если включен и режим позволяет)
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 && (publisherMode == "kafka" || publisherMode == "hybrid") {
 		kafkaConfig := kafka.Config{
 			Brokers:      cfg.Kafka.Brokers,
 			TopicPrefix:  cfg.Kafka.TopicPrefix,
@@ -71,7 +77,7 @@ func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (
 
 		// Установка дефолтных значений если не указаны
 		if kafkaConfig.TopicPrefix == "" {
-			kafkaConfig.TopicPrefix = "metrics" // Backward compatibility
+			kafkaConfig.TopicPrefix = "servereye" // Обновлено для worldwide
 		}
 		if kafkaConfig.Compression == "" {
 			kafkaConfig.Compression = "snappy"
@@ -88,16 +94,19 @@ func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (
 
 		kafkaPub, err := kafka.NewProducer(kafkaConfig, logger)
 		if err != nil {
-			return nil, fmt.Errorf("не удалось создать Kafka publisher: %w", err)
+			if publisherMode == "kafka" {
+				return nil, fmt.Errorf("не удалось создать Kafka publisher: %w", err)
+			}
+			logger.WithError(err).Warn("Failed to create Kafka publisher, using HTTP only")
+		} else {
+			publishers = append(publishers, kafkaPub)
+			logger.Info("Kafka publisher initialized")
 		}
-
-		publishers = append(publishers, kafkaPub)
-		logger.Info("Kafka publisher инициализирован")
 	}
 
-	// Если нет publishers, возвращаем ошибку (требуется Kafka)
+	// Проверяем результат
 	if len(publishers) == 0 {
-		return nil, fmt.Errorf("не настроен ни один publisher (требуется Kafka)")
+		return nil, fmt.Errorf("no publishers configured for mode: %s", publisherMode)
 	}
 
 	// Если один publisher, возвращаем его напрямую
@@ -105,12 +114,9 @@ func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (
 		return publishers[0], nil
 	}
 
-	// Если несколько publishers, создаем multi-publisher
-	// Используем FailIfPrimary - ошибка только если Kafka (первый) упадет
-	multiPub := publisher.NewMultiPublisher(publishers, publisher.FailIfPrimary, logger)
-	logger.WithField("count", len(publishers)).Info("Multi-publisher инициализирован")
-
-	return multiPub, nil
+	// Иначе создаем multi publisher для hybrid режима
+	logger.Info("Multi-publisher initialized for hybrid mode")
+	return publisher.NewMultiPublisher(publishers, publisher.FailIfAll, logger), nil
 }
 
 // New создает новый агент

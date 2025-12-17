@@ -9,11 +9,12 @@ import (
 
 // AgentConfig конфигурация агента
 type AgentConfig struct {
-	Server  ServerConfig  `yaml:"server"`
-	API     APIConfig     `yaml:"api,omitempty"`
-	Kafka   KafkaConfig   `yaml:"kafka,omitempty"`
-	Metrics MetricsConfig `yaml:"metrics"`
-	Logging LoggingConfig `yaml:"logging"`
+	Server        ServerConfig  `yaml:"server"`
+	API           APIConfig     `yaml:"api,omitempty"`
+	Kafka         KafkaConfig   `yaml:"kafka,omitempty"`
+	PublisherMode string        `yaml:"publisher_mode,omitempty"` // "http", "kafka", "hybrid"
+	Metrics       MetricsConfig `yaml:"metrics"`
+	Logging       LoggingConfig `yaml:"logging"`
 }
 
 // ServerConfig конфигурация сервера

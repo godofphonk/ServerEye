@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/servereye/servereye/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -44,8 +45,8 @@ func NewMultiPublisher(publishers []Publisher, strategy FailureStrategy, logger 
 	}
 }
 
-// Publish отправляет метрику во все publishers параллельно
-func (m *MultiPublisher) Publish(ctx context.Context, metric *Metric) error {
+// Publish отправляет метрику во все configured publishers
+func (m *MultiPublisher) Publish(ctx context.Context, metric *types.Metric) error {
 	if len(m.publishers) == 0 {
 		return fmt.Errorf("no publishers configured")
 	}
@@ -89,7 +90,7 @@ func (m *MultiPublisher) Publish(ctx context.Context, metric *Metric) error {
 }
 
 // PublishBatch отправляет пакет метрик во все publishers
-func (m *MultiPublisher) PublishBatch(ctx context.Context, metrics []*Metric) error {
+func (m *MultiPublisher) PublishBatch(ctx context.Context, metrics []*types.Metric) error {
 	if len(m.publishers) == 0 {
 		return fmt.Errorf("no publishers configured")
 	}

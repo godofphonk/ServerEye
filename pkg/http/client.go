@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/servereye/servereye/pkg/publisher"
+	"github.com/servereye/servereye/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,7 +37,7 @@ func New(cfg Config, logger *logrus.Logger) *Client {
 	}
 }
 
-func (c *Client) Publish(ctx context.Context, metric *publisher.Metric) error {
+func (c *Client) Publish(ctx context.Context, metric *types.Metric) error {
 	const maxRetries = 3
 	const baseDelay = 100 * time.Millisecond
 
@@ -72,7 +72,7 @@ func (c *Client) Publish(ctx context.Context, metric *publisher.Metric) error {
 	return fmt.Errorf("failed after %d retries", maxRetries)
 }
 
-func (c *Client) publishAttempt(ctx context.Context, metric *publisher.Metric) error {
+func (c *Client) publishAttempt(ctx context.Context, metric *types.Metric) error {
 	// Prepare request payload
 	payload := map[string]interface{}{
 		"server_id":  metric.ServerID,
@@ -133,7 +133,7 @@ func isClientError(err error) bool {
 		errStr[len(errStr)-1] >= '0' && errStr[len(errStr)-1] <= '9'
 }
 
-func (c *Client) PublishBatch(ctx context.Context, metrics []*publisher.Metric) error {
+func (c *Client) PublishBatch(ctx context.Context, metrics []*types.Metric) error {
 	// For simplicity, publish metrics one by one
 	// Could be optimized to send as batch if API supports it
 	for _, metric := range metrics {
