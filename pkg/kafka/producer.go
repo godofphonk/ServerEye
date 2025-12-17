@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/segmentio/kafka-go"
-	"github.com/servereye/servereye/pkg/publisher"
+	"github.com/servereye/servereye/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -100,7 +100,7 @@ func NewProducer(cfg Config, logger *logrus.Logger) (*Producer, error) {
 }
 
 // Publish отправляет метрику в Kafka
-func (p *Producer) Publish(ctx context.Context, metric *publisher.Metric) error {
+func (p *Producer) Publish(ctx context.Context, metric *types.Metric) error {
 	// Определяем топик на основе типа метрики
 	topic := p.getTopicName(metric.Type)
 
@@ -166,7 +166,7 @@ func (p *Producer) Publish(ctx context.Context, metric *publisher.Metric) error 
 }
 
 // PublishBatch отправляет пакет метрик
-func (p *Producer) PublishBatch(ctx context.Context, metrics []*publisher.Metric) error {
+func (p *Producer) PublishBatch(ctx context.Context, metrics []*types.Metric) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -229,7 +229,7 @@ func (p *Producer) Name() string {
 
 // getTopicName формирует имя топика
 func (p *Producer) getTopicName(metricType string) string {
-	return fmt.Sprintf("%s.%s", p.config.TopicPrefix, metricType)
+	return fmt.Sprintf("%s.metrics", p.config.TopicPrefix)
 }
 
 // Stats возвращает статистику Kafka producer
