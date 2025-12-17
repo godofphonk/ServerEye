@@ -50,6 +50,11 @@ func New(cfg *config.Config, storage storage.Storage, logger *logrus.Logger) *Se
 	return s
 }
 
+// GetWebSocketServer returns the WebSocket server instance
+func (s *Server) GetWebSocketServer() *WebSocketServer {
+	return s.wsServer
+}
+
 func (s *Server) setupRoutes() *mux.Router {
 	router := mux.NewRouter()
 
