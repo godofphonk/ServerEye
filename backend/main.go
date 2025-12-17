@@ -57,8 +57,8 @@ func main() {
 		logger.WithError(err).Fatal("Failed to initialize API server")
 	}
 
-	// Initialize Kafka consumer
-	kafkaConsumer, err := consumer.New(cfg, storage, logger)
+	// Initialize Kafka consumer with WebSocket server
+	kafkaConsumer, err := consumer.New(cfg, storage, apiServer.GetWebSocketServer(), logger)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Kafka consumer")
 	}
@@ -66,18 +66,18 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start consumer
-	if err := kafkaConsumer.Start(ctx); err != nil {
-		logger.WithError(err).Fatal("Failed to start Kafka consumer")
-	}
-
-	// Start API server
+	// Start consumer in goroutine
 	go func() {
-		if err := apiServer.Start(); err != nil {
-			logger.WithError(err).Error("API server error")
+		if err := kafkaConsumer.Start(ctx); err != nil {
+			logger.WithError(err).Error("Kafka consumer error")
 			cancel()
 		}
 	}()
+
+	// Start API server (blocking)
+	if err := apiServer.Start(); err != nil {
+		logger.WithError(err).Fatal("Failed to start API server")
+	}
 
 	// Graceful shutdown
 	sigChan := make(chan os.Signal, 1)

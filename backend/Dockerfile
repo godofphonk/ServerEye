@@ -20,7 +20,7 @@ COPY . .
 WORKDIR /app/backend
 
 # Build binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/servereye-backend ./main-prod.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/servereye-backend .
 
 # Final stage
 FROM alpine:latest

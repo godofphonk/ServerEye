@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/servereye/servereye/pkg/kafka"
 	"github.com/servereye/servereye/pkg/publisher"
 	"github.com/sirupsen/logrus"
@@ -18,6 +20,7 @@ type Server struct {
 	logger        *logrus.Logger
 	kafkaProducer *kafka.Producer
 	httpServer    *http.Server
+	wsServer      *WebSocketServer
 }
 
 type Config struct {
@@ -67,24 +70,31 @@ func New(cfg *Config, logger *logrus.Logger) (*Server, error) {
 		return nil, fmt.Errorf("failed to create Kafka producer: %w", err)
 	}
 
-	return &Server{
+	server := &Server{
 		config:        cfg,
 		logger:        logger,
 		kafkaProducer: kafkaProducer,
-	}, nil
+	}
+
+	// Initialize WebSocket server
+	server.wsServer = NewWebSocketServer(server, logger)
+
+	return server, nil
 }
 
 func (s *Server) Start() error {
 	router := mux.NewRouter()
 
-	// Metrics endpoint
-	router.HandleFunc("/v1/metrics", s.handleMetrics).Methods("POST")
-
-	// Health check
+	// Public endpoints (no auth required)
 	router.HandleFunc("/health", s.handleHealth).Methods("GET")
+	router.HandleFunc("/ws", s.wsServer.handleWebSocket)
 
-	// Add middleware
-	router.Use(s.authMiddleware)
+	// Protected endpoints
+	protected := router.PathPrefix("/v1").Subrouter()
+	protected.HandleFunc("/metrics", s.handleMetrics).Methods("POST")
+	protected.Use(s.authMiddleware)
+
+	// Global middleware
 	router.Use(s.loggingMiddleware)
 
 	addr := fmt.Sprintf("%s:%s", s.config.Server.Host, s.config.Server.Port)
@@ -193,4 +203,115 @@ func (s *Server) writeError(w http.ResponseWriter, status int, errorType, messag
 		Code:    status,
 		Message: message,
 	})
+}
+
+// WebSocket structures
+type WebSocketServer struct {
+	server   *Server
+	upgrader websocket.Upgrader
+	clients  map[*websocket.Conn]bool
+	clientsM sync.RWMutex
+	logger   *logrus.Logger
+}
+
+type WSMessage struct {
+	Type      string      `json:"type"`
+	Data      interface{} `json:"data"`
+	Timestamp time.Time   `json:"timestamp"`
+}
+
+// NewWebSocketServer creates a new WebSocket server
+func NewWebSocketServer(server *Server, logger *logrus.Logger) *WebSocketServer {
+	return &WebSocketServer{
+		server:  server,
+		clients: make(map[*websocket.Conn]bool),
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return true // Allow all origins for development
+			},
+		},
+		logger: logger,
+	}
+}
+
+// GetWebSocketServer returns the WebSocket server instance
+func (s *Server) GetWebSocketServer() *WebSocketServer {
+	return s.wsServer
+}
+
+// handleWebSocket handles WebSocket connections
+func (ws *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := ws.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		ws.logger.WithError(err).Error("Failed to upgrade WebSocket connection")
+		return
+	}
+	defer conn.Close()
+
+	// Add client
+	ws.clientsM.Lock()
+	ws.clients[conn] = true
+	ws.clientsM.Unlock()
+
+	defer func() {
+		ws.clientsM.Lock()
+		delete(ws.clients, conn)
+		ws.clientsM.Unlock()
+	}()
+
+	ws.logger.Info("WebSocket client connected")
+
+	// Send welcome message
+	welcome := WSMessage{
+		Type:      "welcome",
+		Data:      map[string]string{"status": "connected"},
+		Timestamp: time.Now(),
+	}
+	if err := conn.WriteJSON(welcome); err != nil {
+		ws.logger.WithError(err).Error("Failed to send welcome message")
+		return
+	}
+
+	// Keep connection alive and handle messages
+	for {
+		var msg WSMessage
+		if err := conn.ReadJSON(&msg); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				ws.logger.WithError(err).Error("WebSocket error")
+			}
+			break
+		}
+
+		// Handle subscription messages
+		if msg.Type == "subscribe" {
+			ws.handleSubscription(conn, msg)
+		}
+	}
+}
+
+// handleSubscription handles subscription messages from clients
+func (ws *WebSocketServer) handleSubscription(conn *websocket.Conn, msg WSMessage) {
+	// For now, just log subscription - can be extended later
+	ws.logger.WithField("data", msg.Data).Info("Client subscription received")
+}
+
+// BroadcastMetric sends metric to all connected WebSocket clients
+func (ws *WebSocketServer) BroadcastMetric(metric interface{}) {
+	ws.clientsM.RLock()
+	defer ws.clientsM.RUnlock()
+
+	message := WSMessage{
+		Type:      "metric",
+		Data:      metric,
+		Timestamp: time.Now(),
+	}
+
+	for conn := range ws.clients {
+		if err := conn.WriteJSON(message); err != nil {
+			ws.logger.WithError(err).Error("Failed to broadcast metric to WebSocket client")
+			// Remove client on error
+			delete(ws.clients, conn)
+			conn.Close()
+		}
+	}
 }
