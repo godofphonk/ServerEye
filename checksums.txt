@@ -1,0 +1,2 @@
+9c157bf5dc0f2801f94d63271b63870c11b81c757407f235c0e1b1b519a6e950  downloads/servereye-agent-linux-amd64
+2e70ab601cb0dea183e1be5153fd137a901245702cb4640ad2a32cfe60af316a  downloads/servereye-agent-linux-arm64

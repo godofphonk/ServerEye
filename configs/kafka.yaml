@@ -1,0 +1,49 @@
+# Kafka Configuration for ServerEye Worldwide
+
+# Confluent Cloud Settings
+kafka:
+  brokers:
+    - "pkc-xxxx.eastus.azure.confluent.cloud:9092"  # Update with your brokers
+  api_key: "YOUR_API_KEY"                              # Update with your API key
+  secret: "YOUR_SECRET"                                # Update with your secret
+  
+  # Topic Configuration
+  topics:
+    metrics: "servereye.metrics"
+    commands: "servereye.commands"
+    responses: "servereye.responses"
+  
+  # Producer Settings
+  producer:
+    compression: "snappy"
+    batch_size: 100
+    batch_timeout: "10ms"
+    max_attempts: 5
+    required_acks: 1
+    write_timeout: "10s"
+  
+  # Consumer Settings
+  consumer:
+    group_id: "servereye-backend"
+    batch_size: 10
+    batch_timeout: "1s"
+    commit_interval: "5s"
+    min_bytes: 10240    # 10KB
+    max_bytes: 1048576  # 1MB
+
+# Hybrid Publisher Settings
+publisher:
+  enable_kafka: true
+  fallback_delay: "2s"
+  max_retries: 3
+  
+  # HTTP Fallback
+  http:
+    url: "https://api.servereye.dev/v1/metrics"
+    api_key: "prod-api-key-2024-change-me"
+    timeout: "10s"
+
+# Logging
+logging:
+  level: "info"
+  format: "json"

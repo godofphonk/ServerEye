@@ -1,0 +1,37 @@
+# ServerEye Agent Hybrid Configuration
+# HTTP API for metrics + Kafka for commands
+
+# Server identification
+server:
+  name: "prod-server-001"
+  secret_key: "srv_91a1a72ea96869c28b595996a8c47e09"
+  
+# HTTP API Configuration (Primary for metrics)
+api:
+  base_url: "https://api.servereye.dev"
+  api_key: "prod-api-key-2024-change-me"
+  timeout: "30"
+  
+# Kafka Configuration (For commands from Telegram bot)
+kafka:
+  enabled: true
+  brokers:
+    - "192.168.0.104:9093"
+  topic_prefix: "metrics"
+  compression: "snappy"
+  max_attempts: 3
+  batch_size: 100
+  required_acks: 1
+  
+# Metrics collection
+metrics:
+  interval: "30s"
+  cpu_usage: true
+  memory_usage: true
+  disk_usage: true
+  cpu_temperature: true
+  
+# Logging
+logging:
+  level: "info"
+  file: "/var/log/servereye/agent.log"

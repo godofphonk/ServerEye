@@ -104,6 +104,13 @@ func (p *Producer) Publish(ctx context.Context, metric *types.Metric) error {
 	// Определяем топик на основе типа метрики
 	topic := p.getTopicName(metric.Type)
 
+	// Debug logging to verify getTopicName result
+	p.logger.WithFields(map[string]interface{}{
+		"metric_type":  metric.Type,
+		"topic_prefix": p.config.TopicPrefix,
+		"result_topic": topic,
+	}).Info("DEBUG: getTopicName result")
+
 	// Log the actual topic and brokers being used
 	p.logger.WithFields(map[string]interface{}{
 		"topic":     topic,
@@ -229,7 +236,13 @@ func (p *Producer) Name() string {
 
 // getTopicName формирует имя топика
 func (p *Producer) getTopicName(metricType string) string {
-	return fmt.Sprintf("%s.metrics", p.config.TopicPrefix)
+	topic := fmt.Sprintf("%s.metrics", p.config.TopicPrefix)
+	p.logger.WithFields(logrus.Fields{
+		"metric_type":  metricType,
+		"topic_prefix": p.config.TopicPrefix,
+		"result_topic": topic,
+	}).Debug("getTopicName called")
+	return topic
 }
 
 // Stats возвращает статистику Kafka producer
