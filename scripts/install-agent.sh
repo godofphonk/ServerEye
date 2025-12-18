@@ -177,6 +177,14 @@ for cmd in wget curl openssl systemctl sha256sum; do
     fi
 done
 
+# Check for netcat (optional, for Kafka auto-detection)
+if ! command -v nc &> /dev/null; then
+    echo "[INFO] netcat not found - Kafka auto-detection will be limited"
+    NETCAT_AVAILABLE=false
+else
+    NETCAT_AVAILABLE=true
+fi
+
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
    echo "[ERROR] This script must be run as root (use sudo)"
@@ -367,9 +375,42 @@ else
     SECRET_KEY=$(openssl rand -hex 16 | sed 's/^/srv_/')
     HOSTNAME=$(hostname)
 
+    # Auto-detect and configure Kafka for enterprise deployments
+detect_kafka_config() {
+    local kafka_brokers=""
+    local kafka_enabled="false"
+    
+    echo "[*] Configuring Kafka for enterprise deployment..."
+    
+    # 1. Check explicit environment variable (highest priority)
+    if [ -n "$SERVEREYE_KAFKA_BROKERS" ]; then
+        kafka_brokers="$SERVEREYE_KAFKA_BROKERS"
+        kafka_enabled="true"
+        echo "[OK] Using Kafka brokers from environment: $kafka_brokers"
+    # 2. Use hardcoded enterprise Kafka server for worldwide deployment
+    else
+        # Default to central enterprise Kafka server
+        local server_ip=$(hostname -I | awk '{print $1}')
+        kafka_brokers="192.168.0.104:9093"
+        kafka_enabled="true"
+        echo "[OK] Using enterprise Kafka server: $kafka_brokers"
+        echo "[INFO] Override with SERVEREYE_KAFKA_BROKERS if needed"
+    fi
+    
+    # Export for later use
+    export KAFKA_BROKERS="$kafka_brokers"
+    export KAFKA_ENABLED="$kafka_enabled"
+}
+
+# Detect Kafka configuration early
+detect_kafka_config
+
     # Create configuration file
     echo "[*] Creating configuration..."
-    cat > "$CONFIG_DIR/config.yaml" << EOF
+    
+    # Build Kafka configuration section
+    if [ "$KAFKA_ENABLED" = "true" ]; then
+        cat > "$CONFIG_DIR/config.yaml" << EOF
 server:
   name: "$HOSTNAME"
   description: "ServerEye monitored server"
@@ -379,7 +420,38 @@ api:
   base_url: "$SERVEREYE_API_URL"
   timeout: "30s"
 
-# Disable Kafka for external deployments
+# Enable Kafka for command processing and metrics
+kafka:
+  enabled: true
+  brokers:
+    - "$KAFKA_BROKERS"
+  topic_prefix: "servereye"
+  compression: "snappy"
+  max_attempts: 3
+  batch_size: 100
+  required_acks: 1
+
+metrics:
+  cpu_temperature: true
+  interval: "30s"
+
+logging:
+  level: "info"
+  file: "$LOG_DIR/agent.log"
+EOF
+        echo "[OK] Kafka auto-configured with broker: $KAFKA_BROKERS"
+    else
+        cat > "$CONFIG_DIR/config.yaml" << EOF
+server:
+  name: "$HOSTNAME"
+  description: "ServerEye monitored server"
+  secret_key: "$SECRET_KEY"
+
+api:
+  base_url: "$SERVEREYE_API_URL"
+  timeout: "30s"
+
+# Kafka not detected - disabled for external deployments
 kafka:
   enabled: false
 
@@ -391,6 +463,8 @@ logging:
   level: "info"
   file: "$LOG_DIR/agent.log"
 EOF
+        echo "[INFO] Kafka not detected - command processing disabled"
+    fi
 
     chown root:$AGENT_USER "$CONFIG_DIR/config.yaml"
     chmod 640 "$CONFIG_DIR/config.yaml"
