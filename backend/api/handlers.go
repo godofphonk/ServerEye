@@ -83,7 +83,7 @@ func (s *Server) handleInternalWebhook(w http.ResponseWriter, r *http.Request) {
 		req.Hostname = "unknown"
 	}
 	if req.Status == "" {
-		req.Status = "generated"
+		req.Status = "active"
 	}
 
 	// Insert into database

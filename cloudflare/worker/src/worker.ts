@@ -53,7 +53,7 @@ export default {
     try {
       await env.REG_DB.prepare(
         `INSERT INTO generated_keys (secret_key, agent_version, os_info, hostname, status)
-         VALUES (?1, ?2, ?3, ?4, 'generated')
+         VALUES (?1, ?2, ?3, ?4, 'active')
          ON CONFLICT(secret_key) DO UPDATE SET
             agent_version = excluded.agent_version,
             os_info = excluded.os_info,
@@ -82,7 +82,7 @@ export default {
               agent_version: normalizedPayload.agent_version,
               os_info: normalizedPayload.os_info,
               hostname: normalizedPayload.hostname,
-              status: "generated",
+              status: "active",
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             }),

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/servereye/servereye/pkg/publisher"
 	"github.com/sirupsen/logrus"
 )
 
@@ -112,7 +113,7 @@ func (s *PostgresStorage) initSchema() error {
 func (s *PostgresStorage) InsertGeneratedKey(ctx context.Context, secretKey, agentVersion, osInfo, hostname string) error {
 	query := `
 		INSERT INTO generated_keys (secret_key, agent_version, os_info, hostname, status)
-		VALUES ($1, $2, $3, $4, 'generated')
+		VALUES ($1, $2, $3, $4, 'active')
 		ON CONFLICT (secret_key) DO NOTHING
 	`
 
