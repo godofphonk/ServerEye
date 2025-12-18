@@ -380,21 +380,46 @@ detect_kafka_config() {
     local kafka_brokers=""
     local kafka_enabled="false"
     
-    echo "[*] Configuring Kafka for enterprise deployment..."
+    echo "[*] Configuring Kafka for worldwide deployment..."
     
-    # 1. Check explicit environment variable (highest priority)
+    # 1. Check explicit environment variable (required for worldwide deployment)
     if [ -n "$SERVEREYE_KAFKA_BROKERS" ]; then
         kafka_brokers="$SERVEREYE_KAFKA_BROKERS"
         kafka_enabled="true"
         echo "[OK] Using Kafka brokers from environment: $kafka_brokers"
-    # 2. Use hardcoded enterprise Kafka server for worldwide deployment
-    else
-        # Default to central enterprise Kafka server
-        local server_ip=$(hostname -I | awk '{print $1}')
-        kafka_brokers="192.168.0.104:9093"
+    # 2. Check for local development (localhost only)
+    elif nc -z localhost 9092 2>/dev/null; then
+        kafka_brokers="localhost:9092"
         kafka_enabled="true"
-        echo "[OK] Using enterprise Kafka server: $kafka_brokers"
-        echo "[INFO] Override with SERVEREYE_KAFKA_BROKERS if needed"
+        echo "[OK] Detected local Kafka for development: $kafka_brokers"
+        echo "[WARNING] For production deployment, use SERVEREYE_KAFKA_BROKERS"
+    # 3. No Kafka configured - require user input
+    else
+        if [ -t 0 ]; then
+            echo ""
+            echo "[ERROR] Kafka configuration required for worldwide deployment!"
+            echo ""
+            echo "For production deployment, please provide your Kafka broker:"
+            echo "  export SERVEREYE_KAFKA_BROKERS=kafka.yourcompany.com:9093"
+            echo "  wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash"
+            echo ""
+            echo "For local development only:"
+            echo "  Start Kafka on localhost:9092 and retry"
+            echo ""
+            read -r -p "Enter Kafka brokers (or press Enter to skip): " user_brokers
+            if [ -n "$user_brokers" ]; then
+                kafka_brokers="$user_brokers"
+                kafka_enabled="true"
+                echo "[OK] Using user-provided Kafka: $kafka_brokers"
+            else
+                kafka_enabled="false"
+                echo "[WARNING] Proceeding without Kafka - commands will not work"
+            fi
+        else
+            echo "[ERROR] SERVEREYE_KAFKA_BROKERS required for worldwide deployment"
+            echo "        Please set the environment variable and retry"
+            kafka_enabled="false"
+        fi
     fi
     
     # Export for later use
