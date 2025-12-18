@@ -382,44 +382,29 @@ detect_kafka_config() {
     
     echo "[*] Configuring Kafka for worldwide deployment..."
     
-    # 1. Check explicit environment variable (required for worldwide deployment)
+    # 1. Check explicit environment variable (for custom Kafka setups)
     if [ -n "$SERVEREYE_KAFKA_BROKERS" ]; then
         kafka_brokers="$SERVEREYE_KAFKA_BROKERS"
         kafka_enabled="true"
         echo "[OK] Using Kafka brokers from environment: $kafka_brokers"
-    # 2. Check for local development (localhost only)
+    # 2. Use public Kafka broker for worldwide deployment
+    elif curl -s -m 5 "https://api.servereye.dev/health" > /dev/null 2>&1; then
+        kafka_brokers="demo-upstash-kafka.upstash.io:9092"
+        kafka_enabled="true"
+        echo "[OK] Configured for worldwide deployment with public Kafka"
+        echo "[INFO] Using public broker: $kafka_brokers"
+    # 3. Check for local development (localhost only)
     elif nc -z localhost 9092 2>/dev/null; then
         kafka_brokers="localhost:9092"
         kafka_enabled="true"
         echo "[OK] Detected local Kafka for development: $kafka_brokers"
-        echo "[WARNING] For production deployment, use SERVEREYE_KAFKA_BROKERS"
-    # 3. No Kafka configured - require user input
+        echo "[WARNING] For production deployment, public Kafka will be used"
+    # 4. No configuration available - use localhost fallback
     else
-        if [ -t 0 ]; then
-            echo ""
-            echo "[ERROR] Kafka configuration required for worldwide deployment!"
-            echo ""
-            echo "For production deployment, please provide your Kafka broker:"
-            echo "  export SERVEREYE_KAFKA_BROKERS=kafka.yourcompany.com:9093"
-            echo "  wget -qO- https://raw.githubusercontent.com/godofphonk/ServerEye/master/scripts/install-agent.sh | sudo bash"
-            echo ""
-            echo "For local development only:"
-            echo "  Start Kafka on localhost:9092 and retry"
-            echo ""
-            read -r -p "Enter Kafka brokers (or press Enter to skip): " user_brokers
-            if [ -n "$user_brokers" ]; then
-                kafka_brokers="$user_brokers"
-                kafka_enabled="true"
-                echo "[OK] Using user-provided Kafka: $kafka_brokers"
-            else
-                kafka_enabled="false"
-                echo "[WARNING] Proceeding without Kafka - commands will not work"
-            fi
-        else
-            echo "[ERROR] SERVEREYE_KAFKA_BROKERS required for worldwide deployment"
-            echo "        Please set the environment variable and retry"
-            kafka_enabled="false"
-        fi
+        echo "[INFO] No Kafka detected - using localhost fallback"
+        kafka_brokers="localhost:9092"
+        kafka_enabled="true"
+        echo "[WARNING] Please start Kafka or configure SERVEREYE_KAFKA_BROKERS"
     fi
     
     # Export for later use
@@ -433,7 +418,7 @@ detect_kafka_config
     # Create configuration file
     echo "[*] Creating configuration..."
     
-    # Build Kafka configuration section
+    # Build configuration based on deployment type
     if [ "$KAFKA_ENABLED" = "true" ]; then
         cat > "$CONFIG_DIR/config.yaml" << EOF
 server:
@@ -445,7 +430,7 @@ api:
   base_url: "$SERVEREYE_API_URL"
   timeout: "30s"
 
-# Enable Kafka for command processing and metrics
+# Kafka enabled for worldwide command processing
 kafka:
   enabled: true
   brokers:
@@ -464,31 +449,10 @@ logging:
   level: "info"
   file: "$LOG_DIR/agent.log"
 EOF
-        echo "[OK] Kafka auto-configured with broker: $KAFKA_BROKERS"
+        echo "[OK] Kafka configured for worldwide deployment: $KAFKA_BROKERS"
     else
-        cat > "$CONFIG_DIR/config.yaml" << EOF
-server:
-  name: "$HOSTNAME"
-  description: "ServerEye monitored server"
-  secret_key: "$SECRET_KEY"
-
-api:
-  base_url: "$SERVEREYE_API_URL"
-  timeout: "30s"
-
-# Kafka not detected - disabled for external deployments
-kafka:
-  enabled: false
-
-metrics:
-  cpu_temperature: true
-  interval: "30s"
-
-logging:
-  level: "info"
-  file: "$LOG_DIR/agent.log"
-EOF
-        echo "[INFO] Kafka not detected - command processing disabled"
+        echo "[ERROR] Kafka configuration failed - please check connectivity"
+        exit 1
     fi
 
     chown root:$AGENT_USER "$CONFIG_DIR/config.yaml"
