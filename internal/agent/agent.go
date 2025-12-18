@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/servereye/servereye/internal/config"
+	"github.com/servereye/servereye/pkg/commands"
 	"github.com/servereye/servereye/pkg/docker"
 	"github.com/servereye/servereye/pkg/http"
 	"github.com/servereye/servereye/pkg/kafka"
@@ -18,16 +19,18 @@ import (
 
 // Agent представляет агент ServerEye
 type Agent struct {
-	config          *config.AgentConfig
-	logger          *logrus.Logger
-	metricPublisher publisher.Publisher    // unified publisher
-	commandConsumer *kafka.CommandConsumer // Kafka consumer for commands
-	cpuMetrics      *metrics.CPUMetrics
-	systemMonitor   *metrics.SystemMonitor
-	dockerClient    *docker.Client
-	ctx             context.Context
-	cancel          context.CancelFunc
-	useKafka        bool // Flag to use Kafka for commands
+	config              *config.AgentConfig
+	logger              *logrus.Logger
+	metricPublisher     publisher.Publisher           // unified publisher
+	commandConsumer     *kafka.CommandConsumer        // Kafka consumer for commands
+	httpCommandConsumer *commands.HTTPCommandConsumer // HTTP consumer for worldwide
+	cpuMetrics          *metrics.CPUMetrics
+	systemMonitor       *metrics.SystemMonitor
+	dockerClient        *docker.Client
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	useKafka            bool // Flag to use Kafka for commands
+	useHTTPCommands     bool // Flag to use HTTP for commands (worldwide mode)
 
 	// updateFunc allows mocking performUpdate in tests
 	updateFunc func(string) error
@@ -130,19 +133,22 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 		return nil, fmt.Errorf("не удалось инициализировать metric publisher: %v", err)
 	}
 
-	// Initialize Kafka command consumer if enabled
+	// Initialize command consumer (Kafka or HTTP)
 	var commandConsumer *kafka.CommandConsumer
-	var useKafka bool
-	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
-		// Создаем временный agent для consumer initialization
-		tempAgent := &Agent{
-			config:        cfg,
-			logger:        logger,
-			cpuMetrics:    metrics.NewCPUMetrics(),
-			systemMonitor: metrics.NewSystemMonitor(logger),
-			dockerClient:  docker.NewClient(logger),
-		}
+	var httpCommandConsumer *commands.HTTPCommandConsumer
+	var useKafka, useHTTPCommands bool
 
+	// Create temp agent for command handling
+	tempAgent := &Agent{
+		config:        cfg,
+		logger:        logger,
+		cpuMetrics:    metrics.NewCPUMetrics(),
+		systemMonitor: metrics.NewSystemMonitor(logger),
+		dockerClient:  docker.NewClient(logger),
+	}
+
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		// Use Kafka for commands (local/direct mode)
 		consumerConfig := kafka.CommandConsumerConfig{
 			Brokers:        cfg.Kafka.Brokers,
 			GroupID:        fmt.Sprintf("agent-new-%s", cfg.Server.SecretKey),
@@ -155,26 +161,45 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 
 		consumer, err := kafka.NewCommandConsumer(consumerConfig, tempAgent, logger)
 		if err != nil {
-			cancel() // Cleanup context
-			return nil, fmt.Errorf("не удалось создать Kafka consumer: %v", err)
+			logger.WithError(err).Warn("Failed to create Kafka consumer, trying HTTP mode")
+		} else {
+			commandConsumer = consumer
+			useKafka = true
+			logger.Info("Kafka command consumer initialized")
+		}
+	}
+
+	// If Kafka not available, use HTTP command polling (worldwide mode)
+	if !useKafka && cfg.API.BaseURL != "" {
+		httpConfig := commands.HTTPConsumerConfig{
+			APIURL:       cfg.API.BaseURL,
+			APIKey:       cfg.API.APIKey,
+			ServerKey:    cfg.Server.SecretKey,
+			PollInterval: 2 * time.Second,
 		}
 
-		commandConsumer = consumer
-		useKafka = true
-		logger.Info("Kafka command consumer initialized")
+		httpCommandConsumer = commands.NewHTTPCommandConsumer(httpConfig, tempAgent, logger)
+		useHTTPCommands = true
+		logger.Info("HTTP command consumer initialized (worldwide mode)")
+	}
+
+	if !useKafka && !useHTTPCommands {
+		logger.Warn("No command consumer available - commands will not work")
 	}
 
 	return &Agent{
-		config:          cfg,
-		logger:          logger,
-		metricPublisher: metricPublisher,
-		commandConsumer: commandConsumer,
-		useKafka:        useKafka,
-		cpuMetrics:      metrics.NewCPUMetrics(),
-		systemMonitor:   metrics.NewSystemMonitor(logger),
-		dockerClient:    docker.NewClient(logger),
-		ctx:             ctx,
-		cancel:          cancel,
+		config:              cfg,
+		logger:              logger,
+		metricPublisher:     metricPublisher,
+		commandConsumer:     commandConsumer,
+		httpCommandConsumer: httpCommandConsumer,
+		useKafka:            useKafka,
+		useHTTPCommands:     useHTTPCommands,
+		cpuMetrics:          metrics.NewCPUMetrics(),
+		systemMonitor:       metrics.NewSystemMonitor(logger),
+		dockerClient:        docker.NewClient(logger),
+		ctx:                 ctx,
+		cancel:              cancel,
 	}, nil
 }
 
@@ -185,14 +210,23 @@ func (a *Agent) Start() error {
 		"secret_key":  a.config.Server.SecretKey,
 	}).Info("Запуск агента ServerEye")
 
-	// Start Kafka consumer if enabled
+	// Start command consumer (Kafka or HTTP)
 	if a.useKafka && a.commandConsumer != nil {
-		a.logger.Info("Starting with Kafka mode")
-		if err := a.commandConsumer.Start(a.ctx); err != nil {
-			return fmt.Errorf("не удалось запустить Kafka consumer: %v", err)
-		}
+		a.logger.Info("Starting with Kafka command mode")
+		go func() {
+			if err := a.commandConsumer.Start(a.ctx); err != nil {
+				a.logger.WithError(err).Error("Kafka consumer failed")
+			}
+		}()
+	} else if a.useHTTPCommands && a.httpCommandConsumer != nil {
+		a.logger.Info("Starting with HTTP command mode (worldwide)")
+		go func() {
+			if err := a.httpCommandConsumer.Start(a.ctx); err != nil {
+				a.logger.WithError(err).Error("HTTP command consumer failed")
+			}
+		}()
 	} else {
-		a.logger.Warn("Command consumer disabled - Kafka not configured")
+		a.logger.Warn("No command consumer available - commands disabled")
 	}
 
 	// Запускаем heartbeat
@@ -224,6 +258,13 @@ func (a *Agent) Stop() error {
 	if a.commandConsumer != nil {
 		if err := a.commandConsumer.Close(); err != nil {
 			a.logger.WithError(err).Error("Ошибка при закрытии Kafka consumer")
+		}
+	}
+
+	// Закрываем HTTP command consumer
+	if a.httpCommandConsumer != nil {
+		if err := a.httpCommandConsumer.Close(); err != nil {
+			a.logger.WithError(err).Error("Ошибка при закрытии HTTP command consumer")
 		}
 	}
 

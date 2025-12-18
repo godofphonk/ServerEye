@@ -16,11 +16,15 @@ import (
 )
 
 type Server struct {
-	config        *Config
-	logger        *logrus.Logger
-	kafkaProducer *kafka.Producer
-	httpServer    *http.Server
-	wsServer      *WebSocketServer
+	config          *Config
+	logger          *logrus.Logger
+	kafkaProducer   *kafka.Producer
+	httpServer      *http.Server
+	wsServer        *WebSocketServer
+	pendingCommands map[string][]PendingCommand
+	pendingMutex    sync.RWMutex
+	responseChans   map[string]chan CommandResponse
+	responseMutex   sync.RWMutex
 }
 
 type Config struct {
@@ -52,6 +56,28 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+type CommandRequest struct {
+	ServerKey string                 `json:"server_key"`
+	Command   string                 `json:"command"`
+	Params    map[string]interface{} `json:"params,omitempty"`
+	RequestID string                 `json:"request_id"`
+}
+
+type CommandResponse struct {
+	RequestID string      `json:"request_id"`
+	ServerKey string      `json:"server_key"`
+	Success   bool        `json:"success"`
+	Data      interface{} `json:"data,omitempty"`
+	Error     string      `json:"error,omitempty"`
+}
+
+type PendingCommand struct {
+	ID        string                 `json:"id"`
+	Command   string                 `json:"command"`
+	Params    map[string]interface{} `json:"params,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
+}
+
 func New(cfg *Config, logger *logrus.Logger) (*Server, error) {
 	// Initialize Kafka producer
 	kafkaConfig := kafka.Config{
@@ -71,9 +97,11 @@ func New(cfg *Config, logger *logrus.Logger) (*Server, error) {
 	}
 
 	server := &Server{
-		config:        cfg,
-		logger:        logger,
-		kafkaProducer: kafkaProducer,
+		config:          cfg,
+		logger:          logger,
+		kafkaProducer:   kafkaProducer,
+		pendingCommands: make(map[string][]PendingCommand),
+		responseChans:   make(map[string]chan CommandResponse),
 	}
 
 	// Initialize WebSocket server
@@ -92,6 +120,9 @@ func (s *Server) Start() error {
 	// Protected endpoints
 	protected := router.PathPrefix("/v1").Subrouter()
 	protected.HandleFunc("/metrics", s.handleMetrics).Methods("POST")
+	protected.HandleFunc("/commands", s.handleSendCommand).Methods("POST")
+	protected.HandleFunc("/commands/{server_key}", s.handleGetCommands).Methods("GET")
+	protected.HandleFunc("/commands/{server_key}/response", s.handleCommandResponse).Methods("POST")
 	protected.Use(s.authMiddleware)
 
 	// Global middleware
@@ -203,6 +234,141 @@ func (s *Server) writeError(w http.ResponseWriter, status int, errorType, messag
 		Code:    status,
 		Message: message,
 	})
+}
+
+func (s *Server) handleSendCommand(w http.ResponseWriter, r *http.Request) {
+	var req CommandRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON", err.Error())
+		return
+	}
+
+	if req.ServerKey == "" || req.Command == "" {
+		s.writeError(w, http.StatusBadRequest, "Missing required fields", "server_key and command are required")
+		return
+	}
+
+	if req.RequestID == "" {
+		req.RequestID = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+
+	cmd := PendingCommand{
+		ID:        req.RequestID,
+		Command:   req.Command,
+		Params:    req.Params,
+		Timestamp: time.Now(),
+	}
+
+	s.pendingMutex.Lock()
+	s.pendingCommands[req.ServerKey] = append(s.pendingCommands[req.ServerKey], cmd)
+	s.pendingMutex.Unlock()
+
+	responseChan := make(chan CommandResponse, 1)
+	s.responseMutex.Lock()
+	s.responseChans[req.RequestID] = responseChan
+	s.responseMutex.Unlock()
+
+	s.logger.WithFields(logrus.Fields{
+		"server_key": req.ServerKey,
+		"command":    req.Command,
+		"request_id": req.RequestID,
+	}).Info("Command queued for agent")
+
+	select {
+	case resp := <-responseChan:
+		s.responseMutex.Lock()
+		delete(s.responseChans, req.RequestID)
+		s.responseMutex.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		if resp.Success {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		json.NewEncoder(w).Encode(resp)
+
+	case <-time.After(30 * time.Second):
+		s.responseMutex.Lock()
+		delete(s.responseChans, req.RequestID)
+		s.responseMutex.Unlock()
+
+		s.pendingMutex.Lock()
+		cmds := s.pendingCommands[req.ServerKey]
+		for i, c := range cmds {
+			if c.ID == req.RequestID {
+				s.pendingCommands[req.ServerKey] = append(cmds[:i], cmds[i+1:]...)
+				break
+			}
+		}
+		s.pendingMutex.Unlock()
+
+		s.writeError(w, http.StatusGatewayTimeout, "Timeout", "Agent did not respond in time")
+	}
+}
+
+func (s *Server) handleGetCommands(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	serverKey := vars["server_key"]
+
+	if serverKey == "" {
+		s.writeError(w, http.StatusBadRequest, "Missing server_key", "server_key is required")
+		return
+	}
+
+	s.pendingMutex.Lock()
+	commands := s.pendingCommands[serverKey]
+	s.pendingCommands[serverKey] = nil
+	s.pendingMutex.Unlock()
+
+	if commands == nil {
+		commands = []PendingCommand{}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"server_key": serverKey,
+		"count":      len(commands),
+	}).Debug("Commands fetched by agent")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"commands": commands,
+	})
+}
+
+func (s *Server) handleCommandResponse(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	serverKey := vars["server_key"]
+
+	var resp CommandResponse
+	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON", err.Error())
+		return
+	}
+
+	resp.ServerKey = serverKey
+
+	s.responseMutex.RLock()
+	responseChan, exists := s.responseChans[resp.RequestID]
+	s.responseMutex.RUnlock()
+
+	if exists {
+		select {
+		case responseChan <- resp:
+			s.logger.WithFields(logrus.Fields{
+				"server_key": serverKey,
+				"request_id": resp.RequestID,
+				"success":    resp.Success,
+			}).Info("Command response received")
+		default:
+			s.logger.Warn("Response channel full, dropping response")
+		}
+	} else {
+		s.logger.WithField("request_id", resp.RequestID).Warn("No waiting request for response")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "received"})
 }
 
 // WebSocket structures

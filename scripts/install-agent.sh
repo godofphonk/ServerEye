@@ -375,36 +375,32 @@ else
     SECRET_KEY=$(openssl rand -hex 16 | sed 's/^/srv_/')
     HOSTNAME=$(hostname)
 
-    # Auto-detect and configure Kafka for enterprise deployments
+    # Auto-detect and configure for worldwide or local deployment
 detect_kafka_config() {
     local kafka_brokers=""
     local kafka_enabled="false"
     
-    echo "[*] Configuring Kafka for worldwide deployment..."
+    echo "[*] Configuring deployment mode..."
     
     # 1. Check explicit environment variable (for custom Kafka setups)
     if [ -n "$SERVEREYE_KAFKA_BROKERS" ]; then
         kafka_brokers="$SERVEREYE_KAFKA_BROKERS"
         kafka_enabled="true"
         echo "[OK] Using Kafka brokers from environment: $kafka_brokers"
-    # 2. Use public Kafka broker for worldwide deployment
+    # 2. Worldwide mode - use HTTP commands via api.servereye.dev
     elif curl -s -m 5 "https://api.servereye.dev/health" > /dev/null 2>&1; then
-        kafka_brokers="demo-upstash-kafka.upstash.io:9092"
-        kafka_enabled="true"
-        echo "[OK] Configured for worldwide deployment with public Kafka"
-        echo "[INFO] Using public broker: $kafka_brokers"
-    # 3. Check for local development (localhost only)
+        kafka_enabled="false"
+        echo "[OK] Worldwide mode - using HTTP commands via api.servereye.dev"
+        echo "[INFO] Commands will be processed via backend API proxy"
+    # 3. Check for local Kafka development
     elif nc -z localhost 9092 2>/dev/null; then
         kafka_brokers="localhost:9092"
         kafka_enabled="true"
-        echo "[OK] Detected local Kafka for development: $kafka_brokers"
-        echo "[WARNING] For production deployment, public Kafka will be used"
-    # 4. No configuration available - use localhost fallback
+        echo "[OK] Local mode - detected Kafka on localhost:9092"
+    # 4. No configuration available - use HTTP fallback
     else
-        echo "[INFO] No Kafka detected - using localhost fallback"
-        kafka_brokers="localhost:9092"
-        kafka_enabled="true"
-        echo "[WARNING] Please start Kafka or configure SERVEREYE_KAFKA_BROKERS"
+        kafka_enabled="false"
+        echo "[INFO] No Kafka detected - using HTTP command mode"
     fi
     
     # Export for later use
@@ -430,7 +426,7 @@ api:
   base_url: "$SERVEREYE_API_URL"
   timeout: "30s"
 
-# Kafka enabled for worldwide command processing
+# Kafka enabled for local/direct command processing
 kafka:
   enabled: true
   brokers:
@@ -449,10 +445,32 @@ logging:
   level: "info"
   file: "$LOG_DIR/agent.log"
 EOF
-        echo "[OK] Kafka configured for worldwide deployment: $KAFKA_BROKERS"
+        echo "[OK] Local mode - Kafka configured: $KAFKA_BROKERS"
     else
-        echo "[ERROR] Kafka configuration failed - please check connectivity"
-        exit 1
+        cat > "$CONFIG_DIR/config.yaml" << EOF
+server:
+  name: "$HOSTNAME"
+  description: "ServerEye monitored server"
+  secret_key: "$SECRET_KEY"
+
+api:
+  base_url: "https://api.servereye.dev"
+  api_key: "$SECRET_KEY"
+  timeout: "30s"
+
+# Kafka disabled - using HTTP commands via backend proxy (worldwide mode)
+kafka:
+  enabled: false
+
+metrics:
+  cpu_temperature: true
+  interval: "30s"
+
+logging:
+  level: "info"
+  file: "$LOG_DIR/agent.log"
+EOF
+        echo "[OK] Worldwide mode - HTTP commands via api.servereye.dev"
     fi
 
     chown root:$AGENT_USER "$CONFIG_DIR/config.yaml"
