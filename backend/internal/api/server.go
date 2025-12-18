@@ -13,6 +13,7 @@ import (
 	"github.com/servereye/servereye/pkg/kafka"
 	"github.com/servereye/servereye/pkg/publisher"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 )
 
 type Server struct {
@@ -137,7 +138,12 @@ func (s *Server) Start() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	s.logger.WithField("addr", addr).Info("Starting HTTP server")
+	// Enable HTTP/2 support
+	if err := http2.ConfigureServer(s.httpServer, &http2.Server{}); err != nil {
+		s.logger.WithError(err).Error("Failed to configure HTTP/2")
+	}
+
+	s.logger.WithField("addr", addr).Info("Starting HTTP server with HTTP/2 support")
 	return s.httpServer.ListenAndServe()
 }
 

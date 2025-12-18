@@ -10,6 +10,7 @@ require (
 	github.com/segmentio/kafka-go v0.4.47
 	github.com/servereye/servereye v0.0.0-00010101000000-000000000000
 	github.com/sirupsen/logrus v1.9.3
+	golang.org/x/net v0.20.0
 )
 
 replace github.com/servereye/servereye => ../
