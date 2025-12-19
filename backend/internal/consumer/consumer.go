@@ -8,7 +8,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"github.com/servereye/servereye/backend/internal/api"
 	"github.com/servereye/servereye/backend/internal/config"
-	"github.com/servereye/servereye/backend/internal/storage"
+	"github.com/servereye/servereye/backend/storage"
 	"github.com/servereye/servereye/pkg/publisher"
 	"github.com/sirupsen/logrus"
 )
