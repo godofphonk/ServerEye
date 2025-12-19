@@ -10,7 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/servereye/servereye/backend/internal/storage"
+	"github.com/servereye/servereye/backend/storage"
 	"github.com/servereye/servereye/pkg/kafka"
 	"github.com/servereye/servereye/pkg/publisher"
 	"github.com/sirupsen/logrus"
