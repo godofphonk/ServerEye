@@ -455,7 +455,7 @@ server:
 
 api:
   base_url: "https://api.servereye.dev"
-  api_key: "$SECRET_KEY"
+  api_key: "change-me-in-production"
   timeout: "30s"
 
 # Kafka disabled - using HTTP commands via backend proxy (worldwide mode)
