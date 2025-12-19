@@ -86,8 +86,8 @@ services:
       # Authentication
       API_KEY: "${API_KEY:-change-me-in-production}"
       
-      # Database (using keys database)
-      DATABASE_URL: "${DATABASE_URL:-postgres://servereye_keys@pg-registered-keys:5432/PgRegisteredKeys?sslmode=disable}"
+      # Database (using keys database via host IP)
+      DATABASE_URL: "${DATABASE_URL:-postgres://servereye_keys@192.168.0.107:5433/PgRegisteredKeys?sslmode=disable}"
       
     networks:
       - servereye-network
