@@ -79,6 +79,13 @@ type PendingCommand struct {
 	Timestamp time.Time              `json:"timestamp"`
 }
 
+type KeyRegistrationRequest struct {
+	SecretKey    string `json:"secret_key"`
+	AgentVersion string `json:"agent_version"`
+	OSInfo       string `json:"os_info"`
+	Hostname     string `json:"hostname"`
+}
+
 func New(cfg *Config, logger *logrus.Logger) (*Server, error) {
 	// Initialize Kafka producer
 	kafkaConfig := kafka.Config{
@@ -116,6 +123,7 @@ func (s *Server) Start() error {
 
 	// Public endpoints (no auth required)
 	router.HandleFunc("/health", s.handleHealth).Methods("GET")
+	router.HandleFunc("/register-key", s.handleRegisterKey).Methods("POST")
 	router.HandleFunc("/ws", s.wsServer.handleWebSocket)
 
 	// Protected endpoints
@@ -486,4 +494,37 @@ func (ws *WebSocketServer) BroadcastMetric(metric interface{}) {
 			conn.Close()
 		}
 	}
+}
+
+func (s *Server) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
+	var req KeyRegistrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if req.SecretKey == "" {
+		s.writeError(w, "secret_key is required", http.StatusBadRequest)
+		return
+	}
+	if req.Hostname == "" {
+		req.Hostname = "unknown"
+	}
+	if req.AgentVersion == "" {
+		req.AgentVersion = "unknown"
+	}
+	if req.OSInfo == "" {
+		req.OSInfo = "unknown"
+	}
+
+	// Insert into database
+	if err := s.storage.InsertGeneratedKey(r.Context(), req.SecretKey, req.AgentVersion, req.OSInfo, req.Hostname); err != nil {
+		s.logger.WithError(err).WithField("secret_key", req.SecretKey).Error("Failed to insert generated key")
+		s.writeError(w, "Failed to register key", http.StatusInternalServerError)
+		return
+	}
+
+	s.logger.WithField("secret_key", req.SecretKey).Info("Key registered successfully")
+	s.writeResponse(w, map[string]string{"status": "success", "message": "Key registered successfully"})
 }
