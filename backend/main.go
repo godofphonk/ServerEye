@@ -10,7 +10,7 @@ import (
 	"github.com/servereye/servereye/backend/internal/api"
 	"github.com/servereye/servereye/backend/internal/config"
 	"github.com/servereye/servereye/backend/internal/consumer"
-	"github.com/servereye/servereye/backend/internal/storage"
+	"github.com/servereye/servereye/backend/storage"
 	"github.com/sirupsen/logrus"
 )
 
