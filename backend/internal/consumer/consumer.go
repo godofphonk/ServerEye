@@ -22,12 +22,12 @@ type Config struct {
 
 type Consumer struct {
 	config   *config.Config
-	storage  *storage.Storage
+	storage  storage.Storage
 	logger   *logrus.Logger
 	wsServer *api.WebSocketServer
 }
 
-func New(cfg *config.Config, storage *storage.Storage, wsServer *api.WebSocketServer, logger *logrus.Logger) (*Consumer, error) {
+func New(cfg *config.Config, storage storage.Storage, wsServer *api.WebSocketServer, logger *logrus.Logger) (*Consumer, error) {
 	return &Consumer{
 		config:   cfg,
 		storage:  storage,
