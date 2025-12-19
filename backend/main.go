@@ -52,7 +52,7 @@ func main() {
 		}{
 			APIKey: cfg.Auth.APIKey,
 		},
-	}, logger)
+	}, logger, storage)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize API server")
 	}

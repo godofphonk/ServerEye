@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/servereye/servereye/backend/internal/storage"
 	"github.com/servereye/servereye/pkg/kafka"
 	"github.com/servereye/servereye/pkg/publisher"
 	"github.com/sirupsen/logrus"
@@ -26,6 +27,7 @@ type Server struct {
 	pendingMutex    sync.RWMutex
 	responseChans   map[string]chan CommandResponse
 	responseMutex   sync.RWMutex
+	storage         storage.Storage
 }
 
 type Config struct {
@@ -86,7 +88,7 @@ type KeyRegistrationRequest struct {
 	Hostname     string `json:"hostname"`
 }
 
-func New(cfg *Config, logger *logrus.Logger) (*Server, error) {
+func New(cfg *Config, logger *logrus.Logger, storage storage.Storage) (*Server, error) {
 	// Initialize Kafka producer
 	kafkaConfig := kafka.Config{
 		Brokers:      cfg.Kafka.Brokers,
@@ -110,6 +112,7 @@ func New(cfg *Config, logger *logrus.Logger) (*Server, error) {
 		kafkaProducer:   kafkaProducer,
 		pendingCommands: make(map[string][]PendingCommand),
 		responseChans:   make(map[string]chan CommandResponse),
+		storage:         storage,
 	}
 
 	// Initialize WebSocket server
@@ -499,13 +502,13 @@ func (ws *WebSocketServer) BroadcastMetric(metric interface{}) {
 func (s *Server) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 	var req KeyRegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.writeError(w, "Invalid JSON", http.StatusBadRequest)
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON", err.Error())
 		return
 	}
 
 	// Validate required fields
 	if req.SecretKey == "" {
-		s.writeError(w, "secret_key is required", http.StatusBadRequest)
+		s.writeError(w, http.StatusBadRequest, "Missing required fields", "secret_key is required")
 		return
 	}
 	if req.Hostname == "" {
@@ -521,10 +524,11 @@ func (s *Server) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 	// Insert into database
 	if err := s.storage.InsertGeneratedKey(r.Context(), req.SecretKey, req.AgentVersion, req.OSInfo, req.Hostname); err != nil {
 		s.logger.WithError(err).WithField("secret_key", req.SecretKey).Error("Failed to insert generated key")
-		s.writeError(w, "Failed to register key", http.StatusInternalServerError)
+		s.writeError(w, http.StatusInternalServerError, "Internal server error", "Failed to register key")
 		return
 	}
 
 	s.logger.WithField("secret_key", req.SecretKey).Info("Key registered successfully")
-	s.writeResponse(w, map[string]string{"status": "success", "message": "Key registered successfully"})
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Key registered successfully"})
 }
