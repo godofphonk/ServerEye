@@ -80,7 +80,7 @@ services:
       PORT: "8080"
       
       # Kafka configuration (internal network)
-      KAFKA_BROKERS: "kafka:9093"
+      KAFKA_BROKERS: "servereye-kafka-prod:9092"
       KAFKA_TOPIC_PREFIX: "metrics"
       
       # Authentication

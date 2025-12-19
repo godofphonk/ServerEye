@@ -145,7 +145,7 @@ func (s *Server) Start() error {
 		Addr:         addr,
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 45 * time.Second, // Увеличено для ожидания ответа от агента
 		IdleTimeout:  60 * time.Second,
 	}
 

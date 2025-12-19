@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -53,13 +54,32 @@ func NewHTTPCommandConsumer(cfg HTTPConsumerConfig, handler CommandHandler, logg
 		cfg.PollInterval = 2 * time.Second
 	}
 
+	// Create IPv4-only transport
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			// Force IPv4 connection
+			dialer := &net.Dialer{
+				Timeout:   30 * time.Second, // Увеличено для Cloudflare
+				KeepAlive: 30 * time.Second,
+			}
+			// Only use IPv4
+			return dialer.DialContext(ctx, "tcp4", addr)
+		},
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   30 * time.Second, // Увеличено для Cloudflare
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
 	return &HTTPCommandConsumer{
 		apiURL:       cfg.APIURL,
 		apiKey:       cfg.APIKey,
 		serverKey:    cfg.ServerKey,
 		pollInterval: cfg.PollInterval,
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout:   30 * time.Second,
+			Transport: transport,
 		},
 		handler: handler,
 		logger:  logger,
@@ -83,13 +103,14 @@ func (c *HTTPCommandConsumer) Start(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			if err := c.pollCommands(ctx); err != nil {
-				c.logger.WithError(err).Debug("Failed to poll commands")
+				c.logger.WithError(err).Info("Failed to poll commands")
 			}
 		}
 	}
 }
 
 func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
+	c.logger.Info("Starting command polling")
 	url := fmt.Sprintf("%s/v1/commands/%s", c.apiURL, c.serverKey)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -100,7 +121,9 @@ func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
 	req.Header.Set("X-API-Key", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
+	c.logger.Info("Sending HTTP request to backend")
 	resp, err := c.client.Do(req)
+	c.logger.Info("HTTP request completed")
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
@@ -119,6 +142,11 @@ func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	c.logger.WithField("commands_count", len(result.Commands)).Info("Received response from backend")
+	if len(result.Commands) == 0 {
+		return nil
+	}
+
 	for _, cmd := range result.Commands {
 		c.logger.WithFields(logrus.Fields{
 			"command_id": cmd.ID,
@@ -134,6 +162,11 @@ func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
 func (c *HTTPCommandConsumer) processCommand(ctx context.Context, cmd Command) {
 	// Convert HTTP Command to protocol.Message for handler
 	msgType := c.mapCommandToType(cmd.Command)
+	c.logger.WithFields(logrus.Fields{
+		"command": cmd.Command,
+		"msgType": msgType,
+	}).Info("Processing command")
+
 	protoMsg := &protocol.Message{
 		ID:        cmd.ID,
 		Type:      msgType,
@@ -142,7 +175,12 @@ func (c *HTTPCommandConsumer) processCommand(ctx context.Context, cmd Command) {
 		Payload:   cmd.Params,
 	}
 
+	c.logger.Info("Calling handler.HandleCommand")
 	protoResp, err := c.handler.HandleCommand(ctx, protoMsg)
+	c.logger.WithFields(logrus.Fields{
+		"hasResponse": protoResp != nil,
+		"error":       err,
+	}).Info("Handler completed")
 
 	var response *CommandResponse
 	if err != nil {
