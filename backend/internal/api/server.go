@@ -305,7 +305,7 @@ func (s *Server) handleSendCommand(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewEncoder(w).Encode(resp)
 
-	case <-time.After(30 * time.Second):
+	case <-time.After(45 * time.Second):
 		s.responseMutex.Lock()
 		delete(s.responseChans, req.RequestID)
 		s.responseMutex.Unlock()

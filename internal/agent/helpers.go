@@ -29,23 +29,3 @@ func (a *Agent) handleUnknownCommand(msg *protocol.Message) *protocol.Message {
 	response.ID = msg.ID
 	return response
 }
-
-// sendResponse отправляет ответ через Kafka
-func (a *Agent) sendResponse(msg *protocol.Message) error {
-	// В Kafka-only архитектуре ответы отправляются через commandConsumer
-	if a.useKafka && a.commandConsumer != nil {
-		return a.commandConsumer.SendResponse(a.ctx, msg.ID, msg)
-	}
-
-	return fmt.Errorf("Kafka не доступен для отправки ответа")
-}
-
-// sendResponseToCommand отправляет ответ через Kafka
-func (a *Agent) sendResponseToCommand(msg *protocol.Message, commandID string) error {
-	// В Kafka-only архитектуре ответы отправляются через commandConsumer
-	if a.useKafka && a.commandConsumer != nil {
-		return a.commandConsumer.SendResponse(a.ctx, commandID, msg)
-	}
-
-	return fmt.Errorf("Kafka не доступен для отправки ответа")
-}

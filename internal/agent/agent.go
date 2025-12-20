@@ -10,7 +10,6 @@ import (
 	"github.com/servereye/servereye/pkg/commands"
 	"github.com/servereye/servereye/pkg/docker"
 	"github.com/servereye/servereye/pkg/http"
-	"github.com/servereye/servereye/pkg/kafka"
 	"github.com/servereye/servereye/pkg/metrics"
 	"github.com/servereye/servereye/pkg/protocol"
 	"github.com/servereye/servereye/pkg/publisher"
@@ -22,15 +21,12 @@ type Agent struct {
 	config              *config.AgentConfig
 	logger              *logrus.Logger
 	metricPublisher     publisher.Publisher           // unified publisher
-	commandConsumer     *kafka.CommandConsumer        // Kafka consumer for commands
-	httpCommandConsumer *commands.HTTPCommandConsumer // HTTP consumer for worldwide
+	httpCommandConsumer *commands.HTTPCommandConsumer // HTTP consumer for commands
 	cpuMetrics          *metrics.CPUMetrics
 	systemMonitor       *metrics.SystemMonitor
 	dockerClient        *docker.Client
 	ctx                 context.Context
 	cancel              context.CancelFunc
-	useKafka            bool // Flag to use Kafka for commands
-	useHTTPCommands     bool // Flag to use HTTP for commands (worldwide mode)
 
 	// updateFunc allows mocking performUpdate in tests
 	updateFunc func(string) error
@@ -38,88 +34,22 @@ type Agent struct {
 	updateDoneChan chan<- bool
 }
 
-// initializeMetricPublisher создает publisher на основе конфигурации
+// initializeMetricPublisher создает HTTP publisher для метрик
 func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (publisher.Publisher, error) {
-	// Определяем режим publisher
-	publisherMode := cfg.PublisherMode
-	if publisherMode == "" {
-		publisherMode = "hybrid" // По умолчанию hybrid для обратной совместимости
-	}
-
-	var publishers []publisher.Publisher
-
-	// HTTP publisher (если настроен и режим позволяет)
-	if cfg.API.BaseURL != "" && (publisherMode == "http" || publisherMode == "hybrid") {
-		timeout := 30
-		if cfg.API.Timeout != "" {
-			if t, err := strconv.Atoi(cfg.API.Timeout); err == nil {
-				timeout = t
-			}
-		}
-
-		httpConfig := http.Config{
-			BaseURL: cfg.API.BaseURL,
-			APIKey:  cfg.API.APIKey,
-			Timeout: timeout,
-		}
-
-		httpClient := http.New(httpConfig, logger)
-		publishers = append(publishers, httpClient)
-	}
-
-	// Kafka publisher (если включен и режим позволяет)
-	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 && (publisherMode == "kafka" || publisherMode == "hybrid") {
-		kafkaConfig := kafka.Config{
-			Brokers:      cfg.Kafka.Brokers,
-			TopicPrefix:  cfg.Kafka.TopicPrefix,
-			Compression:  cfg.Kafka.Compression,
-			MaxAttempts:  cfg.Kafka.MaxAttempts,
-			BatchSize:    cfg.Kafka.BatchSize,
-			RequiredAcks: cfg.Kafka.RequiredAcks,
-		}
-
-		// Установка дефолтных значений если не указаны
-		if kafkaConfig.TopicPrefix == "" {
-			kafkaConfig.TopicPrefix = "servereye" // Обновлено для worldwide
-		}
-		if kafkaConfig.Compression == "" {
-			kafkaConfig.Compression = "snappy"
-		}
-		if kafkaConfig.MaxAttempts == 0 {
-			kafkaConfig.MaxAttempts = 3
-		}
-		if kafkaConfig.BatchSize == 0 {
-			kafkaConfig.BatchSize = 100
-		}
-		if kafkaConfig.RequiredAcks == 0 {
-			kafkaConfig.RequiredAcks = 1
-		}
-
-		kafkaPub, err := kafka.NewProducer(kafkaConfig, logger)
-		if err != nil {
-			if publisherMode == "kafka" {
-				return nil, fmt.Errorf("не удалось создать Kafka publisher: %w", err)
-			}
-			logger.WithError(err).Warn("Failed to create Kafka publisher, using HTTP only")
-		} else {
-			publishers = append(publishers, kafkaPub)
-			logger.Info("Kafka publisher initialized")
+	timeout := 30
+	if cfg.API.Timeout != "" {
+		if t, err := strconv.Atoi(cfg.API.Timeout); err == nil {
+			timeout = t
 		}
 	}
 
-	// Проверяем результат
-	if len(publishers) == 0 {
-		return nil, fmt.Errorf("no publishers configured for mode: %s", publisherMode)
+	httpConfig := http.Config{
+		BaseURL: cfg.API.BaseURL,
+		APIKey:  cfg.API.APIKey,
+		Timeout: timeout,
 	}
 
-	// Если один publisher, возвращаем его напрямую
-	if len(publishers) == 1 {
-		return publishers[0], nil
-	}
-
-	// Иначе создаем multi publisher для hybrid режима
-	logger.Info("Multi-publisher initialized for hybrid mode")
-	return publisher.NewMultiPublisher(publishers, publisher.FailIfAll, logger), nil
+	return http.New(httpConfig, logger), nil
 }
 
 // New создает новый агент
@@ -133,11 +63,7 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 		return nil, fmt.Errorf("не удалось инициализировать metric publisher: %v", err)
 	}
 
-	// Initialize command consumer (Kafka or HTTP)
-	var commandConsumer *kafka.CommandConsumer
-	var httpCommandConsumer *commands.HTTPCommandConsumer
-	var useKafka, useHTTPCommands bool
-
+	// Initialize HTTP command consumer (worldwide mode)
 	// Create temp agent for command handling
 	tempAgent := &Agent{
 		config:        cfg,
@@ -147,54 +73,21 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 		dockerClient:  docker.NewClient(logger),
 	}
 
-	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
-		// Use Kafka for commands (local/direct mode)
-		consumerConfig := kafka.CommandConsumerConfig{
-			Brokers:        cfg.Kafka.Brokers,
-			GroupID:        fmt.Sprintf("agent-new-%s", cfg.Server.SecretKey),
-			ServerKey:      cfg.Server.SecretKey,
-			Topic:          fmt.Sprintf("cmd.%s", cfg.Server.SecretKey),
-			MinBytes:       10e3, // 10KB
-			MaxBytes:       10e6, // 10MB
-			CommitInterval: time.Second,
-		}
-
-		consumer, err := kafka.NewCommandConsumer(consumerConfig, tempAgent, logger)
-		if err != nil {
-			logger.WithError(err).Warn("Failed to create Kafka consumer, trying HTTP mode")
-		} else {
-			commandConsumer = consumer
-			useKafka = true
-			logger.Info("Kafka command consumer initialized")
-		}
+	httpConfig := commands.HTTPConsumerConfig{
+		APIURL:       cfg.API.BaseURL,
+		APIKey:       cfg.API.APIKey,
+		ServerKey:    cfg.Server.SecretKey,
+		PollInterval: 2 * time.Second,
 	}
 
-	// If Kafka not available, use HTTP command polling (worldwide mode)
-	if !useKafka && cfg.API.BaseURL != "" {
-		httpConfig := commands.HTTPConsumerConfig{
-			APIURL:       cfg.API.BaseURL,
-			APIKey:       cfg.API.APIKey,
-			ServerKey:    cfg.Server.SecretKey,
-			PollInterval: 2 * time.Second,
-		}
-
-		httpCommandConsumer = commands.NewHTTPCommandConsumer(httpConfig, tempAgent, logger)
-		useHTTPCommands = true
-		logger.Info("HTTP command consumer initialized (worldwide mode)")
-	}
-
-	if !useKafka && !useHTTPCommands {
-		logger.Warn("No command consumer available - commands will not work")
-	}
+	httpCommandConsumer := commands.NewHTTPCommandConsumer(httpConfig, tempAgent, logger)
+	logger.Info("HTTP command consumer initialized (worldwide mode)")
 
 	return &Agent{
 		config:              cfg,
 		logger:              logger,
 		metricPublisher:     metricPublisher,
-		commandConsumer:     commandConsumer,
 		httpCommandConsumer: httpCommandConsumer,
-		useKafka:            useKafka,
-		useHTTPCommands:     useHTTPCommands,
 		cpuMetrics:          metrics.NewCPUMetrics(),
 		systemMonitor:       metrics.NewSystemMonitor(logger),
 		dockerClient:        docker.NewClient(logger),
@@ -210,15 +103,8 @@ func (a *Agent) Start() error {
 		"secret_key":  a.config.Server.SecretKey,
 	}).Info("Запуск агента ServerEye")
 
-	// Start command consumer (Kafka or HTTP)
-	if a.useKafka && a.commandConsumer != nil {
-		a.logger.Info("Starting with Kafka command mode")
-		go func() {
-			if err := a.commandConsumer.Start(a.ctx); err != nil {
-				a.logger.WithError(err).Error("Kafka consumer failed")
-			}
-		}()
-	} else if a.useHTTPCommands && a.httpCommandConsumer != nil {
+	// Start command consumer (HTTP mode)
+	if a.httpCommandConsumer != nil {
 		a.logger.Info("Starting with HTTP command mode (worldwide)")
 		go func() {
 			if err := a.httpCommandConsumer.Start(a.ctx); err != nil {
@@ -226,7 +112,7 @@ func (a *Agent) Start() error {
 			}
 		}()
 	} else {
-		a.logger.Warn("No command consumer available - commands disabled")
+		a.logger.Warn("No HTTP command consumer available - commands disabled")
 	}
 
 	// Запускаем heartbeat
@@ -251,13 +137,6 @@ func (a *Agent) Stop() error {
 	if a.metricPublisher != nil {
 		if err := a.metricPublisher.Close(); err != nil {
 			a.logger.WithError(err).Error("Ошибка при закрытии metric publisher")
-		}
-	}
-
-	// Закрываем Kafka consumer
-	if a.commandConsumer != nil {
-		if err := a.commandConsumer.Close(); err != nil {
-			a.logger.WithError(err).Error("Ошибка при закрытии Kafka consumer")
 		}
 	}
 
@@ -316,9 +195,7 @@ func (a *Agent) processCommand(data []byte) {
 				ErrorMessage: fmt.Sprintf("Внутренняя ошибка при обработке команды: %v", r),
 			})
 			response.ID = msg.ID
-			if err := a.sendResponse(response); err != nil {
-				a.logger.WithError(err).Error("Failed to send response")
-			}
+			// В HTTP-only архитектуре ответы отправляются автоматически через consumer
 		}
 	}()
 
@@ -363,12 +240,8 @@ func (a *Agent) processCommand(data []byte) {
 			"response_type": response.Type,
 		}).Info("Отправляем ответ")
 
-		// Отправляем в уникальный канал с ID команды (Redis Streams)
-		if err := a.sendResponseToCommand(response, msg.ID); err != nil {
-			a.logger.WithError(err).Error("Не удалось отправить ответ")
-		} else {
-			a.logger.WithField("command_id", msg.ID).Info("Ответ успешно отправлен")
-		}
+		// В HTTP-only архитектуре ответы отправляются автоматически через consumer
+		a.logger.WithField("command_id", msg.ID).Info("Ответ будет отправлен через HTTP")
 
 		// Дополнительно отправляем метрику в Kafka (если настроен)
 		a.publishMetricToKafka(response)

@@ -12,12 +12,6 @@ api:
   api_key: "prod-api-key-2024-change-me"
   timeout: "30"
   
-# Kafka Configuration (Disabled - using HTTP API)
-kafka:
-  enabled: false
-  brokers: []
-  topic_prefix: "metrics"
-  
 # Metrics collection
 metrics:
   interval: "30s"  # seconds

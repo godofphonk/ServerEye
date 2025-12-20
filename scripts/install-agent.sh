@@ -375,79 +375,11 @@ else
     SECRET_KEY=$(openssl rand -hex 16 | sed 's/^/srv_/')
     HOSTNAME=$(hostname)
 
-    # Auto-detect and configure for worldwide or local deployment
-detect_kafka_config() {
-    local kafka_brokers=""
-    local kafka_enabled="false"
-    
-    echo "[*] Configuring deployment mode..."
-    
-    # 1. Check explicit environment variable (for custom Kafka setups)
-    if [ -n "$SERVEREYE_KAFKA_BROKERS" ]; then
-        kafka_brokers="$SERVEREYE_KAFKA_BROKERS"
-        kafka_enabled="true"
-        echo "[OK] Using Kafka brokers from environment: $kafka_brokers"
-    # 2. Worldwide mode - use HTTP commands via api.servereye.dev
-    elif curl -s -m 5 "https://api.servereye.dev/health" > /dev/null 2>&1; then
-        kafka_enabled="false"
-        echo "[OK] Worldwide mode - using HTTP commands via api.servereye.dev"
-        echo "[INFO] Commands will be processed via backend API proxy"
-    # 3. Check for local Kafka development
-    elif nc -z localhost 9092 2>/dev/null; then
-        kafka_brokers="localhost:9092"
-        kafka_enabled="true"
-        echo "[OK] Local mode - detected Kafka on localhost:9092"
-    # 4. No configuration available - use HTTP fallback
-    else
-        kafka_enabled="false"
-        echo "[INFO] No Kafka detected - using HTTP command mode"
-    fi
-    
-    # Export for later use
-    export KAFKA_BROKERS="$kafka_brokers"
-    export KAFKA_ENABLED="$kafka_enabled"
-}
-
-# Detect Kafka configuration early
-detect_kafka_config
-
     # Create configuration file
     echo "[*] Creating configuration..."
     
-    # Build configuration based on deployment type
-    if [ "$KAFKA_ENABLED" = "true" ]; then
-        cat > "$CONFIG_DIR/config.yaml" << EOF
-server:
-  name: "$HOSTNAME"
-  description: "ServerEye monitored server"
-  secret_key: "$SECRET_KEY"
-
-api:
-  base_url: "$SERVEREYE_API_URL"
-  timeout: "30s"
-
-# Kafka enabled for local/direct command processing
-kafka:
-  enabled: true
-  brokers:
-    - "$KAFKA_BROKERS"
-  topic_prefix: "servereye"
-  compression: "snappy"
-  max_attempts: 3
-  batch_size: 100
-  required_acks: 1
-
-metrics:
-  cpu_temperature: true
-  interval: "30s"
-
-logging:
-  level: "info"
-  file: "$LOG_DIR/agent.log"
-EOF
-        echo "[OK] Local mode - Kafka configured: $KAFKA_BROKERS"
-    else
-        cat > "$CONFIG_DIR/config.yaml" << EOF
+    # Create HTTP-only configuration
+    cat > "$CONFIG_DIR/config.yaml" << EOF
 server:
   name: "$HOSTNAME"
   description: "ServerEye monitored server"
@@ -458,10 +390,6 @@ api:
   api_key: "change-me-in-production"
   timeout: "30s"
 
-# Kafka disabled - using HTTP commands via backend proxy (worldwide mode)
-kafka:
-  enabled: false
-
 metrics:
   cpu_temperature: true
   interval: "30s"
@@ -470,8 +398,7 @@ logging:
   level: "info"
   file: "$LOG_DIR/agent.log"
 EOF
-        echo "[OK] Worldwide mode - HTTP commands via api.servereye.dev"
-    fi
+    echo "[OK] HTTP-only configuration created"
 
     chown root:$AGENT_USER "$CONFIG_DIR/config.yaml"
     chmod 640 "$CONFIG_DIR/config.yaml"

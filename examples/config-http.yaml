@@ -9,12 +9,6 @@ api:
   api_key: "prod-api-key-2024-change-me"
   timeout: "30"
 
-# Kafka configuration (disabled when using HTTP API)
-kafka:
-  enabled: false
-  brokers: []
-  topic_prefix: ""
-
 metrics:
   cpu_usage: false
   memory_usage: false

@@ -4,15 +4,12 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
-	"time"
 
 	"github.com/creack/pty"
-	"github.com/segmentio/kafka-go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -248,50 +245,7 @@ func (a *Agent) initTerminalSession(msg *TerminalMessage, sessions map[string]*T
 }
 
 func (a *Agent) subscribeToTerminalCommands(ch chan<- []byte) {
-	if !a.config.Kafka.Enabled {
-		a.logger.Warn("Kafka not enabled, terminal commands not available")
-		return
-	}
-
-	a.logger.Info("Subscribed to terminal commands")
-
-	// Create Kafka reader for terminal commands
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:        a.config.Kafka.Brokers,
-		Topic:          "terminal.commands",
-		GroupID:        fmt.Sprintf("agent-%s", a.config.Server.SecretKey),
-		MinBytes:       1,
-		MaxBytes:       10e6,
-		CommitInterval: time.Second,
-	})
-	defer reader.Close()
-
-	for {
-		select {
-		case <-a.ctx.Done():
-			return
-		default:
-			msg, err := reader.FetchMessage(a.ctx)
-			if err != nil {
-				if err == context.Canceled {
-					return
-				}
-				a.logger.WithError(err).Debug("Failed to fetch terminal command (waiting)")
-				time.Sleep(time.Second)
-				continue
-			}
-
-			a.logger.WithField("message", string(msg.Value)).Info("Received terminal command from Kafka")
-
-			// Send to channel
-			ch <- msg.Value
-
-			// Commit message
-			if err := reader.CommitMessages(a.ctx, msg); err != nil {
-				a.logger.WithError(err).Warn("Failed to commit terminal message")
-			}
-		}
-	}
+	a.logger.Warn("Terminal commands not available in HTTP-only mode")
 }
 
 func (a *Agent) sendTerminalOutput(sessionID string, msg TerminalMessage) {
@@ -299,37 +253,5 @@ func (a *Agent) sendTerminalOutput(sessionID string, msg TerminalMessage) {
 		"session_id": sessionID,
 		"type":       msg.Type,
 		"data_len":   len(msg.Data),
-	}).Info("sendTerminalOutput called")
-
-	if !a.config.Kafka.Enabled {
-		a.logger.Warn("Kafka not enabled, cannot send terminal output")
-		return
-	}
-
-	data, err := json.Marshal(msg)
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to marshal terminal output")
-		return
-	}
-
-	a.logger.WithField("json", string(data)).Info("Sending to Kafka terminal.output")
-
-	// Send directly to Kafka topic "terminal.output"
-	writer := &kafka.Writer{
-		Addr:     kafka.TCP(a.config.Kafka.Brokers...),
-		Topic:    "terminal.output",
-		Balancer: &kafka.LeastBytes{},
-	}
-	defer writer.Close()
-
-	err = writer.WriteMessages(a.ctx, kafka.Message{
-		Key:   []byte(sessionID),
-		Value: data,
-	})
-
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to send terminal output to Kafka")
-	} else {
-		a.logger.Info("Successfully sent terminal output to Kafka!")
-	}
+	}).Warn("Terminal output not available in HTTP-only mode")
 }

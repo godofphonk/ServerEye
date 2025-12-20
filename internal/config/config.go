@@ -9,12 +9,10 @@ import (
 
 // AgentConfig конфигурация агента
 type AgentConfig struct {
-	Server        ServerConfig  `yaml:"server"`
-	API           APIConfig     `yaml:"api,omitempty"`
-	Kafka         KafkaConfig   `yaml:"kafka,omitempty"`
-	PublisherMode string        `yaml:"publisher_mode,omitempty"` // "http", "kafka", "hybrid"
-	Metrics       MetricsConfig `yaml:"metrics"`
-	Logging       LoggingConfig `yaml:"logging"`
+	Server  ServerConfig  `yaml:"server"`
+	API     APIConfig     `yaml:"api,omitempty"`
+	Metrics MetricsConfig `yaml:"metrics"`
+	Logging LoggingConfig `yaml:"logging"`
 }
 
 // ServerConfig конфигурация сервера
@@ -46,17 +44,6 @@ type LoggingConfig struct {
 	File  string `yaml:"file"`
 }
 
-// KafkaConfig конфигурация Kafka
-type KafkaConfig struct {
-	Enabled      bool     `yaml:"enabled"`
-	Brokers      []string `yaml:"brokers"`
-	TopicPrefix  string   `yaml:"topic_prefix"`
-	Compression  string   `yaml:"compression"`
-	MaxAttempts  int      `yaml:"max_attempts"`
-	BatchSize    int      `yaml:"batch_size"`
-	RequiredAcks int      `yaml:"required_acks"`
-}
-
 // LoadAgentConfig загружает конфигурацию агента
 func LoadAgentConfig(filepath string) (*AgentConfig, error) {
 	data, err := os.ReadFile(filepath)
@@ -86,9 +73,9 @@ func (c *AgentConfig) validate() error {
 		return fmt.Errorf("секретный ключ не может быть пустым")
 	}
 
-	// Проверяем, что есть либо Kafka, либо HTTP API конфигурация
-	if !c.Kafka.Enabled && c.API.BaseURL == "" {
-		return fmt.Errorf("должен быть включен Kafka либо указан базовый URL API")
+	// Проверяем, что указан базовый URL API
+	if c.API.BaseURL == "" {
+		return fmt.Errorf("должен быть указан базовый URL API")
 	}
 
 	return nil
