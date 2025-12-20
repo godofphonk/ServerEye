@@ -9,49 +9,49 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// HandleCommand реализует интерфейс CommandHandler для Kafka
-func (a *Agent) HandleCommand(ctx context.Context, command *protocol.Message) (*protocol.Message, error) {
+// HandleCommand реализует интерфейс CommandHandler для HTTP API
+func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*protocol.Message, error) {
 	a.logger.WithFields(logrus.Fields{
-		"command_id":   command.ID,
-		"command_type": command.Type,
-		"server_id":    command.ServerID,
-	}).Info("Handling command via Kafka")
+		"command_id":   msg.ID,
+		"command_type": msg.Type,
+		"server_id":    a.config.Server.Name,
+	}).Info("Handling command via HTTP API")
 
 	// Создаем базовый response
 	response := &protocol.Message{
-		ID:        command.ID,
+		ID:        msg.ID,
 		Timestamp: time.Now(),
 		ServerID:  a.config.Server.Name,
 		ServerKey: a.config.Server.SecretKey,
 	}
 
 	// Обрабатываем команду в зависимости от типа
-	switch command.Type {
+	switch msg.Type {
 	case protocol.TypeGetCPUTemp:
-		return a.handleTemperatureCommand(ctx, command, response)
+		return a.handleTemperatureCommand(ctx, msg, response)
 	case protocol.TypeGetMemoryInfo:
-		return a.handleMemoryCommand(ctx, command, response)
+		return a.handleMemoryCommand(ctx, msg, response)
 	case protocol.TypeGetSystemInfo:
-		return a.handleMemoryCommand(ctx, command, response)
+		return a.handleMemoryCommand(ctx, msg, response)
 	case protocol.TypeGetDiskInfo:
-		return a.handleDiskCommand(ctx, command, response)
+		return a.handleDiskCommand(ctx, msg, response)
 	case protocol.TypeGetUptime:
-		return a.handleUptimeCommand(ctx, command, response)
+		return a.handleUptimeCommand(ctx, msg, response)
 	case protocol.TypeGetProcesses:
-		return a.handleProcessesCommand(ctx, command, response)
+		return a.handleProcessesCommand(ctx, msg, response)
 	case protocol.TypeGetContainers:
-		return a.handleContainersCommand(ctx, command, response)
+		return a.handleContainersCommand(ctx, msg, response)
 	default:
 		response.Type = protocol.TypeErrorResponse
 		response.Payload = map[string]string{
-			"error": fmt.Sprintf("неизвестный тип команды: %s", command.Type),
+			"error": fmt.Sprintf("неизвестный тип команды: %s", msg.Type),
 		}
 		return response, nil
 	}
 }
 
 // handleTemperatureCommand обрабатывает запрос температуры
-func (a *Agent) handleTemperatureCommand(ctx context.Context, command *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
+func (a *Agent) handleTemperatureCommand(ctx context.Context, msg *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
 	temp, err := a.cpuMetrics.GetTemperature()
 	if err != nil {
 		response.Type = protocol.TypeErrorResponse
@@ -71,7 +71,7 @@ func (a *Agent) handleTemperatureCommand(ctx context.Context, command *protocol.
 }
 
 // handleMemoryCommand обрабатывает запрос памяти
-func (a *Agent) handleMemoryCommand(ctx context.Context, command *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
+func (a *Agent) handleMemoryCommand(ctx context.Context, msg *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
 	memInfo, err := a.systemMonitor.GetMemoryInfo()
 	if err != nil {
 		response.Type = protocol.TypeErrorResponse
@@ -88,7 +88,7 @@ func (a *Agent) handleMemoryCommand(ctx context.Context, command *protocol.Messa
 }
 
 // handleDiskCommand обрабатывает запрос диска
-func (a *Agent) handleDiskCommand(ctx context.Context, command *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
+func (a *Agent) handleDiskCommand(ctx context.Context, msg *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
 	diskInfo, err := a.systemMonitor.GetDiskInfo()
 	if err != nil {
 		response.Type = protocol.TypeErrorResponse
@@ -107,7 +107,7 @@ func (a *Agent) handleDiskCommand(ctx context.Context, command *protocol.Message
 }
 
 // handleUptimeCommand обрабатывает запрос uptime
-func (a *Agent) handleUptimeCommand(ctx context.Context, command *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
+func (a *Agent) handleUptimeCommand(ctx context.Context, msg *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
 	uptime, err := a.systemMonitor.GetUptime()
 	if err != nil {
 		response.Type = protocol.TypeErrorResponse
@@ -128,18 +128,18 @@ func (a *Agent) handleUptimeCommand(ctx context.Context, command *protocol.Messa
 }
 
 // handleProcessesCommand обрабатывает запрос процессов
-func (a *Agent) handleProcessesCommand(ctx context.Context, command *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
+func (a *Agent) handleProcessesCommand(ctx context.Context, msg *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
 	// TODO: Реализовать получение списка процессов в SystemMonitor
-	// Команда процессов временно отключена для Kafka migration
+	// Команда процессов временно отключена
 	response.Type = protocol.TypeErrorResponse
-	response.Payload = map[string]string{
-		"error": "processes command not yet implemented in Kafka migration",
+	response.Payload = map[string]interface{}{
+		"error": "processes command not yet implemented",
 	}
 	return response, nil
 }
 
 // handleContainersCommand обрабатывает запрос контейнеров
-func (a *Agent) handleContainersCommand(ctx context.Context, command *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
+func (a *Agent) handleContainersCommand(ctx context.Context, msg *protocol.Message, response *protocol.Message) (*protocol.Message, error) {
 	containers, err := a.dockerClient.GetContainers(ctx)
 	if err != nil {
 		response.Type = protocol.TypeErrorResponse

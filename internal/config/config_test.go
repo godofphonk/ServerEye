@@ -54,7 +54,7 @@ logging:
 	}
 }
 
-func TestLoadAgentConfig_WithRedis(t *testing.T) {
+func TestLoadAgentConfig_HTTPOnly(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "agent.yaml")
 
@@ -63,10 +63,10 @@ server:
   name: "TestServer"
   secret_key: "srv_abc123def456abc123def456abc12345"
 
-redis:
-  address: "localhost:6379"
-  password: ""
-  db: 0
+api:
+  base_url: "http://localhost:8080"
+  api_key: "test-key"
+  timeout: "30"
 
 metrics:
   cpu_temperature: false
@@ -86,8 +86,9 @@ logging:
 		t.Fatalf("LoadAgentConfig() error = %v", err)
 	}
 
-	if config.Redis.Address != "localhost:6379" {
-		t.Errorf("Redis.Address = %v, want localhost:6379", config.Redis.Address)
+	// Проверяем только API конфигурацию в HTTP-only режиме
+	if config.API.BaseURL != "http://localhost:8080" {
+		t.Errorf("API.BaseURL = %v, want http://localhost:8080", config.API.BaseURL)
 	}
 }
 
@@ -138,14 +139,14 @@ func TestAgentConfigValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid config without Redis",
+			name: "missing API config",
 			config: AgentConfig{
 				Server: ServerConfig{
 					Name:      "TestServer",
 					SecretKey: "srv_test123",
 				},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "missing server name",
@@ -172,14 +173,17 @@ func TestAgentConfigValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "missing both Redis and API",
+			name: "valid config with API",
 			config: AgentConfig{
 				Server: ServerConfig{
 					Name:      "TestServer",
 					SecretKey: "srv_test123",
 				},
+				API: APIConfig{
+					BaseURL: "https://api.example.com",
+				},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 

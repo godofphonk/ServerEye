@@ -147,7 +147,7 @@ func (a *Agent) collectAndSendMetrics() {
 	}
 }
 
-// sendMetric отправляет метрику в Kafka
+// sendMetric отправляет метрику через HTTP API
 func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 	if a.metricPublisher == nil {
 		a.logger.Error("metricPublisher is nil - cannot send metric")
@@ -166,7 +166,7 @@ func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 		"server_id":  metric.ServerID,
 		"server_key": metric.ServerKey,
 		"value":      metric.Value,
-	}).Info("Publishing metric to Kafka")
+	}).Info("Publishing metric via HTTP API")
 
 	if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
 		a.logger.WithError(err).WithField("type", metricType).Error("Failed to send metric")

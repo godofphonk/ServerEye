@@ -88,7 +88,6 @@ jobs:
           - pkg/metrics
           - pkg/docker
           - pkg/redis
-          - pkg/kafka
           - pkg/publisher
     
     steps:

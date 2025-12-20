@@ -27,11 +27,6 @@ type Agent struct {
 	dockerClient        *docker.Client
 	ctx                 context.Context
 	cancel              context.CancelFunc
-
-	// updateFunc allows mocking performUpdate in tests
-	updateFunc func(string) error
-	// updateDoneChan notifies when update goroutine completes (for tests)
-	updateDoneChan chan<- bool
 }
 
 // initializeMetricPublisher создает HTTP publisher для метрик
@@ -242,9 +237,6 @@ func (a *Agent) processCommand(data []byte) {
 
 		// В HTTP-only архитектуре ответы отправляются автоматически через consumer
 		a.logger.WithField("command_id", msg.ID).Info("Ответ будет отправлен через HTTP")
-
-		// Дополнительно отправляем метрику в Kafka (если настроен)
-		a.publishMetricToKafka(response)
 	} else {
 		a.logger.WithField("command_id", msg.ID).Error("Ответ не сгенерирован")
 	}
