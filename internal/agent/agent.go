@@ -196,36 +196,96 @@ func (a *Agent) processCommand(data []byte) {
 
 	// Обрабатываем команду
 	switch msg.Type {
-	case protocol.TypeGetCPUTemp:
-		response = a.handleGetCPUTemp(msg)
-	case protocol.TypeGetContainers:
-		response = a.handleGetContainers(msg)
-	case protocol.TypeStartContainer:
-		response = a.handleStartContainer(msg)
-	case protocol.TypeStopContainer:
-		response = a.handleStopContainer(msg)
-	case protocol.TypeRestartContainer:
-		response = a.handleRestartContainer(msg)
-	case protocol.TypeRemoveContainer:
-		response = a.handleRemoveContainer(msg)
-	case protocol.TypeCreateContainer:
-		response = a.handleCreateContainer(msg)
-	case protocol.TypeGetMemoryInfo:
-		response = a.handleGetMemoryInfo(msg)
-	case protocol.TypeGetDiskInfo:
-		response = a.handleGetDiskInfo(msg)
-	case protocol.TypeGetUptime:
-		response = a.handleGetUptime(msg)
-	case protocol.TypeGetProcesses:
-		response = a.handleGetProcesses(msg)
-	case protocol.TypeGetNetworkInfo:
-		response = a.handleGetNetworkInfo(msg)
-	case protocol.TypeUpdateAgent:
-		response = a.handleUpdateAgent(msg)
 	case protocol.TypePing:
-		response = a.handlePing(msg)
+		response.Type = protocol.TypePong
+		response.Payload = protocol.PongPayload{
+			Status: "healthy",
+			Uptime: "unknown",
+		}
+	case protocol.TypeGetCPUTemp:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorCommandTimeout,
+			ErrorMessage: "CPU temperature command not implemented",
+		}
+	case protocol.TypeGetContainers:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorDockerUnavailable,
+			ErrorMessage: "Docker not available",
+		}
+	case protocol.TypeStartContainer:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Start container command not implemented",
+		}
+	case protocol.TypeStopContainer:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Stop container command not implemented",
+		}
+	case protocol.TypeRestartContainer:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Restart container command not implemented",
+		}
+	case protocol.TypeRemoveContainer:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Remove container command not implemented",
+		}
+	case protocol.TypeCreateContainer:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Create container command not implemented",
+		}
+	case protocol.TypeGetMemoryInfo:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorCommandTimeout,
+			ErrorMessage: "Memory info command not implemented",
+		}
+	case protocol.TypeGetDiskInfo:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorCommandTimeout,
+			ErrorMessage: "Disk info command not implemented",
+		}
+	case protocol.TypeGetUptime:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorCommandTimeout,
+			ErrorMessage: "Uptime command not implemented",
+		}
+	case protocol.TypeGetProcesses:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Get processes command not implemented",
+		}
+	case protocol.TypeGetNetworkInfo:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Get network info command not implemented",
+		}
+	case protocol.TypeUpdateAgent:
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: "Update agent command not implemented",
+		}
 	default:
-		response = a.handleUnknownCommand(msg)
+		response.Type = protocol.TypeErrorResponse
+		response.Payload = protocol.ErrorPayload{
+			ErrorCode:    protocol.ErrorInvalidCommand,
+			ErrorMessage: fmt.Sprintf("Неизвестная команда: %s", msg.Type),
+		}
 	}
 
 	// Отправляем ответ
@@ -243,8 +303,4 @@ func (a *Agent) processCommand(data []byte) {
 }
 
 // Command handlers are in separate files:
-// - docker_handlers.go: Docker container management
-// - monitoring_handlers.go: System monitoring (CPU, memory, disk, etc.)
-// - update.go: Agent update functionality
-// - heartbeat.go: Heartbeat functionality
-// - helpers.go: Utility functions (ping, sendResponse, etc.)
+// - handlers.go: All command handlers
