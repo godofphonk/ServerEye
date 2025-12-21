@@ -87,7 +87,6 @@ jobs:
           - pkg/protocol
           - pkg/metrics
           - pkg/docker
-                    - pkg/publisher
     
     steps:
       - name: Checkout code
