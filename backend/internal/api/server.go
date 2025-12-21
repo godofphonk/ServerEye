@@ -11,8 +11,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/servereye/servereye/backend/storage"
-	"github.com/servereye/servereye/pkg/kafka"
-	"github.com/servereye/servereye/pkg/publisher"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 )
@@ -20,7 +18,6 @@ import (
 type Server struct {
 	config          *Config
 	logger          *logrus.Logger
-	kafkaProducer   *kafka.Producer
 	httpServer      *http.Server
 	wsServer        *WebSocketServer
 	pendingCommands map[string][]PendingCommand
@@ -34,10 +31,6 @@ type Config struct {
 	Server struct {
 		Host string
 		Port string
-	}
-	Kafka struct {
-		Brokers     []string
-		TopicPrefix string
 	}
 	Auth struct {
 		APIKey string
@@ -89,27 +82,9 @@ type KeyRegistrationRequest struct {
 }
 
 func New(cfg *Config, logger *logrus.Logger, storage storage.Storage) (*Server, error) {
-	// Initialize Kafka producer
-	kafkaConfig := kafka.Config{
-		Brokers:      cfg.Kafka.Brokers,
-		TopicPrefix:  cfg.Kafka.TopicPrefix,
-		Compression:  "snappy",
-		MaxAttempts:  3,
-		BatchSize:    100,
-		BatchTimeout: 1 * time.Second,
-		RequiredAcks: 1,
-		WriteTimeout: 10 * time.Second,
-	}
-
-	kafkaProducer, err := kafka.NewProducer(kafkaConfig, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kafka producer: %w", err)
-	}
-
 	server := &Server{
 		config:          cfg,
 		logger:          logger,
-		kafkaProducer:   kafkaProducer,
 		pendingCommands: make(map[string][]PendingCommand),
 		responseChans:   make(map[string]chan CommandResponse),
 		storage:         storage,
@@ -177,28 +152,13 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create publisher metric
-	metric := &publisher.Metric{
-		ServerID:  req.ServerID,
-		ServerKey: req.ServerKey,
-		Type:      req.Type,
-		Value:     req.Value,
-		Timestamp: req.Timestamp,
-		Tags:      req.Tags,
-		Version:   "1.0",
-	}
-
-	// Publish to Kafka
-	if err := s.kafkaProducer.Publish(r.Context(), metric); err != nil {
-		s.logger.WithError(err).WithField("type", req.Type).Error("Failed to publish metric to Kafka")
-		s.writeError(w, http.StatusInternalServerError, "Internal server error", "Failed to publish metric")
-		return
-	}
-
+	// Store metric in database (HTTP-only mode)
+	// TODO: Implement metric storage if needed
 	s.logger.WithFields(logrus.Fields{
 		"server_id": req.ServerID,
 		"type":      req.Type,
 		"value":     req.Value,
-	}).Info("Metric published to Kafka")
+	}).Info("Metric received (HTTP-only mode)")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
