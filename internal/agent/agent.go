@@ -145,54 +145,21 @@ func (a *Agent) Stop() error {
 	return nil
 }
 
-// handleCommands обрабатывает входящие команды
-func (a *Agent) handleCommands(msgChan <-chan []byte) {
-	for {
-		select {
-		case msg := <-msgChan:
-			if msg == nil {
-				return
-			}
-			a.processCommand(msg)
-		case <-a.ctx.Done():
-			return
-		}
-	}
-}
-
-// processCommand обрабатывает одну команду
-func (a *Agent) processCommand(data []byte) {
-	// Парсим сообщение
-	msg, err := protocol.FromJSON(data)
-	if err != nil {
-		a.logger.WithError(err).Error("Не удалось парсить команду")
-		return
-	}
-
+// HandleCommand реализует интерфейс CommandHandler для HTTP API
+func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*protocol.Message, error) {
 	a.logger.WithFields(logrus.Fields{
 		"command_id":   msg.ID,
 		"command_type": msg.Type,
-	}).Info("Получена команда")
+		"server_id":    a.config.Server.Name,
+	}).Info("Handling command via HTTP API")
 
-	var response *protocol.Message
-
-	// Обрабатываем команду с обработкой паники
-	defer func() {
-		if r := recover(); r != nil {
-			a.logger.WithFields(logrus.Fields{
-				"command_id":   msg.ID,
-				"command_type": msg.Type,
-				"panic":        r,
-			}).Error("Паника при обработке команды")
-
-			response = protocol.NewMessage(protocol.TypeErrorResponse, protocol.ErrorPayload{
-				ErrorCode:    "PANIC_ERROR",
-				ErrorMessage: fmt.Sprintf("Внутренняя ошибка при обработке команды: %v", r),
-			})
-			response.ID = msg.ID
-			// В HTTP-only архитектуре ответы отправляются автоматически через consumer
-		}
-	}()
+	// Создаем базовый response
+	response := &protocol.Message{
+		ID:        msg.ID,
+		Timestamp: time.Now(),
+		ServerID:  a.config.Server.Name,
+		ServerKey: a.config.Server.SecretKey,
+	}
 
 	// Обрабатываем команду
 	switch msg.Type {
@@ -288,18 +255,7 @@ func (a *Agent) processCommand(data []byte) {
 		}
 	}
 
-	// Отправляем ответ
-	if response != nil {
-		a.logger.WithFields(logrus.Fields{
-			"command_id":    msg.ID,
-			"response_type": response.Type,
-		}).Info("Отправляем ответ")
-
-		// В HTTP-only архитектуре ответы отправляются автоматически через consumer
-		a.logger.WithField("command_id", msg.ID).Info("Ответ будет отправлен через HTTP")
-	} else {
-		a.logger.WithField("command_id", msg.ID).Error("Ответ не сгенерирован")
-	}
+	return response, nil
 }
 
 // Command handlers are in separate files:

@@ -29,8 +29,8 @@ func (a *Agent) sendHeartbeat() {
 	// Check if Web API base URL is configured
 	webAPIURL := a.config.API.BaseURL
 	if webAPIURL == "" {
-		// In Kafka-only mode, we don't send heartbeat via Redis
-		a.logger.Warn("Heartbeat skipped: Web API not configured and Redis removed")
+		// In HTTP-only mode, we don't send heartbeat via legacy protocols
+		a.logger.Warn("Heartbeat skipped: Web API not configured")
 		return
 	}
 

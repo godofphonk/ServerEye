@@ -138,7 +138,7 @@ func TestPayloadStructs(t *testing.T) {
 				{
 					ID:    "def456",
 					Name:  "container2",
-					Image: "redis",
+					Image: "nginx",
 					State: "running",
 				},
 			},

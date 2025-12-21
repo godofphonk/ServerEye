@@ -6,49 +6,9 @@ import (
 	"time"
 
 	"github.com/servereye/servereye/pkg/protocol"
-	"github.com/sirupsen/logrus"
 )
 
-// HandleCommand реализует интерфейс CommandHandler для HTTP API
-func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*protocol.Message, error) {
-	a.logger.WithFields(logrus.Fields{
-		"command_id":   msg.ID,
-		"command_type": msg.Type,
-		"server_id":    a.config.Server.Name,
-	}).Info("Handling command via HTTP API")
-
-	// Создаем базовый response
-	response := &protocol.Message{
-		ID:        msg.ID,
-		Timestamp: time.Now(),
-		ServerID:  a.config.Server.Name,
-		ServerKey: a.config.Server.SecretKey,
-	}
-
-	// Обрабатываем команду в зависимости от типа
-	switch msg.Type {
-	case protocol.TypeGetCPUTemp:
-		return a.handleTemperatureCommand(ctx, msg, response)
-	case protocol.TypeGetMemoryInfo:
-		return a.handleMemoryCommand(ctx, msg, response)
-	case protocol.TypeGetSystemInfo:
-		return a.handleMemoryCommand(ctx, msg, response)
-	case protocol.TypeGetDiskInfo:
-		return a.handleDiskCommand(ctx, msg, response)
-	case protocol.TypeGetUptime:
-		return a.handleUptimeCommand(ctx, msg, response)
-	case protocol.TypeGetProcesses:
-		return a.handleProcessesCommand(ctx, msg, response)
-	case protocol.TypeGetContainers:
-		return a.handleContainersCommand(ctx, msg, response)
-	default:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = map[string]string{
-			"error": fmt.Sprintf("неизвестный тип команды: %s", msg.Type),
-		}
-		return response, nil
-	}
-}
+// Command handling functions are now inline in agent.go HandleCommand method
 
 // handleTemperatureCommand обрабатывает запрос температуры
 func (a *Agent) handleTemperatureCommand(ctx context.Context, msg *protocol.Message, response *protocol.Message) (*protocol.Message, error) {

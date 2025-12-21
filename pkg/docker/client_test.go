@@ -44,7 +44,7 @@ func TestConvertToContainerInfo(t *testing.T) {
 			input: dockerContainer{
 				ID:     "def987654321",
 				Names:  "another-container",
-				Image:  "redis:alpine",
+				Image:  "nginx:alpine",
 				Status: "Up 1 day",
 				State:  "running",
 				Ports:  "6379/tcp",
@@ -102,7 +102,7 @@ func TestParseContainers(t *testing.T) {
 
 	// Test with valid JSON
 	validJSON := `{"Id":"abc123","Names":"test-container","Image":"nginx","Status":"Up","State":"running","Ports":"80/tcp","Labels":"key=value"}
-{"Id":"def456","Names":"another-container","Image":"redis","Status":"Up","State":"running","Ports":"6379/tcp","Labels":""}`
+{"Id":"def456","Names":"another-container","Image":"nginx","Status":"Up","State":"running","Ports":"6379/tcp","Labels":""}`
 
 	containers, err := client.parseContainers([]byte(validJSON))
 	require.NoError(t, err)
@@ -119,7 +119,7 @@ func TestParseContainers(t *testing.T) {
 	// Test with invalid JSON (should skip invalid lines)
 	invalidJSON := `{"Id":"abc123","Names":"test-container","Image":"nginx","Status":"Up","State":"running","Ports":"80/tcp","Labels":"key=value"}
 invalid json line
-{"Id":"def456","Names":"another-container","Image":"redis","Status":"Up","State":"running","Ports":"6379/tcp","Labels":""}`
+{"Id":"def456","Names":"another-container","Image":"nginx","Status":"Up","State":"running","Ports":"6379/tcp","Labels":""}`
 
 	partialContainers, err := client.parseContainers([]byte(invalidJSON))
 	require.NoError(t, err)
