@@ -20,6 +20,9 @@ type Config struct {
 	Auth struct {
 		APIKey string `env:"API_KEY" envDefault:""`
 	}
+
+	// Telegram
+	TelegramBotToken string
 }
 
 func Load() (*Config, error) {
@@ -32,6 +35,7 @@ func Load() (*Config, error) {
 	cfg.Kafka.Brokers = []string{getEnv("KAFKA_BROKERS", "localhost:9092")}
 	cfg.Kafka.TopicPrefix = getEnv("KAFKA_TOPIC_PREFIX", "metrics")
 	cfg.Auth.APIKey = getEnv("API_KEY", "")
+	cfg.TelegramBotToken = getEnv("TELEGRAM_BOT_TOKEN", "")
 
 	if cfg.Auth.APIKey == "" {
 		return nil, fmt.Errorf("API_KEY environment variable is required")

@@ -9,6 +9,7 @@ import (
 
 	"github.com/servereye/servereye/backend/internal/api"
 	"github.com/servereye/servereye/backend/internal/config"
+	"github.com/servereye/servereye/backend/internal/telegram"
 	"github.com/servereye/servereye/backend/storage"
 	"github.com/sirupsen/logrus"
 )
@@ -47,6 +48,31 @@ func main() {
 	}, logger, storage)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize API server")
+	}
+
+	// Initialize Telegram bot if token is provided
+	var telegramBot *telegram.Bot
+	if cfg.TelegramBotToken != "" {
+		telegramBot, err = telegram.NewBot(cfg.TelegramBotToken, logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize Telegram bot")
+		} else {
+			logger.Info("Telegram bot initialized successfully")
+		}
+	} else {
+		logger.Warn("TELEGRAM_BOT_TOKEN not set - Telegram bot disabled")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start Telegram bot in goroutine if initialized
+	if telegramBot != nil {
+		go func() {
+			if err := telegramBot.Start(ctx); err != nil {
+				logger.WithError(err).Error("Telegram bot error")
+			}
+		}()
 	}
 
 	// Start API server (blocking)
