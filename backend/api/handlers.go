@@ -340,7 +340,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 		Services: map[string]interface{}{
 			"database": "ok",
-			"kafka":    "ok",
 		},
 	}
 
@@ -348,18 +347,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if err := s.storage.Ping(); err != nil {
 		response.Status = "degraded"
 		response.Services["database"] = "error"
-	}
-
-	s.writeJSON(w, response)
-}
-
-func (s *Server) handleKafkaHealth(w http.ResponseWriter, r *http.Request) {
-	// This would check the Kafka consumer health
-	// For now, just return status
-	response := map[string]interface{}{
-		"status":    "ok",
-		"timestamp": time.Now(),
-		"consumer":  "connected",
 	}
 
 	s.writeJSON(w, response)

@@ -62,7 +62,6 @@ func (s *Server) setupRoutes() *mux.Router {
 	public := router.PathPrefix("/api/v1").Subrouter()
 	public.HandleFunc("/register-key", s.handleRegisterKey).Methods("POST")
 	public.HandleFunc("/health", s.handleHealth).Methods("GET")
-	public.HandleFunc("/health/kafka", s.handleKafkaHealth).Methods("GET")
 
 	// Internal webhook route (authenticated by webhook secret)
 	internal := router.PathPrefix("/internal").Subrouter()
