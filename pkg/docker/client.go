@@ -44,7 +44,7 @@ func (c *Client) GetContainers(ctx context.Context) (*protocol.ContainersPayload
 	}
 
 	// Execute docker ps command with JSON format
-	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--format", "json")
+	cmd := exec.CommandContext(ctx, "/snap/bin/docker", "ps", "-a", "--format", "json")
 	output, err := cmd.Output()
 	if err != nil {
 		c.logger.WithError(err).Error("Failed to execute docker ps command")
@@ -67,9 +67,11 @@ func (c *Client) GetContainers(ctx context.Context) (*protocol.ContainersPayload
 
 // checkDockerAvailable checks if Docker is available and accessible
 func (c *Client) checkDockerAvailable() error {
-	cmd := exec.Command("docker", "version", "--format", "json")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker command failed: %v", err)
+	cmd := exec.Command("/snap/bin/docker", "version", "--format", "json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		c.logger.WithField("output", string(output)).Error("Docker command failed with stderr")
+		return fmt.Errorf("docker command failed: %v, output: %s", err, string(output))
 	}
 	return nil
 }

@@ -16,7 +16,7 @@ func (c *Client) CheckDockerAvailability(ctx context.Context) error {
 	defer cancel()
 
 	// Try to run 'docker version' command
-	cmd := exec.CommandContext(healthCtx, "docker", "version", "--format", "{{.Server.Version}}")
+	cmd := exec.CommandContext(healthCtx, "/snap/bin/docker", "version", "--format", "{{.Server.Version}}")
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

@@ -23,7 +23,7 @@ func (c *Client) StartContainer(ctx context.Context, containerID string) (*proto
 		}, nil
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", "start", containerID)
+	cmd := exec.CommandContext(ctx, "/snap/bin/docker", "start", containerID)
 	output, err := cmd.CombinedOutput()
 
 	response := &protocol.ContainerActionResponse{
@@ -62,7 +62,7 @@ func (c *Client) StopContainer(ctx context.Context, containerID string) (*protoc
 		}, nil
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", "stop", containerID)
+	cmd := exec.CommandContext(ctx, "/snap/bin/docker", "stop", containerID)
 	output, err := cmd.CombinedOutput()
 
 	response := &protocol.ContainerActionResponse{
@@ -101,7 +101,7 @@ func (c *Client) RestartContainer(ctx context.Context, containerID string) (*pro
 		}, nil
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", "restart", containerID)
+	cmd := exec.CommandContext(ctx, "/snap/bin/docker", "restart", containerID)
 	output, err := cmd.CombinedOutput()
 
 	response := &protocol.ContainerActionResponse{
@@ -141,7 +141,7 @@ func (c *Client) RemoveContainer(ctx context.Context, containerID string) (*prot
 	}
 
 	// Use -f flag to force removal
-	cmd := exec.CommandContext(ctx, "docker", "rm", "-f", containerID)
+	cmd := exec.CommandContext(ctx, "/snap/bin/docker", "rm", "-f", containerID)
 	output, err := cmd.CombinedOutput()
 
 	response := &protocol.ContainerActionResponse{
@@ -198,7 +198,7 @@ func (c *Client) CreateContainer(ctx context.Context, payload *protocol.CreateCo
 	args = append(args, payload.Image)
 
 	// Execute docker run command
-	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd := exec.CommandContext(ctx, "/snap/bin/docker", args...)
 	output, err := cmd.CombinedOutput()
 
 	response := &protocol.ContainerActionResponse{
@@ -236,7 +236,7 @@ func (c *Client) CreateContainer(ctx context.Context, payload *protocol.CreateCo
 
 // getContainerState gets the current state of a container
 func (c *Client) getContainerState(ctx context.Context, containerID string) (string, error) {
-	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Status}}", containerID)
+	cmd := exec.CommandContext(ctx, "/snap/bin/docker", "inspect", "--format", "{{.State.Status}}", containerID)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err

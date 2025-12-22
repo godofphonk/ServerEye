@@ -164,47 +164,26 @@ func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*prot
 	// Обрабатываем команду
 	switch msg.Type {
 	case protocol.TypePing:
-		response.Type = protocol.TypePong
-		response.Payload = protocol.PongPayload{
-			Status: "healthy",
-			Uptime: "unknown",
-		}
+		result := a.handlePing(msg)
+		return result, nil
 	case protocol.TypeGetCPUTemp:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorCommandTimeout,
-			ErrorMessage: "CPU temperature command not implemented",
-		}
+		result := a.handleGetCPUTemp(msg)
+		return result, nil
 	case protocol.TypeGetContainers:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorDockerUnavailable,
-			ErrorMessage: "Docker not available",
-		}
+		result := a.handleGetContainers(msg)
+		return result, nil
 	case protocol.TypeStartContainer:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: "Start container command not implemented",
-		}
+		result := a.handleStartContainer(msg)
+		return result, nil
 	case protocol.TypeStopContainer:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: "Stop container command not implemented",
-		}
+		result := a.handleStopContainer(msg)
+		return result, nil
 	case protocol.TypeRestartContainer:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: "Restart container command not implemented",
-		}
+		result := a.handleRestartContainer(msg)
+		return result, nil
 	case protocol.TypeRemoveContainer:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: "Remove container command not implemented",
-		}
+		result := a.handleRemoveContainer(msg)
+		return result, nil
 	case protocol.TypeCreateContainer:
 		response.Type = protocol.TypeErrorResponse
 		response.Payload = protocol.ErrorPayload{
@@ -212,41 +191,23 @@ func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*prot
 			ErrorMessage: "Create container command not implemented",
 		}
 	case protocol.TypeGetMemoryInfo:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorCommandTimeout,
-			ErrorMessage: "Memory info command not implemented",
-		}
+		result := a.handleGetMemoryInfo(msg)
+		return result, nil
 	case protocol.TypeGetDiskInfo:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorCommandTimeout,
-			ErrorMessage: "Disk info command not implemented",
-		}
+		result := a.handleGetDiskInfo(msg)
+		return result, nil
 	case protocol.TypeGetUptime:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorCommandTimeout,
-			ErrorMessage: "Uptime command not implemented",
-		}
+		result := a.handleGetUptime(msg)
+		return result, nil
 	case protocol.TypeGetProcesses:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: "Get processes command not implemented",
-		}
+		result := a.handleGetProcesses(msg)
+		return result, nil
 	case protocol.TypeGetNetworkInfo:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: "Get network info command not implemented",
-		}
+		result := a.handleGetNetworkInfo(msg)
+		return result, nil
 	case protocol.TypeUpdateAgent:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: "Update agent command not implemented",
-		}
+		result := a.handleUpdateAgent(msg)
+		return result, nil
 	default:
 		response.Type = protocol.TypeErrorResponse
 		response.Payload = protocol.ErrorPayload{
