@@ -61,6 +61,11 @@ func LoadAgentConfig(filepath string) (*AgentConfig, error) {
 		return nil, fmt.Errorf("некорректная конфигурация: %v", err)
 	}
 
+	// Устанавливаем дефолтные значения
+	if config.Metrics.Interval == "" {
+		config.Metrics.Interval = "30s"
+	}
+
 	return &config, nil
 }
 

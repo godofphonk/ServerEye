@@ -15,6 +15,12 @@ type Config struct {
 	Auth struct {
 		APIKey string `env:"API_KEY" envDefault:""`
 	}
+
+	Kafka struct {
+		Brokers     []string `env:"KAFKA_BROKERS" envDefault:"localhost:9092"`
+		TopicPrefix string   `env:"KAFKA_TOPIC_PREFIX" envDefault:"metrics"`
+		Enabled     bool     `env:"KAFKA_ENABLED" envDefault:"false"`
+	}
 }
 
 func Load() (*Config, error) {
@@ -25,6 +31,14 @@ func Load() (*Config, error) {
 	cfg.Server.Port = getEnv("SERVER_PORT", "8080")
 	cfg.DatabaseURL = getEnv("DATABASE_URL", "postgres://user:password@localhost/servereye?sslmode=disable")
 	cfg.Auth.APIKey = getEnv("API_KEY", "")
+
+	// Kafka configuration
+	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:9092")
+	if kafkaBrokers != "" {
+		cfg.Kafka.Brokers = []string{kafkaBrokers}
+	}
+	cfg.Kafka.TopicPrefix = getEnv("KAFKA_TOPIC_PREFIX", "metrics")
+	cfg.Kafka.Enabled = getEnv("KAFKA_ENABLED", "false") == "true"
 
 	if cfg.Auth.APIKey == "" {
 		return nil, fmt.Errorf("API_KEY environment variable is required")

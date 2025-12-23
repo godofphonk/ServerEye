@@ -387,7 +387,7 @@ server:
 
 api:
   base_url: "https://api.servereye.dev"
-  api_key: "change-me-in-production"
+  api_key: "sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU"
   timeout: "30s"
 
 metrics:

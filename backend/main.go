@@ -36,13 +36,22 @@ func main() {
 			Host string
 			Port string
 		}{
-			Host: "0.0.0.0",
-			Port: "8080",
+			Host: cfg.Server.Host,
+			Port: cfg.Server.Port,
 		},
 		Auth: struct {
 			APIKey string
 		}{
 			APIKey: cfg.Auth.APIKey,
+		},
+		Kafka: struct {
+			Brokers     []string
+			TopicPrefix string
+			Enabled     bool
+		}{
+			Brokers:     cfg.Kafka.Brokers,
+			TopicPrefix: cfg.Kafka.TopicPrefix,
+			Enabled:     cfg.Kafka.Enabled,
 		},
 	}, logger, storage)
 	if err != nil {

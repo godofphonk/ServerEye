@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/servereye/servereye/backend/internal/kafka"
 	"github.com/servereye/servereye/backend/storage"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
@@ -25,6 +26,7 @@ type Server struct {
 	responseChans   map[string]chan CommandResponse
 	responseMutex   sync.RWMutex
 	storage         storage.Storage
+	kafkaPublisher  kafka.Publisher
 }
 
 type Config struct {
@@ -35,13 +37,18 @@ type Config struct {
 	Auth struct {
 		APIKey string
 	}
+	Kafka struct {
+		Brokers     []string
+		TopicPrefix string
+		Enabled     bool
+	}
 }
 
 type MetricRequest struct {
 	ServerID  string            `json:"server_id"`
 	ServerKey string            `json:"server_key"`
 	Type      string            `json:"type"`
-	Value     float64           `json:"value"`
+	Value     interface{}       `json:"value"` // Changed from float64 to interface{} to support complex metrics
 	Timestamp time.Time         `json:"timestamp"`
 	Tags      map[string]string `json:"tags"`
 }
@@ -92,6 +99,19 @@ func New(cfg *Config, logger *logrus.Logger, storage storage.Storage) (*Server, 
 
 	// Initialize WebSocket server
 	server.wsServer = NewWebSocketServer(server, logger)
+
+	// Initialize Kafka publisher if enabled
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		publisher, err := kafka.NewPublisher(cfg.Kafka.Brokers, cfg.Kafka.TopicPrefix)
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize Kafka publisher")
+			return nil, fmt.Errorf("failed to initialize kafka publisher: %w", err)
+		}
+		server.kafkaPublisher = publisher
+		logger.Info("Kafka publisher initialized")
+	} else {
+		logger.Info("Kafka publisher disabled")
+	}
 
 	return server, nil
 }
@@ -151,14 +171,43 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create publisher metric
-	// Store metric in database (HTTP-only mode)
-	// TODO: Implement metric storage if needed
+	// Log received metric
 	s.logger.WithFields(logrus.Fields{
 		"server_id": req.ServerID,
 		"type":      req.Type,
 		"value":     req.Value,
-	}).Info("Metric received (HTTP-only mode)")
+	}).Info("Metric received")
+
+	// Publish to Kafka if enabled
+	if s.kafkaPublisher != nil {
+		metricMsg := &kafka.MetricMessage{
+			ServerID:   req.ServerID,
+			ServerKey:  req.ServerKey,
+			ServerName: "", // Will be filled by metrics-service if needed
+			Type:       req.Type,
+			Timestamp:  req.Timestamp,
+			Value:      req.Value,
+			Tags:       req.Tags,
+			Version:    "1.0",
+		}
+
+		// Set default timestamp if not provided
+		if metricMsg.Timestamp.IsZero() {
+			metricMsg.Timestamp = time.Now()
+		}
+
+		if err := s.kafkaPublisher.PublishMetric(r.Context(), metricMsg); err != nil {
+			s.logger.WithError(err).Error("Failed to publish metric to Kafka")
+			// Don't return error to client - metric is stored locally
+		} else {
+			s.logger.WithFields(logrus.Fields{
+				"server_id":   req.ServerID,
+				"metric_type": req.Type,
+			}).Debug("Metric published to Kafka")
+		}
+	}
+
+	// TODO: Store metric in local database if needed
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
