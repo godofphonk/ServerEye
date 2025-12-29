@@ -9,7 +9,7 @@ import (
 
 	"github.com/godofphonk/ServerEye/backend/internal/api"
 	"github.com/godofphonk/ServerEye/backend/internal/config"
-	"github.com/godofphonk/ServerEye/backend/storage"
+	"github.com/godofphonk/ServerEye/backend/internal/storage"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,7 +24,7 @@ func main() {
 	}
 
 	// Initialize storage (optional)
-	var store storage.Storage
+	var store *storage.PostgresStorage
 	var keysStore *storage.KeysStorage
 	if cfg.DatabaseURL != "" && cfg.DatabaseURL != "skip" {
 		var err error
