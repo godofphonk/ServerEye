@@ -14,16 +14,12 @@ AGENT_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/serv
 CHECKSUM_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/checksums.txt"
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
 AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
-DEFAULT_SECRET_ENDPOINT="https://servereye-secret-endpoint.servereye.workers.dev/agent"
-AGENT_SECRET_ENDPOINT="${SERVEREYE_SECRET_ENDPOINT:-$DEFAULT_SECRET_ENDPOINT}"
-AGENT_INSTALLER_KEY="${SERVEREYE_INSTALLER_KEY:-}"
-AGENT_SECRET_TOKEN="${SERVEREYE_SECRET_TOKEN:-}"
-DEFAULT_API_URL="https://servereye-registration-worker.servereye.workers.dev"
-SERVEREYE_API_URL="${SERVEREYE_API_URL:-$DEFAULT_API_URL}"
-
-# Worker API configuration
-USE_WORKER_API="${USE_WORKER_API:-true}"  # Use Cloudflare Worker by default
-AGENT_INSTALLER_KEY="${AGENT_INSTALLER_KEY:-301210}"
+# Backend API configuration
+DEFAULT_BACKEND_URL="http://localhost:8080"
+BACKEND_URL="${SERVEREYE_BACKEND_URL:-$DEFAULT_BACKEND_URL}"
+API_KEY="${SERVEREYE_API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}"
+# Database configuration (for direct access if needed)
+DATABASE_URL="${DATABASE_URL:-postgres://postgres:test123456@localhost:5432/PgRegisteredKeys?sslmode=disable}"
 
 ensure_api_env() {
     # Load existing env file if present
@@ -32,37 +28,32 @@ ensure_api_env() {
         source "$AGENT_ENV_FILE"
     fi
 
-    if [ -z "$SERVEREYE_API_URL" ]; then
-        fetch_env_from_secret_endpoint || true
-    fi
-
-    if [ -z "$SERVEREYE_API_URL" ]; then
+    if [ -z "$BACKEND_URL" ]; then
         if [ -t 0 ]; then
-            echo "[*] SERVEREYE_API_URL not set."
-            read -r -p "Enter SERVEREYE_API_URL (ServerEye API endpoint): " user_api_url
-            SERVEREYE_API_URL="$user_api_url"
+            echo "[*] BACKEND_URL not set."
+            read -r -p "Enter BACKEND_URL (ServerEye Backend API endpoint): " user_backend_url
+            BACKEND_URL="$user_backend_url"
         fi
     fi
 
-    if [ -z "$SERVEREYE_API_URL" ]; then
+    if [ -z "$BACKEND_URL" ]; then
         cat <<EOF
-[ERROR] SERVEREYE_API_URL is required for key registration.
+[ERROR] BACKEND_URL is required for key registration.
   - Option 1: export it before running the installer
-      SERVEREYE_API_URL=https://api.servereye.dev bash install-agent.sh
+      BACKEND_URL=https://api.servereye.dev bash install-agent.sh
   - Option 2: rerun this installer from an interactive shell and enter the value when prompted
-  - Option 3: Set SERVEREYE_SECRET_ENDPOINT and SERVEREYE_INSTALLER_KEY to fetch from a secure endpoint
 EOF
         exit 1
     fi
 
     mkdir -p "$CONFIG_DIR"
     cat > "$AGENT_ENV_FILE" <<EOF
-SERVEREYE_API_URL="$SERVEREYE_API_URL"
-USE_WORKER_API="$USE_WORKER_API"
-AGENT_INSTALLER_KEY="$AGENT_INSTALLER_KEY"
+BACKEND_URL="$BACKEND_URL"
+API_KEY="$API_KEY"
+DATABASE_URL="$DATABASE_URL"
 EOF
     chmod 600 "$AGENT_ENV_FILE"
-    echo "[*] Stored SERVEREYE_API_URL in $AGENT_ENV_FILE"
+    echo "[*] Stored configuration in $AGENT_ENV_FILE"
 }
 
 register_key_with_api() {
@@ -71,8 +62,8 @@ register_key_with_api() {
     local os_info="$3"
     local hostname="$4"
 
-    if [ -z "$SERVEREYE_API_URL" ]; then
-        echo "[WARNING] SERVEREYE_API_URL not set - skipping backend API registration"
+    if [ -z "$BACKEND_URL" ]; then
+        echo "[WARNING] BACKEND_URL not set - skipping backend API registration"
         return 1
     fi
 
@@ -92,26 +83,15 @@ EOF
     local http_code
     
     # Prepare curl headers
-    local curl_headers="-H 'Content-Type: application/json'"
+    local curl_headers="-H 'Content-Type: application/json' -H 'X-API-Key: $API_KEY'"
     
-    # Add installer key if available
-    if [ -n "$AGENT_INSTALLER_KEY" ]; then
-        curl_headers="$curl_headers -H 'x-installer-key: $AGENT_INSTALLER_KEY'"
-    fi
+    echo "[*] Registering key with backend API at $BACKEND_URL"
     
-    # Use /api/register-key for Cloudflare Worker (fallback to /api/v1/register-key for backend)
-    local endpoint="$SERVEREYE_API_URL/api/register-key"
-    if [ "$USE_WORKER_API" != "true" ]; then
-        endpoint="$SERVEREYE_API_URL/api/v1/register-key"
-    fi
+    # Use backend API endpoint
+    local endpoint="$BACKEND_URL/api/v1/keys/register"
     
     # Build curl command without eval
-    local curl_cmd=(curl -s -o "$response_file" -w "%{http_code}" -X POST "$endpoint" -H "Content-Type: application/json")
-    
-    # Add installer key header if available
-    if [ -n "$AGENT_INSTALLER_KEY" ]; then
-        curl_cmd+=(-H "x-installer-key: $AGENT_INSTALLER_KEY")
-    fi
+    local curl_cmd=(curl -s -o "$response_file" -w "%{http_code}" -X POST "$endpoint" -H "Content-Type: application/json" -H "X-API-Key: $API_KEY")
     
     # Add payload
     curl_cmd+=(-d "$payload")
@@ -131,39 +111,6 @@ EOF
     fi
     rm -f "$response_file"
     return 1
-}
-
-fetch_env_from_secret_endpoint() {
-    if [ -z "$AGENT_SECRET_ENDPOINT" ]; then
-        return 1
-    fi
-
-    if ! command -v curl >/dev/null 2>&1; then
-        echo "[WARNING] curl is required to fetch secrets automatically"
-        return 1
-    fi
-
-    echo "[*] Fetching secrets from secure endpoint..."
-    local curl_cmd=(curl -fsSL "$AGENT_SECRET_ENDPOINT")
-
-    if [ -n "$AGENT_SECRET_TOKEN" ]; then
-        curl_cmd+=(-H "X-Secret-Token: $AGENT_SECRET_TOKEN")
-    elif [ -n "$AGENT_INSTALLER_KEY" ]; then
-        curl_cmd+=(-H "X-Installer-Key: $AGENT_INSTALLER_KEY")
-    fi
-
-    local response
-    if ! response=$("${curl_cmd[@]}"); then
-        echo "[WARNING] Could not fetch secrets from endpoint"
-        return 1
-    fi
-
-    mkdir -p "$CONFIG_DIR"
-    echo "$response" > "$AGENT_ENV_FILE"
-    chmod 600 "$AGENT_ENV_FILE"
-    # shellcheck disable=SC1090
-    source "$AGENT_ENV_FILE"
-    echo "[OK] Secrets pulled successfully"
 }
 
 echo "[*] Installing ServerEye Agent..."
@@ -232,7 +179,7 @@ chmod 755 "$CONFIG_DIR"
 
 # Ensure API endpoint is available
 ensure_api_env
-export SERVEREYE_API_URL
+export BACKEND_URL API_KEY DATABASE_URL
 
 # Check version if updating
 if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
@@ -355,8 +302,9 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
 EOF
 )
 
-    if curl -s -X POST "$BOT_URL/api/register-key" \
+    if curl -s -X POST "$BACKEND_URL/api/v1/keys/register" \
        -H "Content-Type: application/json" \
+       -H "X-API-Key: $API_KEY" \
        -d "$JSON_PAYLOAD" > /dev/null; then
         echo "[OK] Agent version updated in bot database!"
     else
@@ -386,8 +334,8 @@ server:
   secret_key: "$SECRET_KEY"
 
 api:
-  base_url: "https://api.servereye.dev"
-  api_key: "sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU"
+  base_url: "$BACKEND_URL"
+  api_key: "$API_KEY"
   timeout: "30s"
 
 metrics:
@@ -419,8 +367,9 @@ EOF
 EOF
 )
 
-    if curl -s -X POST "$BOT_URL/api/register-key" \
+    if curl -s -X POST "$BACKEND_URL/api/v1/keys/register" \
        -H "Content-Type: application/json" \
+       -H "X-API-Key: $API_KEY" \
        -d "$JSON_PAYLOAD" > /dev/null; then
         echo "[OK] Key registered with ServerEye bot!"
     else
