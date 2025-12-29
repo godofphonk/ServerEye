@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/godofphonk/ServerEye/backend/internal/kafka"
+	"github.com/godofphonk/ServerEye/backend/internal/storage"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/godofphonk/ServerEye/backend/internal/kafka"
-	"github.com/godofphonk/ServerEye/backend/storage"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 )
@@ -25,7 +25,7 @@ type Server struct {
 	pendingMutex    sync.RWMutex
 	responseChans   map[string]chan CommandResponse
 	responseMutex   sync.RWMutex
-	storage         storage.Storage
+	storage         *storage.PostgresStorage
 	keysStorage     *storage.KeysStorage
 	kafkaPublisher  kafka.Publisher
 }
@@ -89,7 +89,7 @@ type KeyRegistrationRequest struct {
 	Hostname     string `json:"hostname"`
 }
 
-func New(cfg *Config, logger *logrus.Logger, storage storage.Storage, keysStorage *storage.KeysStorage) (*Server, error) {
+func New(cfg *Config, logger *logrus.Logger, storage *storage.PostgresStorage, keysStorage *storage.KeysStorage) (*Server, error) {
 	server := &Server{
 		config:          cfg,
 		logger:          logger,
