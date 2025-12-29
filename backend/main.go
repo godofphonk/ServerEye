@@ -23,12 +23,31 @@ func main() {
 		logger.WithError(err).Fatal("Failed to load config")
 	}
 
-	// Initialize storage
-	storage, err := storage.New(cfg.DatabaseURL, logger)
-	if err != nil {
-		logger.WithError(err).Fatal("Failed to initialize storage")
+	// Initialize storage (optional)
+	var store storage.Storage
+	var keysStore *storage.KeysStorage
+	if cfg.DatabaseURL != "" && cfg.DatabaseURL != "skip" {
+		var err error
+		store, err = storage.New(cfg.DatabaseURL, logger)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize storage")
+		}
+		defer store.Close()
+	} else {
+		logger.Info("Storage disabled - running in memory-only mode")
 	}
-	defer storage.Close()
+
+	// Initialize keys storage
+	if cfg.KeysDatabaseURL != "" && cfg.KeysDatabaseURL != "skip" {
+		var err error
+		keysStore, err = storage.NewKeysStorage(cfg.KeysDatabaseURL, logger)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize keys storage")
+		}
+		defer keysStore.Close()
+	} else {
+		logger.Info("Keys storage disabled")
+	}
 
 	// Initialize API server (HTTP-only mode)
 	apiServer, err := api.New(&api.Config{
@@ -53,7 +72,7 @@ func main() {
 			TopicPrefix: cfg.Kafka.TopicPrefix,
 			Enabled:     cfg.Kafka.Enabled,
 		},
-	}, logger, storage)
+	}, logger, store, keysStore)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize API server")
 	}

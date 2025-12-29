@@ -59,6 +59,9 @@ temp/
 # Private deployment files
 private/
 
+# Kubernetes manifests (exclude from version control)
+k8s/
+
 # Built binaries (exclude from root)
 servereye-*
 

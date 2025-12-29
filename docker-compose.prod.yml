@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL database
+  # PostgreSQL database for main application
   postgres:
     image: postgres:15-alpine
     container_name: servereye-postgres-prod
@@ -10,7 +10,7 @@ services:
     environment:
       POSTGRES_DB: servereye
       POSTGRES_USER: servereye
-      POSTGRES_PASSWORD: teec301210600644
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teec301210600644}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -18,6 +18,28 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U servereye"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL for registered keys (separate database)
+  postgres-keys:
+    image: postgres:15-alpine
+    container_name: servereye-postgres-keys
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: PgRegisteredKeys
+      POSTGRES_USER: servereye_keys
+      POSTGRES_PASSWORD: ${KEYS_DB_PASSWORD:-KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D}
+    volumes:
+      - postgres_keys_data:/var/lib/postgresql/data
+      - ./deployments/init-keys-db.sql:/docker-entrypoint-initdb.d/init-schema.sql
+    networks:
+      - servereye-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U servereye_keys"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -31,10 +53,13 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: postgres://servereye:teec301210600644@postgres:5432/servereye
-      API_KEY: change-me-in-production
+      DATABASE_URL: postgres://servereye:${POSTGRES_PASSWORD:-teec301210600644}@postgres:5432/servereye
+      KEYS_DATABASE_URL: postgres://servereye_keys:${KEYS_DB_PASSWORD:-KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D}@postgres-keys:5432/PgRegisteredKeys?sslmode=disable
+      API_KEY: ${API_KEY:-change-me-in-production}
     depends_on:
       postgres:
+        condition: service_healthy
+      postgres-keys:
         condition: service_healthy
     networks:
       - servereye-network
@@ -47,6 +72,7 @@ services:
 
 volumes:
   postgres_data:
+  postgres_keys_data:
 
 networks:
   servereye-network:

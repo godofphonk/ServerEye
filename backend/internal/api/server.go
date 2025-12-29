@@ -26,6 +26,7 @@ type Server struct {
 	responseChans   map[string]chan CommandResponse
 	responseMutex   sync.RWMutex
 	storage         storage.Storage
+	keysStorage     *storage.KeysStorage
 	kafkaPublisher  kafka.Publisher
 }
 
@@ -88,13 +89,14 @@ type KeyRegistrationRequest struct {
 	Hostname     string `json:"hostname"`
 }
 
-func New(cfg *Config, logger *logrus.Logger, storage storage.Storage) (*Server, error) {
+func New(cfg *Config, logger *logrus.Logger, storage storage.Storage, keysStorage *storage.KeysStorage) (*Server, error) {
 	server := &Server{
 		config:          cfg,
 		logger:          logger,
 		pendingCommands: make(map[string][]PendingCommand),
 		responseChans:   make(map[string]chan CommandResponse),
 		storage:         storage,
+		keysStorage:     keysStorage,
 	}
 
 	// Initialize WebSocket server
@@ -531,10 +533,14 @@ func (s *Server) handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert into database
-	if err := s.storage.InsertGeneratedKey(r.Context(), req.SecretKey, req.AgentVersion, req.OSInfo, req.Hostname); err != nil {
-		s.logger.WithError(err).WithField("secret_key", req.SecretKey).Error("Failed to insert generated key")
-		s.writeError(w, http.StatusInternalServerError, "Internal server error", "Failed to register key")
-		return
+	if s.keysStorage != nil {
+		if err := s.keysStorage.InsertGeneratedKey(req.SecretKey, req.AgentVersion, req.OSInfo, req.Hostname); err != nil {
+			s.logger.WithError(err).WithField("secret_key", req.SecretKey).Error("Failed to insert generated key")
+			s.writeError(w, http.StatusInternalServerError, "Internal server error", "Failed to register key")
+			return
+		}
+	} else {
+		s.logger.Warn("Keys storage not initialized, skipping database insert")
 	}
 
 	s.logger.WithField("secret_key", req.SecretKey).Info("Key registered successfully")

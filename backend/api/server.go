@@ -13,13 +13,13 @@ import (
 
 type Server struct {
 	config   *config.Config
-	storage  storage.Storage
+	storage  *storage.PostgresStorage
 	logger   *logrus.Logger
 	server   *http.Server
 	wsServer *WebSocketServer
 }
 
-func New(cfg *config.Config, storage storage.Storage, logger *logrus.Logger) *Server {
+func New(cfg *config.Config, storage *storage.PostgresStorage, logger *logrus.Logger) *Server {
 	s := &Server{
 		config:  cfg,
 		storage: storage,

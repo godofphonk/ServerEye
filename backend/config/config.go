@@ -15,7 +15,8 @@ type Config struct {
 	Port int
 
 	// Database
-	DatabaseURL string
+	DatabaseURL     string
+	KeysDatabaseURL string
 
 	// Metrics
 	MetricsTopic string
@@ -36,7 +37,8 @@ func Load() (*Config, error) {
 		Host: getEnv("HOST", "0.0.0.0"),
 		Port: getEnvInt("PORT", 8080),
 
-		DatabaseURL: getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/servereye?sslmode=disable"),
+		DatabaseURL:     getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/servereye?sslmode=disable"),
+		KeysDatabaseURL: getEnv("KEYS_DATABASE_URL", "postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@localhost:5433/PgRegisteredKeys?sslmode=disable"),
 
 		MetricsTopic: getEnv("METRICS_TOPIC", "metrics"),
 
