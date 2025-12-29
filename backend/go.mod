@@ -1,4 +1,4 @@
-module github.com/servereye/servereye/backend
+module github.com/godofphonk/ServerEye/backend
 
 go 1.24.0
 
@@ -8,12 +8,12 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/lib/pq v1.10.9
 	github.com/segmentio/kafka-go v0.4.47
-	github.com/servereye/servereye v0.0.0-00010101000000-000000000000
+	github.com/godofphonk/ServerEye v0.0.0-00010101000000-000000000000
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/net v0.48.0
 )
 
-replace github.com/servereye/servereye => ../
+replace github.com/godofphonk/ServerEye => ../
 
 require (
 	github.com/klauspost/compress v1.15.9 // indirect

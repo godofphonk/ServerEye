@@ -7,9 +7,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/servereye/servereye/backend/internal/api"
-	"github.com/servereye/servereye/backend/internal/config"
-	"github.com/servereye/servereye/backend/storage"
+	"github.com/godofphonk/ServerEye/backend/internal/api"
+	"github.com/godofphonk/ServerEye/backend/internal/config"
+	"github.com/godofphonk/ServerEye/backend/storage"
 	"github.com/sirupsen/logrus"
 )
 

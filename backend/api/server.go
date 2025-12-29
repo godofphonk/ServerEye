@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/servereye/servereye/backend/internal/config"
-	"github.com/servereye/servereye/backend/internal/storage"
+	"github.com/godofphonk/ServerEye/backend/internal/config"
+	"github.com/godofphonk/ServerEye/backend/internal/storage"
 	"github.com/sirupsen/logrus"
 )
 

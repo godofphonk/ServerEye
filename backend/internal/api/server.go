@@ -10,8 +10,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/servereye/servereye/backend/internal/kafka"
-	"github.com/servereye/servereye/backend/storage"
+	"github.com/godofphonk/ServerEye/backend/internal/kafka"
+	"github.com/godofphonk/ServerEye/backend/storage"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 )

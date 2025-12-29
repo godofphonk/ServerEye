@@ -7,7 +7,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/servereye/servereye/pkg/publisher"
+	"github.com/godofphonk/ServerEye/pkg/publisher"
 	"github.com/sirupsen/logrus"
 )
 

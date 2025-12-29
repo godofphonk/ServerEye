@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/servereye/servereye/pkg/publisher"
+	"github.com/godofphonk/ServerEye/pkg/publisher"
 )
 
 type MetricsResponse struct {
