@@ -1,4 +1,4 @@
-module github.com/servereye/servereye
+module github.com/godofphonk/ServerEye
 
 go 1.24
 

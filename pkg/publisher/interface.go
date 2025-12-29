@@ -1,7 +1,7 @@
 package publisher
 
 import (
-	"github.com/servereye/servereye/pkg/types"
+	"github.com/godofphonk/ServerEye/pkg/types"
 )
 
 // Re-export types from pkg/types to maintain backward compatibility

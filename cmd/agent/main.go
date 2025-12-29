@@ -17,9 +17,9 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/servereye/servereye/internal/agent"
-	"github.com/servereye/servereye/internal/config"
-	"github.com/servereye/servereye/internal/version"
+	"github.com/godofphonk/ServerEye/internal/agent"
+	"github.com/godofphonk/ServerEye/internal/config"
+	"github.com/godofphonk/ServerEye/internal/version"
 	"github.com/sirupsen/logrus"
 )
 

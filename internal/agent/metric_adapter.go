@@ -3,8 +3,8 @@ package agent
 import (
 	"time"
 
-	"github.com/servereye/servereye/pkg/protocol"
-	"github.com/servereye/servereye/pkg/publisher"
+	"github.com/godofphonk/ServerEye/pkg/protocol"
+	"github.com/godofphonk/ServerEye/pkg/publisher"
 )
 
 // ConvertToMetric конвертирует протокольное сообщение в метрику для publisher

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/servereye/servereye/pkg/types"
+	"github.com/godofphonk/ServerEye/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 

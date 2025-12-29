@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/servereye/servereye/pkg/protocol"
+	"github.com/godofphonk/ServerEye/pkg/protocol"
 )
 
 // StartContainer starts a Docker container

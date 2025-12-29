@@ -6,13 +6,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/servereye/servereye/internal/config"
-	"github.com/servereye/servereye/pkg/commands"
-	"github.com/servereye/servereye/pkg/docker"
-	"github.com/servereye/servereye/pkg/http"
-	"github.com/servereye/servereye/pkg/metrics"
-	"github.com/servereye/servereye/pkg/protocol"
-	"github.com/servereye/servereye/pkg/publisher"
+	"github.com/godofphonk/ServerEye/internal/config"
+	"github.com/godofphonk/ServerEye/pkg/commands"
+	"github.com/godofphonk/ServerEye/pkg/docker"
+	"github.com/godofphonk/ServerEye/pkg/http"
+	"github.com/godofphonk/ServerEye/pkg/metrics"
+	"github.com/godofphonk/ServerEye/pkg/protocol"
+	"github.com/godofphonk/ServerEye/pkg/publisher"
 	"github.com/sirupsen/logrus"
 )
 
