@@ -47,8 +47,8 @@ services:
   # Backend API
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: servereye-backend-prod
     ports:
       - "8080:8080"

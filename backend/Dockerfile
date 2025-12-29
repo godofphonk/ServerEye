@@ -8,16 +8,13 @@ RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /app
 
 # Copy entire project (needed for replace directives)
-COPY .. .
+COPY . .
 
 # Change to backend directory for build
 WORKDIR /app/backend
 
 # Download dependencies
 RUN go mod download
-
-# Copy source code
-COPY . .
 
 # Build binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/servereye-backend .
