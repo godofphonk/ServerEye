@@ -11,9 +11,10 @@ services:
       POSTGRES_DB: servereye
       POSTGRES_USER: servereye
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teec301210600644}
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+      POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./deployments/pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
     networks:
       - servereye-network
     restart: unless-stopped
@@ -33,9 +34,10 @@ services:
       POSTGRES_DB: PgRegisteredKeys
       POSTGRES_USER: servereye_keys
       POSTGRES_PASSWORD: ${KEYS_DB_PASSWORD:-KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D}
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+      POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
       - postgres_keys_data:/var/lib/postgresql/data
-      - ./deployments/pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
       - ./deployments/init-keys-db.sql:/docker-entrypoint-initdb.d/init-schema.sql
     networks:
       - servereye-network
