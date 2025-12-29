@@ -15,7 +15,7 @@ CHECKSUM_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/c
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
 AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
 # Backend API configuration
-DEFAULT_BACKEND_URL="https://api.servereye.dev"
+DEFAULT_BACKEND_URL="https://api.servereye.dev:8443"
 BACKEND_URL="${SERVEREYE_BACKEND_URL:-$DEFAULT_BACKEND_URL}"
 API_KEY="${SERVEREYE_API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}"
 # Database configuration (for direct access if needed)
@@ -88,7 +88,7 @@ EOF
     echo "[*] Registering key with backend API at $BACKEND_URL"
     
     # Use backend API endpoint
-    local endpoint="$BACKEND_URL/api/v1/keys/register"
+    local endpoint="$BACKEND_URL/register-key"
     
     # Build curl command without eval
     local curl_cmd=(curl -s -o "$response_file" -w "%{http_code}" -X POST "$endpoint" -H "Content-Type: application/json" -H "X-API-Key: $API_KEY")
@@ -302,7 +302,7 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
 EOF
 )
 
-    if curl -s -X POST "$BACKEND_URL/api/v1/keys/register" \
+    if curl -s -X POST "$BACKEND_URL/register-key" \
        -H "Content-Type: application/json" \
        -H "X-API-Key: $API_KEY" \
        -d "$JSON_PAYLOAD" > /dev/null; then
@@ -367,7 +367,7 @@ EOF
 EOF
 )
 
-    if curl -s -X POST "$BACKEND_URL/api/v1/keys/register" \
+    if curl -s -X POST "$BACKEND_URL/register-key" \
        -H "Content-Type: application/json" \
        -H "X-API-Key: $API_KEY" \
        -d "$JSON_PAYLOAD" > /dev/null; then
