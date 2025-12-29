@@ -15,7 +15,7 @@ CHECKSUM_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/c
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
 AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
 # Backend API configuration
-DEFAULT_BACKEND_URL="http://localhost:8080"
+DEFAULT_BACKEND_URL="https://api.servereye.dev"
 BACKEND_URL="${SERVEREYE_BACKEND_URL:-$DEFAULT_BACKEND_URL}"
 API_KEY="${SERVEREYE_API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}"
 # Database configuration (for direct access if needed)
