@@ -9,8 +9,8 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_DB: PgRegisteredKeys
-      POSTGRES_USER: servereye_keys
-      POSTGRES_PASSWORD: ${KEYS_DB_PASSWORD:-KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${KEYS_DB_PASSWORD:-test123456}
       POSTGRES_INITDB_ARGS: "--auth-host=md5"
       POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
@@ -20,7 +20,7 @@ services:
       - servereye-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U servereye_keys"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -30,11 +30,11 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: servereye-backend-prod
+    container_name: servereye-backend
     network_mode: host
     environment:
-      - DATABASE_URL=${KEYS_DATABASE_URL:-postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@localhost:5432/PgRegisteredKeys?sslmode=disable}
-      - KEYS_DATABASE_URL=${KEYS_DATABASE_URL:-postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@localhost:5432/PgRegisteredKeys?sslmode=disable}
+      - DATABASE_URL=${KEYS_DATABASE_URL:-postgres://postgres:test123456@localhost:5432/PgRegisteredKeys?sslmode=disable}
+      - KEYS_DATABASE_URL=${KEYS_DATABASE_URL:-postgres://postgres:test123456@localhost:5432/PgRegisteredKeys?sslmode=disable}
       - API_KEY=${API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}
     restart: unless-stopped
     healthcheck:
