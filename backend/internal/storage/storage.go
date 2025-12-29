@@ -110,6 +110,9 @@ type KeysStorage struct {
 
 func (s *KeysStorage) initSchema() error {
 	schema := `
+	DROP TRIGGER IF EXISTS update_generated_keys_updated_at ON generated_keys;
+	DROP FUNCTION IF EXISTS update_updated_at_column();
+	
 	CREATE TABLE IF NOT EXISTS generated_keys (
 		id BIGSERIAL PRIMARY KEY,
 		secret_key TEXT UNIQUE NOT NULL,
@@ -125,7 +128,6 @@ func (s *KeysStorage) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_generated_keys_status ON generated_keys (status);
 	CREATE INDEX IF NOT EXISTS idx_generated_keys_created_at ON generated_keys (created_at);
 
-	-- Create trigger for updated_at
 	CREATE OR REPLACE FUNCTION update_updated_at_column()
 	RETURNS TRIGGER AS $$
 	BEGIN

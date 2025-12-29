@@ -22,6 +22,9 @@ CREATE INDEX IF NOT EXISTS idx_generated_keys_created_at ON generated_keys(creat
 -- GRANT SELECT ON generated_keys TO servereye_keys_readonly;
 
 -- Create trigger for updated_at
+DROP TRIGGER IF EXISTS update_generated_keys_updated_at ON generated_keys;
+DROP FUNCTION IF EXISTS update_updated_at_column();
+
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
