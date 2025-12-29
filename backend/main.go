@@ -23,21 +23,8 @@ func main() {
 		logger.WithError(err).Fatal("Failed to load config")
 	}
 
-	// Initialize storage (optional)
-	var store *storage.PostgresStorage
-	var keysStore *storage.KeysStorage
-	if cfg.DatabaseURL != "" && cfg.DatabaseURL != "skip" {
-		var err error
-		store, err = storage.New(cfg.DatabaseURL, logger)
-		if err != nil {
-			logger.WithError(err).Fatal("Failed to initialize storage")
-		}
-		defer store.Close()
-	} else {
-		logger.Info("Storage disabled - running in memory-only mode")
-	}
-
 	// Initialize keys storage
+	var keysStore *storage.KeysStorage
 	if cfg.KeysDatabaseURL != "" && cfg.KeysDatabaseURL != "skip" {
 		var err error
 		keysStore, err = storage.NewKeysStorage(cfg.KeysDatabaseURL, logger)
@@ -72,7 +59,7 @@ func main() {
 			TopicPrefix: cfg.Kafka.TopicPrefix,
 			Enabled:     cfg.Kafka.Enabled,
 		},
-	}, logger, store, keysStore)
+	}, logger, keysStore)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize API server")
 	}

@@ -1,35 +1,12 @@
 version: '3.8'
 
 services:
-  # PostgreSQL database for main application
-  postgres:
-    image: postgres:15-alpine
-    container_name: servereye-postgres-prod
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: servereye
-      POSTGRES_USER: servereye
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teec301210600644}
-      POSTGRES_INITDB_ARGS: "--auth-host=md5"
-      POSTGRES_HOST_AUTH_METHOD: md5
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - servereye-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U servereye"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # PostgreSQL for registered keys (separate database)
+  # PostgreSQL for registered keys
   postgres-keys:
     image: postgres:15-alpine
     container_name: servereye-postgres-keys
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
       POSTGRES_DB: PgRegisteredKeys
       POSTGRES_USER: servereye_keys
@@ -57,14 +34,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: postgres://servereye:${POSTGRES_PASSWORD:-teec301210600644}@postgres:5432/servereye
-      KEYS_DATABASE_URL: postgres://servereye_keys:${KEYS_DB_PASSWORD:-KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D}@postgres-keys:5432/PgRegisteredKeys?sslmode=disable
-      API_KEY: ${API_KEY:-change-me-in-production}
+      - DATABASE_URL=${KEYS_DATABASE_URL:-postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@postgres-keys:5432/PgRegisteredKeys?sslmode=disable}
+      - KEYS_DATABASE_URL=${KEYS_DATABASE_URL:-postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@postgres-keys:5432/PgRegisteredKeys?sslmode=disable}
+      - API_KEY=${API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}
     depends_on:
-      postgres:
-        condition: service_healthy
-      postgres-keys:
-        condition: service_healthy
+      - postgres-keys
     networks:
       - servereye-network
     restart: unless-stopped
@@ -75,7 +49,6 @@ services:
       retries: 3
 
 volumes:
-  postgres_data:
   postgres_keys_data:
 
 networks:

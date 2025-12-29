@@ -25,7 +25,6 @@ type Server struct {
 	pendingMutex    sync.RWMutex
 	responseChans   map[string]chan CommandResponse
 	responseMutex   sync.RWMutex
-	storage         *storage.PostgresStorage
 	keysStorage     *storage.KeysStorage
 	kafkaPublisher  kafka.Publisher
 }
@@ -89,13 +88,12 @@ type KeyRegistrationRequest struct {
 	Hostname     string `json:"hostname"`
 }
 
-func New(cfg *Config, logger *logrus.Logger, storage *storage.PostgresStorage, keysStorage *storage.KeysStorage) (*Server, error) {
+func New(cfg *Config, logger *logrus.Logger, keysStorage *storage.KeysStorage) (*Server, error) {
 	server := &Server{
 		config:          cfg,
 		logger:          logger,
 		pendingCommands: make(map[string][]PendingCommand),
 		responseChans:   make(map[string]chan CommandResponse),
-		storage:         storage,
 		keysStorage:     keysStorage,
 	}
 
