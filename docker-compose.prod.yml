@@ -31,16 +31,11 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: servereye-backend-prod
-    ports:
-      - "8080:8080"
+    network_mode: host
     environment:
-      - DATABASE_URL=${KEYS_DATABASE_URL:-postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@postgres-keys:5432/PgRegisteredKeys?sslmode=disable}
-      - KEYS_DATABASE_URL=${KEYS_DATABASE_URL:-postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@postgres-keys:5432/PgRegisteredKeys?sslmode=disable}
+      - DATABASE_URL=${KEYS_DATABASE_URL:-postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@localhost:5432/PgRegisteredKeys?sslmode=disable}
+      - KEYS_DATABASE_URL=${KEYS_DATABASE_URL:-postgres://servereye_keys:KMRb0xHxWCH%2FQa28YskBl62xI%2FBfkwi%2FZPiHMrZueEc%3D@localhost:5432/PgRegisteredKeys?sslmode=disable}
       - API_KEY=${API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}
-    depends_on:
-      - postgres-keys
-    networks:
-      - servereye-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
