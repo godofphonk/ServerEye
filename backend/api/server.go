@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/godofphonk/ServerEye/backend/internal/config"
 	"github.com/godofphonk/ServerEye/backend/internal/storage"
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
@@ -59,9 +59,9 @@ func (s *Server) setupRoutes() *mux.Router {
 	router := mux.NewRouter()
 
 	// Public routes (no auth required)
-	public := router.PathPrefix("/api/v1").Subrouter()
-	public.HandleFunc("/register-key", s.handleRegisterKey).Methods("POST")
-	public.HandleFunc("/health", s.handleHealth).Methods("GET")
+	public := router.PathPrefix("/public").Subrouter()
+	router.HandleFunc("/api/v1/register-key", s.handleRegisterKey).Methods("POST")
+	router.HandleFunc("/health", s.handleHealth).Methods("GET")
 
 	// Internal webhook route (authenticated by webhook secret)
 	internal := router.PathPrefix("/internal").Subrouter()
@@ -86,7 +86,6 @@ func (s *Server) setupRoutes() *mux.Router {
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/dist/"))).Methods("GET")
 
 	// Middleware - apply auth only to authenticated routes
-	router.Use(s.loggingMiddleware)
 	router.Use(s.corsMiddleware)
 	api.Use(s.authMiddleware)
 

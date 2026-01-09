@@ -121,7 +121,7 @@ func (s *Server) Start() error {
 
 	// Public endpoints (no auth required)
 	router.HandleFunc("/health", s.handleHealth).Methods("GET")
-	router.HandleFunc("/register-key", s.handleRegisterKey).Methods("POST")
+	router.HandleFunc("/api/v1/register-key", s.handleRegisterKey).Methods("POST")
 	router.HandleFunc("/ws", s.wsServer.handleWebSocket)
 
 	// Protected endpoints

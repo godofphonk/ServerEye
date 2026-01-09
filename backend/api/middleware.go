@@ -61,7 +61,7 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 
 		// Check rate limit (10 requests per minute for register-key, 100 per minute for others)
 		var limit int
-		if strings.Contains(r.URL.Path, "/api/register-key") {
+		if strings.Contains(r.URL.Path, "/api/v1/register-key") {
 			limit = 10
 		} else {
 			limit = 100
