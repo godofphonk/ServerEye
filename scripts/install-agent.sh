@@ -88,7 +88,7 @@ EOF
     echo "[*] Registering key with backend API at $BACKEND_URL"
     
     # Use backend API endpoint
-    local endpoint="$BACKEND_URL/register-key"
+    local endpoint="$BACKEND_URL/api/v1/register-key"
     
     # Build curl command without eval
     local curl_cmd=(curl -s -o "$response_file" -w "%{http_code}" -X POST "$endpoint" -H "Content-Type: application/json" -H "X-API-Key: $API_KEY")
@@ -302,7 +302,7 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
 EOF
 )
 
-    if curl -s -X POST "$BACKEND_URL/register-key" \
+    if curl -s -X POST "$BACKEND_URL/api/v1/register-key" \
        -H "Content-Type: application/json" \
        -H "X-API-Key: $API_KEY" \
        -d "$JSON_PAYLOAD" > /dev/null; then
@@ -367,7 +367,7 @@ EOF
 EOF
 )
 
-    if curl -s -X POST "$BACKEND_URL/register-key" \
+    if curl -s -X POST "$BACKEND_URL/api/v1/register-key" \
        -H "Content-Type: application/json" \
        -H "X-API-Key: $API_KEY" \
        -d "$JSON_PAYLOAD" > /dev/null; then
