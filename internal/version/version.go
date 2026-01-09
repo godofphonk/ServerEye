@@ -3,7 +3,7 @@ package version
 // Version information
 var (
 	// Version is the current version of ServerEye
-	Version = "1.2.1.1"
+	Version = "1.2.2.1"
 
 	// BuildDate is set during build time
 	BuildDate = "dev"
