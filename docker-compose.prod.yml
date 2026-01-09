@@ -4,7 +4,7 @@ services:
   # PostgreSQL for registered keys
   postgres-keys:
     image: postgres:15-alpine
-    container_name: servereye-postgres-keys
+    container_name: ServerEyeAgent-Postgres-Keys
     ports:
       - "5432:5432"
     environment:
@@ -30,7 +30,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: servereye-backend
+    container_name: ServerEyeAgent-Backend
     network_mode: host
     environment:
       - DATABASE_URL=${KEYS_DATABASE_URL:-postgres://postgres:test123456@localhost:5432/PgRegisteredKeys?sslmode=disable}
