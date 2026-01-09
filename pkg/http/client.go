@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -19,7 +20,6 @@ type Client struct {
 	httpClient *http.Client
 	logger     *logrus.Logger
 }
-
 type Config struct {
 	BaseURL string `yaml:"base_url"`
 	APIKey  string `yaml:"api_key"`
@@ -32,6 +32,11 @@ func New(cfg Config, logger *logrus.Logger) *Client {
 		apiKey:  cfg.APIKey,
 		httpClient: &http.Client{
 			Timeout: time.Duration(cfg.Timeout) * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true, // Отключаем проверку сертификата для IP
+				},
+			},
 		},
 		logger: logger,
 	}
@@ -92,7 +97,7 @@ func (c *Client) publishAttempt(ctx context.Context, metric *types.Metric) error
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	url := fmt.Sprintf("%s/v1/metrics", c.baseURL)
+	url := fmt.Sprintf("%s/api/v1/metrics", c.baseURL)
 	req, err := http.NewRequestWithContext(reqCtx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

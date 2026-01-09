@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,25 +52,30 @@ type HTTPConsumerConfig struct {
 
 func NewHTTPCommandConsumer(cfg HTTPConsumerConfig, handler CommandHandler, logger *logrus.Logger) *HTTPCommandConsumer {
 	if cfg.PollInterval == 0 {
-		cfg.PollInterval = 2 * time.Second
+		cfg.PollInterval = 5 * time.Second // Увеличим интервал до 5 секунд
 	}
 
-	// Create IPv4-only transport
+	// Create IPv4-only transport с оптимизацией для Cloudflare
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			// Force IPv4 connection
 			dialer := &net.Dialer{
-				Timeout:   30 * time.Second, // Увеличено для Cloudflare
-				KeepAlive: 30 * time.Second,
+				Timeout:   15 * time.Second,
+				KeepAlive: 60 * time.Second, // Увеличим keep-alive
 			}
 			// Only use IPv4
 			return dialer.DialContext(ctx, "tcp4", addr)
 		},
 		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   30 * time.Second, // Увеличено для Cloudflare
+		MaxIdleConns:          10, // Уменьшим для экономии ресурсов
+		MaxIdleConnsPerHost:   5,
+		IdleConnTimeout:       120 * time.Second, // Увеличим время жизни соединений
+		TLSHandshakeTimeout:   15 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
+		DisableCompression:    false, // Включим сжатие
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // Отключаем проверку сертификата для IP
+		},
 	}
 
 	return &HTTPCommandConsumer{
@@ -78,7 +84,7 @@ func NewHTTPCommandConsumer(cfg HTTPConsumerConfig, handler CommandHandler, logg
 		serverKey:    cfg.ServerKey,
 		pollInterval: cfg.PollInterval,
 		client: &http.Client{
-			Timeout:   30 * time.Second,
+			Timeout:   15 * time.Second,
 			Transport: transport,
 		},
 		handler: handler,
@@ -96,6 +102,9 @@ func (c *HTTPCommandConsumer) Start(ctx context.Context) error {
 	ticker := time.NewTicker(c.pollInterval)
 	defer ticker.Stop()
 
+	var consecutiveErrors int
+	const maxErrors = 5
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -103,7 +112,20 @@ func (c *HTTPCommandConsumer) Start(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			if err := c.pollCommands(ctx); err != nil {
-				c.logger.WithError(err).Info("Failed to poll commands")
+				consecutiveErrors++
+				c.logger.WithError(err).WithField("consecutive_errors", consecutiveErrors).Info("Failed to poll commands")
+
+				// Экспоненциальный бэкoff при множественных ошибках
+				if consecutiveErrors >= maxErrors {
+					backoff := time.Duration(consecutiveErrors) * c.pollInterval
+					if backoff > 30*time.Second {
+						backoff = 30 * time.Second
+					}
+					c.logger.WithField("backoff", backoff).Warn("Too many errors, backing off")
+					time.Sleep(backoff)
+				}
+			} else {
+				consecutiveErrors = 0 // Сбрасываем счетчик при успехе
 			}
 		}
 	}
@@ -120,6 +142,7 @@ func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
 
 	req.Header.Set("X-API-Key", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Connection", "keep-alive") // Добавим keep-alive
 
 	c.logger.Info("Sending HTTP request to backend")
 	resp, err := c.client.Do(req)
