@@ -66,8 +66,8 @@ func NewHTTPCommandConsumer(cfg HTTPConsumerConfig, handler CommandHandler, logg
 			// Only use IPv4
 			return dialer.DialContext(ctx, "tcp4", addr)
 		},
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          10, // Уменьшим для экономии ресурсов
+		ForceAttemptHTTP2:     false, // Отключаем HTTP/2 для совместимости с Cloudflare
+		MaxIdleConns:          10,    // Уменьшим для экономии ресурсов
 		MaxIdleConnsPerHost:   5,
 		IdleConnTimeout:       120 * time.Second, // Увеличим время жизни соединений
 		TLSHandshakeTimeout:   15 * time.Second,
