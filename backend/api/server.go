@@ -58,11 +58,15 @@ func (s *Server) GetWebSocketServer() *WebSocketServer {
 func (s *Server) setupRoutes() *mux.Router {
 	router := mux.NewRouter()
 
+	s.logger.Info("Setting up routes...")
+
 	// Public routes (no auth required)
 	public := router.PathPrefix("/public").Subrouter()
 	router.HandleFunc("/api/v1/register-key", s.handleRegisterKey).Methods("POST")
 	router.HandleFunc("/v1/register-key", s.handleRegisterKey).Methods("POST")
 	router.HandleFunc("/health", s.handleHealth).Methods("GET")
+
+	s.logger.Info("Registered public routes")
 
 	// Internal webhook route (authenticated by webhook secret)
 	internal := router.PathPrefix("/internal").Subrouter()
@@ -108,6 +112,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	// Middleware - apply auth only to authenticated routes
 	router.Use(s.corsMiddleware)
 	api.Use(s.authMiddleware)
+	// v1 routes don't need auth for register-key
 	v1.Use(s.authMiddleware)
 
 	return router
