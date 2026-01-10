@@ -67,6 +67,13 @@ func (s *Server) setupRoutes() *mux.Router {
 	router.HandleFunc("/health", s.handleHealth).Methods("GET")
 
 	s.logger.Info("Registered public routes")
+	s.logger.Info("Available routes:")
+	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		path, _ := route.GetPathTemplate()
+		methods, _ := route.GetMethods()
+		s.logger.Infof("Route: %s %s", methods, path)
+		return nil
+	})
 
 	// Internal webhook route (authenticated by webhook secret)
 	internal := router.PathPrefix("/internal").Subrouter()
