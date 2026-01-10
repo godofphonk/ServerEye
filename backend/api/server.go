@@ -102,7 +102,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	api.HandleFunc("/commands/{serverID}", s.handleGetCommands).Methods("GET")
 	v1.HandleFunc("/commands/{serverID}", s.handleGetCommands).Methods("GET")
 
-	// Static files for web UI (optional)
+	// Static files for web UI (optional) - MUST BE LAST
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/dist/"))).Methods("GET")
 
 	// Middleware - apply auth only to authenticated routes
