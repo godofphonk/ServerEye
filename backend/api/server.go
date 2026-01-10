@@ -61,6 +61,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	// Public routes (no auth required)
 	public := router.PathPrefix("/public").Subrouter()
 	router.HandleFunc("/api/v1/register-key", s.handleRegisterKey).Methods("POST")
+	router.HandleFunc("/v1/register-key", s.handleRegisterKey).Methods("POST")
 	router.HandleFunc("/health", s.handleHealth).Methods("GET")
 
 	// Internal webhook route (authenticated by webhook secret)
@@ -70,17 +71,36 @@ func (s *Server) setupRoutes() *mux.Router {
 	// Authenticated routes
 	api := router.PathPrefix("/api/v1").Subrouter()
 
+	// Direct v1 routes (for Cloudflare compatibility)
+	v1 := router.PathPrefix("/v1").Subrouter()
+
 	// Metrics endpoints
 	api.HandleFunc("/metrics", s.handleGetMetrics).Methods("GET")
 	api.HandleFunc("/metrics/{serverID}", s.handleGetServerMetrics).Methods("GET")
 	api.HandleFunc("/metrics/{serverID}/history", s.handleGetMetricsHistory).Methods("GET")
+	api.HandleFunc("/metrics", s.handlePostMetrics).Methods("POST")
+
+	// V1 metrics endpoints
+	v1.HandleFunc("/metrics", s.handleGetMetrics).Methods("GET")
+	v1.HandleFunc("/metrics/{serverID}", s.handleGetServerMetrics).Methods("GET")
+	v1.HandleFunc("/metrics/{serverID}/history", s.handleGetMetricsHistory).Methods("GET")
+	v1.HandleFunc("/metrics", s.handlePostMetrics).Methods("POST")
 
 	// Servers endpoints
 	api.HandleFunc("/servers", s.handleGetServers).Methods("GET")
 	api.HandleFunc("/servers/{serverID}", s.handleGetServer).Methods("GET")
 
+	// V1 servers endpoints
+	v1.HandleFunc("/servers", s.handleGetServers).Methods("GET")
+	v1.HandleFunc("/servers/{serverID}", s.handleGetServer).Methods("GET")
+
 	// WebSocket for live updates
 	api.HandleFunc("/ws", s.wsServer.handleWebSocket).Methods("GET")
+	v1.HandleFunc("/ws", s.wsServer.handleWebSocket).Methods("GET")
+
+	// Commands endpoints
+	api.HandleFunc("/commands/{serverID}", s.handleGetCommands).Methods("GET")
+	v1.HandleFunc("/commands/{serverID}", s.handleGetCommands).Methods("GET")
 
 	// Static files for web UI (optional)
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/dist/"))).Methods("GET")
@@ -88,6 +108,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	// Middleware - apply auth only to authenticated routes
 	router.Use(s.corsMiddleware)
 	api.Use(s.authMiddleware)
+	v1.Use(s.authMiddleware)
 
 	return router
 }

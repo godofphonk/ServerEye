@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/godofphonk/ServerEye/pkg/publisher"
+	"github.com/gorilla/mux"
 )
 
 type MetricsResponse struct {
@@ -370,4 +370,29 @@ func (s *Server) writeError(w http.ResponseWriter, message string, code int) {
 	}
 
 	json.NewEncoder(w).Encode(response)
+}
+
+// handleGetCommands retrieves pending commands for a server
+func (s *Server) handleGetCommands(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	serverID := vars["serverID"]
+
+	if serverID == "" {
+		s.writeError(w, "Server ID is required", http.StatusBadRequest)
+		return
+	}
+
+	commands, err := s.storage.GetPendingCommands(r.Context(), serverID)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to get commands")
+		s.writeError(w, "Failed to get commands", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"commands": commands,
+		"count":    len(commands),
+	}
+
+	s.writeJSON(w, response)
 }
