@@ -112,8 +112,7 @@ func (s *Server) setupRoutes() *mux.Router {
 	// Middleware - apply auth only to authenticated routes
 	router.Use(s.corsMiddleware)
 	api.Use(s.authMiddleware)
-	// v1 routes don't need auth for register-key
-	v1.Use(s.authMiddleware)
+	// v1 routes are public for now
 
 	return router
 }
