@@ -95,18 +95,17 @@ lint:
 
 # Build Docker images
 docker-build:
-	@echo "Building Docker images..."
-	docker build -f deployments/Dockerfile.bot -t servereye/bot:latest .
+	@echo "Building Docker image..."
 	docker build -f deployments/Dockerfile.agent -t servereye/agent:latest .
 
-# Start services with Docker Compose
+# Start services with Docker Compose (agent only)
 docker-up:
-	@echo "Starting services..."
+	@echo "Starting agent services..."
 	cd deployments && docker-compose up -d
 
 # Stop services
 docker-down:
-	@echo "Stopping services..."
+	@echo "Stopping agent services..."
 	cd deployments && docker-compose down
 
 # View logs
@@ -187,8 +186,8 @@ help:
 	@echo ""
 	@echo "Docker:"
 	@echo "  docker-build  - Build Docker image"
-	@echo "  docker-up     - Start services with Docker Compose"
-	@echo "  docker-down   - Stop services"
+	@echo "  docker-up     - Start agent services with Docker Compose"
+	@echo "  docker-down   - Stop agent services"
 	@echo "  docker-logs   - View service logs"
 	@echo ""
 	@echo "Development:"

@@ -52,29 +52,26 @@ type HTTPConsumerConfig struct {
 
 func NewHTTPCommandConsumer(cfg HTTPConsumerConfig, handler CommandHandler, logger *logrus.Logger) *HTTPCommandConsumer {
 	if cfg.PollInterval == 0 {
-		cfg.PollInterval = 5 * time.Second // Увеличим интервал до 5 секунд
+		cfg.PollInterval = 5 * time.Second
 	}
 
-	// Create IPv4-only transport с оптимизацией для Cloudflare
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			// Force IPv4 connection
 			dialer := &net.Dialer{
 				Timeout:   15 * time.Second,
-				KeepAlive: 60 * time.Second, // Увеличим keep-alive
+				KeepAlive: 60 * time.Second,
 			}
-			// Only use IPv4
 			return dialer.DialContext(ctx, "tcp4", addr)
 		},
-		ForceAttemptHTTP2:     false, // Отключаем HTTP/2 для совместимости с Cloudflare
-		MaxIdleConns:          10,    // Уменьшим для экономии ресурсов
+		ForceAttemptHTTP2:     false,
+		MaxIdleConns:          10,
 		MaxIdleConnsPerHost:   5,
-		IdleConnTimeout:       120 * time.Second, // Увеличим время жизни соединений
+		IdleConnTimeout:       120 * time.Second,
 		TLSHandshakeTimeout:   15 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		DisableCompression:    false, // Включим сжатие
+		DisableCompression:    false,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, // Отключаем проверку сертификата для IP
+			InsecureSkipVerify: true,
 		},
 	}
 
@@ -115,7 +112,6 @@ func (c *HTTPCommandConsumer) Start(ctx context.Context) error {
 				consecutiveErrors++
 				c.logger.WithError(err).WithField("consecutive_errors", consecutiveErrors).Info("Failed to poll commands")
 
-				// Экспоненциальный бэкoff при множественных ошибках
 				if consecutiveErrors >= maxErrors {
 					backoff := time.Duration(consecutiveErrors) * c.pollInterval
 					if backoff > 30*time.Second {
@@ -125,14 +121,13 @@ func (c *HTTPCommandConsumer) Start(ctx context.Context) error {
 					time.Sleep(backoff)
 				}
 			} else {
-				consecutiveErrors = 0 // Сбрасываем счетчик при успехе
+				consecutiveErrors = 0
 			}
 		}
 	}
 }
 
 func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
-	c.logger.Info("Starting command polling")
 	url := fmt.Sprintf("%s/v1/commands/%s", c.apiURL, c.serverKey)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -142,11 +137,9 @@ func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
 
 	req.Header.Set("X-API-Key", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Connection", "keep-alive") // Добавим keep-alive
+	req.Header.Set("Connection", "keep-alive")
 
-	c.logger.Info("Sending HTTP request to backend")
 	resp, err := c.client.Do(req)
-	c.logger.Info("HTTP request completed")
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
@@ -165,17 +158,11 @@ func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	c.logger.WithField("commands_count", len(result.Commands)).Info("Received response from backend")
 	if len(result.Commands) == 0 {
 		return nil
 	}
 
 	for _, cmd := range result.Commands {
-		c.logger.WithFields(logrus.Fields{
-			"command_id": cmd.ID,
-			"command":    cmd.Command,
-		}).Info("Received command from backend")
-
 		go c.processCommand(ctx, cmd)
 	}
 
@@ -183,12 +170,7 @@ func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
 }
 
 func (c *HTTPCommandConsumer) processCommand(ctx context.Context, cmd Command) {
-	// Convert HTTP Command to protocol.Message for handler
 	msgType := c.mapCommandToType(cmd.Command)
-	c.logger.WithFields(logrus.Fields{
-		"command": cmd.Command,
-		"msgType": msgType,
-	}).Info("Processing command")
 
 	protoMsg := &protocol.Message{
 		ID:        cmd.ID,
@@ -198,12 +180,7 @@ func (c *HTTPCommandConsumer) processCommand(ctx context.Context, cmd Command) {
 		Payload:   cmd.Params,
 	}
 
-	c.logger.Info("Calling handler.HandleCommand")
 	protoResp, err := c.handler.HandleCommand(ctx, protoMsg)
-	c.logger.WithFields(logrus.Fields{
-		"hasResponse": protoResp != nil,
-		"error":       err,
-	}).Info("Handler completed")
 
 	var response *CommandResponse
 	if err != nil {

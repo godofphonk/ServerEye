@@ -20,6 +20,7 @@ type Client struct {
 	httpClient *http.Client
 	logger     *logrus.Logger
 }
+
 type Config struct {
 	BaseURL string `yaml:"base_url"`
 	APIKey  string `yaml:"api_key"`
@@ -34,7 +35,7 @@ func New(cfg Config, logger *logrus.Logger) *Client {
 			Timeout: time.Duration(cfg.Timeout) * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true, // Отключаем проверку сертификата для IP
+					InsecureSkipVerify: true,
 				},
 			},
 		},
@@ -52,7 +53,6 @@ func (c *Client) Publish(ctx context.Context, metric *types.Metric) error {
 			return nil
 		}
 
-		// Log retry attempt
 		c.logger.WithFields(logrus.Fields{
 			"type":        metric.Type,
 			"server_id":   metric.ServerID,
@@ -61,12 +61,10 @@ func (c *Client) Publish(ctx context.Context, metric *types.Metric) error {
 			"error":       err,
 		}).Warn("HTTP request failed, retrying")
 
-		// Don't retry on client errors (4xx)
 		if isClientError(err) {
 			return err
 		}
 
-		// Exponential backoff with jitter
 		if attempt < maxRetries-1 {
 			delay := baseDelay * time.Duration(math.Pow(2, float64(attempt)))
 			jitter := time.Duration(float64(delay) * 0.1 * (2.0*float64(time.Now().UnixNano()%1000)/1000.0 - 1.0))
@@ -78,7 +76,6 @@ func (c *Client) Publish(ctx context.Context, metric *types.Metric) error {
 }
 
 func (c *Client) publishAttempt(ctx context.Context, metric *types.Metric) error {
-	// Prepare request payload
 	payload := map[string]interface{}{
 		"server_id":  metric.ServerID,
 		"server_key": metric.ServerKey,
@@ -93,7 +90,6 @@ func (c *Client) publishAttempt(ctx context.Context, metric *types.Metric) error
 		return fmt.Errorf("failed to marshal metric: %w", err)
 	}
 
-	// Create HTTP request with shorter timeout for individual attempts
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -103,18 +99,15 @@ func (c *Client) publishAttempt(ctx context.Context, metric *types.Metric) error
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", c.apiKey)
 
-	// Send request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Check response
 	if resp.StatusCode != http.StatusAccepted {
 		var errorResp map[string]interface{}
 		json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -131,7 +124,6 @@ func (c *Client) publishAttempt(ctx context.Context, metric *types.Metric) error
 }
 
 func isClientError(err error) bool {
-	// Check if error message contains 4xx status code
 	errStr := err.Error()
 	return len(errStr) > 0 && errStr[len(errStr)-3] == '4' &&
 		errStr[len(errStr)-2] >= '0' && errStr[len(errStr)-2] <= '9' &&
@@ -139,8 +131,6 @@ func isClientError(err error) bool {
 }
 
 func (c *Client) PublishBatch(ctx context.Context, metrics []*types.Metric) error {
-	// For simplicity, publish metrics one by one
-	// Could be optimized to send as batch if API supports it
 	for _, metric := range metrics {
 		if err := c.Publish(ctx, metric); err != nil {
 			return err
@@ -150,7 +140,6 @@ func (c *Client) PublishBatch(ctx context.Context, metrics []*types.Metric) erro
 }
 
 func (c *Client) Close() error {
-	// HTTP client doesn't need explicit cleanup
 	c.httpClient.CloseIdleConnections()
 	return nil
 }
