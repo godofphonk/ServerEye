@@ -9,10 +9,11 @@ import (
 
 // AgentConfig конфигурация агента
 type AgentConfig struct {
-	Server  ServerConfig  `yaml:"server"`
-	API     APIConfig     `yaml:"api,omitempty"`
-	Metrics MetricsConfig `yaml:"metrics"`
-	Logging LoggingConfig `yaml:"logging"`
+	Server    ServerConfig    `yaml:"server"`
+	API       APIConfig       `yaml:"api,omitempty"`
+	WebSocket WebSocketConfig `yaml:"websocket,omitempty"`
+	Metrics   MetricsConfig   `yaml:"metrics"`
+	Logging   LoggingConfig   `yaml:"logging"`
 }
 
 // ServerConfig конфигурация сервера
@@ -20,6 +21,7 @@ type ServerConfig struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 	SecretKey   string `yaml:"secret_key"`
+	ServerID    string `yaml:"server_id,omitempty"`
 }
 
 // APIConfig конфигурация HTTP API
@@ -27,6 +29,24 @@ type APIConfig struct {
 	BaseURL string `yaml:"base_url"`
 	APIKey  string `yaml:"api_key"`
 	Timeout string `yaml:"timeout,omitempty"`
+}
+
+// WebSocketConfig конфигурация WebSocket
+type WebSocketConfig struct {
+	Enabled              bool   `yaml:"enabled"`
+	URL                  string `yaml:"url"`
+	ReconnectInterval    string `yaml:"reconnect_interval,omitempty"`
+	MaxReconnectAttempts int    `yaml:"max_reconnect_attempts,omitempty"`
+	PingInterval         string `yaml:"ping_interval,omitempty"`
+	WriteTimeout         string `yaml:"write_timeout,omitempty"`
+	ReadTimeout          string `yaml:"read_timeout,omitempty"`
+	HandshakeTimeout     string `yaml:"handshake_timeout,omitempty"`
+	BufferSize           int    `yaml:"buffer_size,omitempty"`
+	EnableCompression    bool   `yaml:"enable_compression,omitempty"`
+	MetricBufferSize     int    `yaml:"metric_buffer_size,omitempty"`
+	MetricBufferFlush    string `yaml:"metric_buffer_flush,omitempty"`
+	CommandQueueSize     int    `yaml:"command_queue_size,omitempty"`
+	CommandTimeout       string `yaml:"command_timeout,omitempty"`
 }
 
 // MetricsConfig конфигурация метрик

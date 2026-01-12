@@ -68,10 +68,6 @@ jobs:
             Production images are automatically built and available:
             
             ```bash
-            # Bot (stable production version)
-            docker pull ghcr.io/godofphonk/servereye-bot:stable
-            docker pull ghcr.io/godofphonk/servereye-bot:${{ steps.version.outputs.VERSION }}
-            
             # Agent (stable production version)
             docker pull ghcr.io/godofphonk/servereye-agent:stable
             docker pull ghcr.io/godofphonk/servereye-agent:${{ steps.version.outputs.VERSION }}

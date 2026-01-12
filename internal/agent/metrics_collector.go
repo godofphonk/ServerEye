@@ -1,56 +1,16 @@
 package agent
 
-import (
-	"time"
-)
-
-// startMetricsCollection запускает периодический сбор метрик
-func (a *Agent) startMetricsCollection() {
-	interval, err := time.ParseDuration(a.config.Metrics.Interval)
-	if err != nil || interval == 0 {
-		interval = 30 * time.Second
-	}
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	a.logger.Info("Metrics collection started")
-
-	// Send first batch immediately
-	a.collectAndSendMetrics()
-
-	for {
-		select {
-		case <-ticker.C:
-			a.logger.Info("Ticker fired - calling collectAndSendMetrics()")
-			a.collectAndSendMetrics()
-		case <-a.ctx.Done():
-			a.logger.Info("Metrics collection stopped")
-			return
-		}
-	}
-}
-
 // collectAndSendMetrics собирает и отправляет все метрики
 func (a *Agent) collectAndSendMetrics() {
 	a.logger.Info("collectAndSendMetrics() called - starting metrics collection")
 
-	// Debug: выводим конфигурацию метрик
-	a.logger.WithFields(map[string]interface{}{
-		"CPUUsage":       a.config.Metrics.CPUUsage,
-		"MemoryUsage":    a.config.Metrics.MemoryUsage,
-		"DiskUsage":      a.config.Metrics.DiskUsage,
-		"CPUTemperature": a.config.Metrics.CPUTemperature,
-		"Interval":       a.config.Metrics.Interval,
-	}).Info("Metrics configuration loaded")
-
-	// Debug: проверяем metricPublisher
-	if a.metricPublisher == nil {
-		a.logger.Error("metricPublisher is nil - cannot publish metrics")
+	// Check if WebSocket publisher is available
+	if a.wsPublisher == nil {
+		a.logger.Error("No WebSocket publisher available - cannot publish metrics")
 		return
 	}
 
-	a.logger.Info("metricPublisher is available, proceeding with metrics collection")
+	a.logger.Info("Publisher is available, proceeding with metrics collection")
 
 	// CPU Temperature (if enabled and cpuMetrics available)
 	if a.config.Metrics.CPUTemperature && a.cpuMetrics != nil {
@@ -86,7 +46,7 @@ func (a *Agent) collectAndSendMetrics() {
 						"path": disk.Path,
 					}
 					metric := a.CreateMetricFromData("disk_usage", disk.UsedPercent, tags)
-					if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+					if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
 						a.logger.WithError(err).Error("Failed to send disk metric")
 					}
 				}
@@ -97,30 +57,26 @@ func (a *Agent) collectAndSendMetrics() {
 	// Network метрики (временно отключены для dev тестирования)
 	// TODO: Добавить NetworkUsage поле в конфигурацию
 	/*
-		if networkInfo, err := a.systemMonitor.GetNetworkInfo(); err == nil {
-			a.sendMetric("network_download_speed", networkInfo.DownloadSpeed, "Mbps")
-			a.sendMetric("network_upload_speed", networkInfo.UploadSpeed, "Mbps")
-			a.sendMetric("network_total_download", float64(networkInfo.TotalDownload), "GB")
-			a.sendMetric("network_total_upload", float64(networkInfo.TotalUpload), "GB")
+		if a.config.Metrics.NetworkUsage && a.systemMonitor != nil {
+			if networkInfo, err := a.systemMonitor.GetNetworkInfo(); err == nil {
+				for _, iface := range networkInfo.Interfaces {
+					tags := map[string]string{
+						"interface": iface.Name,
+					}
 
-			// Отправляем метрики для каждого интерфейса
-			for _, iface := range networkInfo.Interfaces {
-				tags := map[string]string{
-					"interface": iface.Name,
-				}
+					// Bytes sent/recv в GB
+					bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
+					bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
 
-				// Bytes sent/recv в GB
-				bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
-				bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
+					metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
+					if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
+						a.logger.WithError(err).Error("Failed to send network metric")
+					}
 
-				metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
-				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
-					a.logger.WithError(err).Error("Failed to send network metric")
-				}
-
-				metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
-				if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
-					a.logger.WithError(err).Error("Failed to send network metric")
+					metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
+					if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
+						a.logger.WithError(err).Error("Failed to send network metric")
+					}
 				}
 			}
 		}
@@ -130,14 +86,14 @@ func (a *Agent) collectAndSendMetrics() {
 	a.logger.Info("Checking docker client for containers metrics")
 	if a.dockerClient != nil {
 		a.logger.Info("Docker client is not nil, getting containers")
-		if containersPayload, err := a.dockerClient.GetContainers(a.ctx); err == nil {
-			a.logger.WithField("containers_count", containersPayload.Total).Info("Got containers payload, attempting to publish")
+		if containers, err := a.dockerClient.GetContainers(a.ctx); err == nil {
+			a.logger.WithField("containers_count", containers.Total).Info("Got containers payload, attempting to publish")
 			// Отправляем информацию о контейнерах как метрику
-			metric := a.CreateMetricFromData("containers", containersPayload, nil)
-			if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+			metric := a.CreateMetricFromData("containers", containers, nil)
+			if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
 				a.logger.WithError(err).Error("Failed to send containers metric")
 			} else {
-				a.logger.WithField("containers_count", containersPayload.Total).Info("Containers metric sent successfully")
+				a.logger.WithField("containers_count", containers.Total).Info("Containers metric sent successfully")
 			}
 		} else {
 			a.logger.WithError(err).Info("Docker not available or no containers")
@@ -147,10 +103,11 @@ func (a *Agent) collectAndSendMetrics() {
 	}
 }
 
-// sendMetric отправляет метрику через HTTP API
+// sendMetric отправляет метрику через publisher
 func (a *Agent) sendMetric(metricType string, value float64, unit string) {
-	if a.metricPublisher == nil {
-		a.logger.Error("metricPublisher is nil - cannot send metric")
+	// Check if WebSocket publisher is available
+	if a.wsPublisher == nil {
+		a.logger.Error("No WebSocket publisher available - cannot send metric")
 		return
 	}
 
@@ -166,9 +123,9 @@ func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 		"server_id":  metric.ServerID,
 		"server_key": metric.ServerKey,
 		"value":      metric.Value,
-	}).Info("Publishing metric via HTTP API")
+	}).Info("Publishing metric via WebSocket API")
 
-	if err := a.metricPublisher.Publish(a.ctx, metric); err != nil {
+	if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
 		a.logger.WithError(err).WithField("type", metricType).Error("Failed to send metric")
 	} else {
 		a.logger.WithField("type", metricType).Info("Metric sent successfully")

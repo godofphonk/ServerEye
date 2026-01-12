@@ -3,62 +3,149 @@ package agent
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/godofphonk/ServerEye/internal/config"
 	"github.com/godofphonk/ServerEye/pkg/commands"
 	"github.com/godofphonk/ServerEye/pkg/docker"
-	"github.com/godofphonk/ServerEye/pkg/http"
 	"github.com/godofphonk/ServerEye/pkg/metrics"
 	"github.com/godofphonk/ServerEye/pkg/protocol"
-	"github.com/godofphonk/ServerEye/pkg/publisher"
 	"github.com/sirupsen/logrus"
 )
 
 // Agent представляет агент ServerEye
 type Agent struct {
-	config              *config.AgentConfig
-	logger              *logrus.Logger
-	metricPublisher     publisher.Publisher           // unified publisher
-	httpCommandConsumer *commands.HTTPCommandConsumer // HTTP consumer for commands
-	cpuMetrics          *metrics.CPUMetrics
-	systemMonitor       *metrics.SystemMonitor
-	dockerClient        *docker.Client
-	ctx                 context.Context
-	cancel              context.CancelFunc
+	config            *config.AgentConfig
+	logger            *logrus.Logger
+	wsPublisher       *metrics.WebSocketPublisher        // WebSocket publisher
+	wsCommandConsumer *commands.WebSocketCommandConsumer // WebSocket consumer
+	useWebSocket      bool                               // Use WebSocket instead of HTTP
+	cpuMetrics        *metrics.CPUMetrics
+	systemMonitor     *metrics.SystemMonitor
+	dockerClient      *docker.Client
+	ctx               context.Context
+	cancel            context.CancelFunc
 }
 
-// initializeMetricPublisher создает HTTP publisher для метрик
-func initializeMetricPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (publisher.Publisher, error) {
-	timeout := 30
-	if cfg.API.Timeout != "" {
-		if t, err := strconv.Atoi(cfg.API.Timeout); err == nil {
-			timeout = t
-		}
+// initializeWebSocketPublisher создает WebSocket publisher для метрик
+func initializeWebSocketPublisher(cfg *config.AgentConfig, logger *logrus.Logger) (*metrics.WebSocketPublisher, error) {
+	// Parse WebSocket URL
+	wsURL := cfg.WebSocket.URL
+	if wsURL == "" {
+		// Fallback to API URL with WebSocket protocol
+		wsURL = "ws" + cfg.API.BaseURL[4:] + "/ws"
 	}
 
-	httpConfig := http.Config{
-		BaseURL: cfg.API.BaseURL,
-		APIKey:  cfg.API.APIKey,
-		Timeout: timeout,
+	// Parse durations with defaults
+	reconnectInterval := parseDuration(cfg.WebSocket.ReconnectInterval, 5*time.Second)
+	maxReconnectAttempts := cfg.WebSocket.MaxReconnectAttempts
+	if maxReconnectAttempts == 0 {
+		maxReconnectAttempts = 10
+	}
+	pingInterval := parseDuration(cfg.WebSocket.PingInterval, 30*time.Second)
+	writeTimeout := parseDuration(cfg.WebSocket.WriteTimeout, 10*time.Second)
+	readTimeout := parseDuration(cfg.WebSocket.ReadTimeout, 10*time.Second)
+	handshakeTimeout := parseDuration(cfg.WebSocket.HandshakeTimeout, 10*time.Second)
+	bufferSize := cfg.WebSocket.BufferSize
+	if bufferSize == 0 {
+		bufferSize = 1000
+	}
+	metricBufferSize := cfg.WebSocket.MetricBufferSize
+	if metricBufferSize == 0 {
+		metricBufferSize = 100
+	}
+	metricBufferFlush := parseDuration(cfg.WebSocket.MetricBufferFlush, 30*time.Second)
+
+	wsConfig := metrics.Config{
+		URL:                  wsURL,
+		ServerID:             cfg.Server.ServerID,
+		ServerKey:            cfg.Server.SecretKey,
+		ReconnectInterval:    reconnectInterval,
+		MaxReconnectAttempts: maxReconnectAttempts,
+		PingInterval:         pingInterval,
+		WriteTimeout:         writeTimeout,
+		ReadTimeout:          readTimeout,
+		HandshakeTimeout:     handshakeTimeout,
+		BufferSize:           bufferSize,
+		EnableCompression:    cfg.WebSocket.EnableCompression,
+		MetricBufferSize:     metricBufferSize,
+		MetricBufferFlush:    metricBufferFlush,
+		APIURL:               cfg.API.BaseURL,
+		APIKey:               cfg.API.APIKey,
 	}
 
-	return http.New(httpConfig, logger), nil
+	return metrics.NewWebSocketPublisher(wsConfig, logger), nil
+}
+
+// initializeWebSocketCommandConsumer создает WebSocket command consumer
+func initializeWebSocketCommandConsumer(cfg *config.AgentConfig, handler commands.CommandHandlerInterface, logger *logrus.Logger) (*commands.WebSocketCommandConsumer, error) {
+	// Parse WebSocket URL
+	wsURL := cfg.WebSocket.URL
+	if wsURL == "" {
+		// Fallback to API URL with WebSocket protocol
+		wsURL = "ws" + cfg.API.BaseURL[4:] + "/ws"
+	}
+
+	// Parse durations with defaults
+	reconnectInterval := parseDuration(cfg.WebSocket.ReconnectInterval, 5*time.Second)
+	maxReconnectAttempts := cfg.WebSocket.MaxReconnectAttempts
+	if maxReconnectAttempts == 0 {
+		maxReconnectAttempts = 10
+	}
+	pingInterval := parseDuration(cfg.WebSocket.PingInterval, 30*time.Second)
+	writeTimeout := parseDuration(cfg.WebSocket.WriteTimeout, 10*time.Second)
+	readTimeout := parseDuration(cfg.WebSocket.ReadTimeout, 10*time.Second)
+	handshakeTimeout := parseDuration(cfg.WebSocket.HandshakeTimeout, 10*time.Second)
+	bufferSize := cfg.WebSocket.BufferSize
+	if bufferSize == 0 {
+		bufferSize = 1000
+	}
+	commandQueueSize := cfg.WebSocket.CommandQueueSize
+	commandTimeout := parseDuration(cfg.WebSocket.CommandTimeout, 30*time.Second)
+
+	wsConfig := commands.Config{
+		URL:                  wsURL,
+		ServerID:             cfg.Server.ServerID,
+		ServerKey:            cfg.Server.SecretKey,
+		ReconnectInterval:    reconnectInterval,
+		MaxReconnectAttempts: maxReconnectAttempts,
+		PingInterval:         pingInterval,
+		WriteTimeout:         writeTimeout,
+		ReadTimeout:          readTimeout,
+		HandshakeTimeout:     handshakeTimeout,
+		BufferSize:           bufferSize,
+		EnableCompression:    cfg.WebSocket.EnableCompression,
+		CommandQueueSize:     commandQueueSize,
+		CommandTimeout:       commandTimeout,
+		APIURL:               cfg.API.BaseURL,
+		APIKey:               cfg.API.APIKey,
+	}
+
+	return commands.NewWebSocketCommandConsumer(wsConfig, handler, logger), nil
+}
+
+// parseDuration парсит строку duration с fallback
+func parseDuration(str string, fallback time.Duration) time.Duration {
+	if str == "" {
+		return fallback
+	}
+	if duration, err := time.ParseDuration(str); err == nil {
+		return duration
+	}
+	return fallback
 }
 
 // New создает новый агент
 func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Initialize metric publisher(s)
-	metricPublisher, err := initializeMetricPublisher(cfg, logger)
+	// Initialize WebSocket components (always enabled now)
+	wsPub, err := initializeWebSocketPublisher(cfg, logger)
 	if err != nil {
-		cancel() // Cleanup context
-		return nil, fmt.Errorf("не удалось инициализировать metric publisher: %v", err)
+		cancel()
+		return nil, fmt.Errorf("не удалось инициализировать WebSocket publisher: %v", err)
 	}
 
-	// Initialize HTTP command consumer (worldwide mode)
 	// Create temp agent for command handling
 	tempAgent := &Agent{
 		config:        cfg,
@@ -68,56 +155,69 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 		dockerClient:  docker.NewClient(logger),
 	}
 
-	httpConfig := commands.HTTPConsumerConfig{
-		APIURL:       cfg.API.BaseURL,
-		APIKey:       cfg.API.APIKey,
-		ServerKey:    cfg.Server.SecretKey,
-		PollInterval: 2 * time.Second,
+	wsCons, err := initializeWebSocketCommandConsumer(cfg, tempAgent, logger)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("не удалось инициализировать WebSocket command consumer: %v", err)
 	}
 
-	httpCommandConsumer := commands.NewHTTPCommandConsumer(httpConfig, tempAgent, logger)
-	logger.Info("HTTP command consumer initialized (worldwide mode)")
+	logger.Info("WebSocket components initialized")
 
-	return &Agent{
-		config:              cfg,
-		logger:              logger,
-		metricPublisher:     metricPublisher,
-		httpCommandConsumer: httpCommandConsumer,
-		cpuMetrics:          metrics.NewCPUMetrics(),
-		systemMonitor:       metrics.NewSystemMonitor(logger),
-		dockerClient:        docker.NewClient(logger),
-		ctx:                 ctx,
-		cancel:              cancel,
-	}, nil
+	// Create agent instance
+	agent := &Agent{
+		config:            cfg,
+		logger:            logger,
+		wsPublisher:       wsPub,
+		wsCommandConsumer: wsCons,
+		useWebSocket:      true,
+		cpuMetrics:        metrics.NewCPUMetrics(),
+		systemMonitor:     metrics.NewSystemMonitor(logger),
+		dockerClient:      docker.NewClient(logger),
+		ctx:               ctx,
+		cancel:            cancel,
+	}
+
+	return agent, nil
 }
 
 // Start запускает агент
 func (a *Agent) Start() error {
 	a.logger.WithFields(logrus.Fields{
-		"server_name": a.config.Server.Name,
-		"secret_key":  a.config.Server.SecretKey,
+		"server_name":   a.config.Server.Name,
+		"secret_key":    a.config.Server.SecretKey,
+		"use_websocket": a.useWebSocket,
 	}).Info("Запуск агента ServerEye")
 
-	// Start command consumer (HTTP mode)
-	if a.httpCommandConsumer != nil {
-		a.logger.Info("Starting with HTTP command mode (worldwide)")
-		go func() {
-			if err := a.httpCommandConsumer.Start(a.ctx); err != nil {
-				a.logger.WithError(err).Error("HTTP command consumer failed")
+	if a.useWebSocket {
+		// Start WebSocket components
+		a.logger.Info("Starting with WebSocket command mode")
+
+		// Start WebSocket publisher
+		if a.wsPublisher != nil {
+			if err := a.wsPublisher.Start(a.ctx); err != nil {
+				a.logger.WithError(err).Error("WebSocket publisher failed to start")
 			}
-		}()
-	} else {
-		a.logger.Warn("No HTTP command consumer available - commands disabled")
+		}
+
+		// Start WebSocket command consumer
+		if a.wsCommandConsumer != nil {
+			go func() {
+				if err := a.wsCommandConsumer.Start(a.ctx); err != nil {
+					a.logger.WithError(err).Error("WebSocket command consumer failed")
+				}
+			}()
+		}
 	}
 
 	// Запускаем heartbeat
 	go a.startHeartbeat()
 
-	// Запускаем сборщик метрик если есть publisher
-	if a.metricPublisher != nil {
+	// Запускаем сборщик метрик
+	if a.useWebSocket && a.wsPublisher != nil {
 		a.logger.Info("Starting metrics collection")
-		go a.startMetricsCollection()
-		go a.startTerminalHandler()
+		go a.collectAndSendMetrics()
+	} else {
+		a.logger.Warn("No WebSocket publisher available - metrics disabled")
 	}
 
 	return nil
@@ -128,30 +228,28 @@ func (a *Agent) Stop() error {
 	a.logger.Info("Остановка агента")
 	a.cancel()
 
-	// Закрываем metric publisher если есть
-	if a.metricPublisher != nil {
-		if err := a.metricPublisher.Close(); err != nil {
-			a.logger.WithError(err).Error("Ошибка при закрытии metric publisher")
+	// Закрываем WebSocket компоненты
+	if a.wsPublisher != nil {
+		if err := a.wsPublisher.Close(); err != nil {
+			a.logger.WithError(err).Error("Ошибка при закрытии WebSocket publisher")
 		}
 	}
 
-	// Закрываем HTTP command consumer
-	if a.httpCommandConsumer != nil {
-		if err := a.httpCommandConsumer.Close(); err != nil {
-			a.logger.WithError(err).Error("Ошибка при закрытии HTTP command consumer")
+	if a.wsCommandConsumer != nil {
+		if err := a.wsCommandConsumer.Stop(); err != nil {
+			a.logger.WithError(err).Error("Ошибка при закрытии WebSocket command consumer")
 		}
 	}
 
 	return nil
 }
 
-// HandleCommand реализует интерфейс CommandHandler для HTTP API
+// HandleCommand реализует интерфейс CommandHandler для WebSocket
 func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*protocol.Message, error) {
 	a.logger.WithFields(logrus.Fields{
 		"command_id":   msg.ID,
 		"command_type": msg.Type,
-		"server_id":    a.config.Server.Name,
-	}).Info("Handling command via HTTP API")
+	}).Info("Handling command")
 
 	// Создаем базовый response
 	response := &protocol.Message{
@@ -163,56 +261,27 @@ func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*prot
 
 	// Обрабатываем команду
 	switch msg.Type {
-	case protocol.TypePing:
-		result := a.handlePing(msg)
-		return result, nil
-	case protocol.TypeGetCPUTemp:
-		result := a.handleGetCPUTemp(msg)
-		return result, nil
-	case protocol.TypeGetContainers:
-		result := a.handleGetContainers(msg)
-		return result, nil
-	case protocol.TypeStartContainer:
-		result := a.handleStartContainer(msg)
-		return result, nil
-	case protocol.TypeStopContainer:
-		result := a.handleStopContainer(msg)
-		return result, nil
-	case protocol.TypeRestartContainer:
-		result := a.handleRestartContainer(msg)
-		return result, nil
-	case protocol.TypeRemoveContainer:
-		result := a.handleRemoveContainer(msg)
-		return result, nil
-	case protocol.TypeCreateContainer:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: "Create container command not implemented",
+	case "ping":
+		response.Type = "ping_response"
+		response.Payload = map[string]interface{}{
+			"status":    "ok",
+			"timestamp": time.Now().Unix(),
+			"message":   "pong",
 		}
-	case protocol.TypeGetMemoryInfo:
-		result := a.handleGetMemoryInfo(msg)
-		return result, nil
-	case protocol.TypeGetDiskInfo:
-		result := a.handleGetDiskInfo(msg)
-		return result, nil
-	case protocol.TypeGetUptime:
-		result := a.handleGetUptime(msg)
-		return result, nil
-	case protocol.TypeGetProcesses:
-		result := a.handleGetProcesses(msg)
-		return result, nil
-	case protocol.TypeGetNetworkInfo:
-		result := a.handleGetNetworkInfo(msg)
-		return result, nil
-	case protocol.TypeUpdateAgent:
-		result := a.handleUpdateAgent(msg)
-		return result, nil
+	case "restart":
+		response.Type = "error_response"
+		response.Payload = map[string]interface{}{
+			"error": "restart command not implemented",
+		}
+	case "update":
+		response.Type = "error_response"
+		response.Payload = map[string]interface{}{
+			"error": "update command not implemented",
+		}
 	default:
-		response.Type = protocol.TypeErrorResponse
-		response.Payload = protocol.ErrorPayload{
-			ErrorCode:    protocol.ErrorInvalidCommand,
-			ErrorMessage: fmt.Sprintf("Неизвестная команда: %s", msg.Type),
+		response.Type = "error_response"
+		response.Payload = map[string]interface{}{
+			"error": fmt.Sprintf("unknown command type: %s", msg.Type),
 		}
 	}
 

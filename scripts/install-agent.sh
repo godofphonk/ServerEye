@@ -18,8 +18,6 @@ AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
 DEFAULT_BACKEND_URL="https://api.servereye.dev"
 BACKEND_URL="${SERVEREYE_BACKEND_URL:-$DEFAULT_BACKEND_URL}"
 API_KEY="${SERVEREYE_API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}"
-# Database configuration (for direct access if needed)
-DATABASE_URL="${DATABASE_URL:-postgres://postgres:test123456@localhost:5432/PgRegisteredKeys?sslmode=disable}"
 
 ensure_api_env() {
     # Load existing env file if present
@@ -118,8 +116,8 @@ EOF
             echo "[INFO] Server ID: $server_id" >&2
             echo "[INFO] Server Key: ${server_key:0:20}..." >&2
             
-            # Return server_key only to stdout
-            echo "$server_key"
+            # Return both server_id and server_key in format: "server_id|server_key"
+            echo "${server_id}|${server_key}"
             return 0
         else
             echo "[ERROR] Invalid response from API" >&2
@@ -317,7 +315,6 @@ CHECKSUMS=$(curl -sL "$CHECKSUM_URL" 2>/dev/null || wget -qO- "$CHECKSUM_URL" 2>
 if [ -z "$CHECKSUMS" ]; then
     echo "[ERROR] Failed to download checksums file"
     echo "   Cannot verify binary integrity without checksum"
-    rm -f "$AGENT_DIR/servereye-agent.new"
     exit 1
 fi
 
@@ -339,24 +336,18 @@ fi
 # Calculate actual checksum
 ACTUAL_CHECKSUM=$(sha256sum "$AGENT_DIR/servereye-agent.new" | awk '{print $1}')
 
+# Verify checksum
 if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-    echo "[ERROR] SHA256 checksum verification FAILED!"
+    echo "[ERROR] Binary integrity check failed!"
+    echo "Expected: $EXPECTED_CHECKSUM"
+    echo "Actual:   $ACTUAL_CHECKSUM"
     echo ""
-    echo "   Expected: $EXPECTED_CHECKSUM"
-    echo "   Got:      $ACTUAL_CHECKSUM"
-    echo ""
-    echo "[WARNING] This could indicate:"
-    echo "   - Binary was tampered with (MITM attack)"
-    echo "   - Download was corrupted"
-    echo "   - Network issues during download"
-    echo ""
-    echo "[SECURITY] For security, installation has been aborted."
-    echo "   Please try again or contact support."
+    echo "[SECURITY] Installation aborted for security reasons"
     rm -f "$AGENT_DIR/servereye-agent.new"
     exit 1
 fi
 
-echo "[OK] SHA256 checksum verified successfully!"
+echo "[OK] Binary integrity verified"
 echo "   Checksum: ${ACTUAL_CHECKSUM:0:16}..."
 
 # Move new binary to final location
@@ -395,11 +386,17 @@ else
     echo "[INFO] Hostname: $HOSTNAME"
     echo "[INFO] Operating System: $OPERATING_SYSTEM"
     
-    # Register server with API and get server_key
-    SERVER_KEY=$(register_server_with_api "$AGENT_VERSION" "$OPERATING_SYSTEM" "$HOSTNAME")
+    # Register server with API and get server_id and server_key
+    REGISTRATION_RESULT=$(register_server_with_api "$AGENT_VERSION" "$OPERATING_SYSTEM" "$HOSTNAME")
     
-    if [ $? -eq 0 ] && [ -n "$SERVER_KEY" ]; then
+    if [ $? -eq 0 ] && [ -n "$REGISTRATION_RESULT" ]; then
+        # Parse registration result: "server_id|server_key"
+        SERVER_ID=$(echo "$REGISTRATION_RESULT" | cut -d'|' -f1)
+        SERVER_KEY=$(echo "$REGISTRATION_RESULT" | cut -d'|' -f2)
+        
         echo "[OK] Server registered successfully!"
+        echo "[INFO] Server ID: $SERVER_ID"
+        echo "[INFO] Server Key: ${SERVER_KEY:0:20}..."
         SECRET_KEY="$SERVER_KEY"
     else
         echo "[ERROR] Failed to register server with API"
@@ -411,25 +408,45 @@ else
     # Create configuration file
     echo "[*] Creating configuration..."
     
-    # Create HTTP-only configuration with received server_key
+    # Create configuration with WebSocket support
     cat > "$CONFIG_DIR/config.yaml" << EOF
 server:
   name: "$HOSTNAME"
   description: "ServerEye monitored server"
   secret_key: "$SECRET_KEY"
+  server_id: "$SERVER_ID"
 
 api:
   base_url: "$BACKEND_URL"
   api_key: "$API_KEY"
   timeout: "30s"
 
+websocket:
+  enabled: true
+  url: "wss://api.servereye.dev/ws"
+  reconnect_interval: "5s"
+  max_reconnect_attempts: 10
+  ping_interval: "30s"
+  write_timeout: "10s"
+  read_timeout: "10s"
+  handshake_timeout: "10s"
+  buffer_size: 1000
+  enable_compression: true
+  metric_buffer_size: 100
+  metric_buffer_flush: "30s"
+  command_queue_size: 100
+  command_timeout: "30s"
+
 metrics:
+  cpu_usage: false
+  memory_usage: false
+  disk_usage: false
   cpu_temperature: true
   interval: "30s"
 
 logging:
   level: "info"
-  file: "$LOG_DIR/agent.log"
+  file: "/var/log/servereye/agent.log"
 EOF
     echo "[OK] Configuration created with server-provided key"
 
