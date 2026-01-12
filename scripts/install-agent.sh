@@ -56,6 +56,89 @@ EOF
     echo "[*] Stored configuration in $AGENT_ENV_FILE"
 }
 
+register_server_with_api() {
+    local agent_version="$1"
+    local operating_system="$2"
+    local hostname="$3"
+
+    if [ -z "$BACKEND_URL" ]; then
+        echo "[WARNING] BACKEND_URL not set - skipping server registration"
+        return 1
+    fi
+
+    local payload
+    payload=$(cat << EOF
+{
+  "hostname": "$hostname",
+  "operating_system": "$operating_system",
+  "agent_version": "$agent_version"
+}
+EOF
+)
+
+    local response_file
+    response_file=$(mktemp)
+    local http_code
+    
+    echo "[*] Registering server with API at $BACKEND_URL"
+    
+    # Use new API endpoint
+    local endpoint="$BACKEND_URL/RegisterKey"
+    
+    # Build curl command
+    local curl_cmd=(curl -s -o "$response_file" -w "%{http_code}" -X POST "$endpoint" -H "Content-Type: application/json" -H "X-API-Key: $API_KEY")
+    
+    # Add payload to curl command
+    curl_cmd+=(-d "$payload")
+    
+    # Execute curl command
+    http_code=$("${curl_cmd[@]}")
+    
+    # Check HTTP response
+    if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+        # Parse response to get server_key
+        if command -v jq >/dev/null 2>&1; then
+            # Use jq if available
+            server_key=$(jq -r '.server_key' "$response_file" 2>/dev/null)
+            server_id=$(jq -r '.server_id' "$response_file" 2>/dev/null)
+            status=$(jq -r '.status' "$response_file" 2>/dev/null)
+        else
+            # Fallback to grep/sed
+            server_key=$(grep -o '"server_key":"[^"]*"' "$response_file" | sed 's/"server_key":"\([^"]*\)"/\1/' 2>/dev/null)
+            server_id=$(grep -o '"server_id":"[^"]*"' "$response_file" | sed 's/"server_id":"\([^"]*\)"/\1/' 2>/dev/null)
+            status=$(grep -o '"status":"[^"]*"' "$response_file" | sed 's/"status":"\([^"]*\)"/\1/' 2>/dev/null)
+        fi
+        
+        # Clean up response file
+        rm -f "$response_file"
+        
+        # Validate response
+        if [ "$status" = "registered" ] && [ -n "$server_key" ]; then
+            echo "[OK] Server registered successfully"
+            echo "[INFO] Server ID: $server_id"
+            echo "[INFO] Server Key: ${server_key:0:20}..."
+            
+            # Return server_key and server_id
+            echo "$server_key"
+            return 0
+        else
+            echo "[ERROR] Invalid response from API"
+            if [ -f "$response_file" ]; then
+                echo "[DEBUG] Response: $(cat "$response_file")"
+                rm -f "$response_file"
+            fi
+            return 1
+        fi
+    else
+        echo "[ERROR] API request failed with HTTP code: $http_code"
+        if [ -f "$response_file" ]; then
+            echo "[DEBUG] Response: $(cat "$response_file")"
+            rm -f "$response_file"
+        fi
+        return 1
+    fi
+}
+
 register_key_with_api() {
     local secret_key="$1"
     local agent_version="$2"
@@ -286,47 +369,49 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
     echo "[*] Keeping existing configuration..."
     SECRET_KEY=$(grep 'secret_key:' "$CONFIG_DIR/config.yaml" | awk '{print $2}' | tr -d '"')
     
-    # Update agent version in bot database
-    echo "[*] Updating agent version in bot database..."
-    AGENT_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'ServerEye Agent v\K[0-9.]+' || echo "unknown")
-    OS_INFO=$(uname -s)" "$(uname -m)
-    HOSTNAME=$(hostname)
-
-    JSON_PAYLOAD=$(cat << EOF
-{
-  "secret_key": "$SECRET_KEY",
-  "agent_version": "$AGENT_VERSION",
-  "os_info": "$OS_INFO",
-  "hostname": "$HOSTNAME"
-}
-EOF
-)
-
-    if curl -s -X POST "$BACKEND_URL/api/v1/register-key" \
-       -H "Content-Type: application/json" \
-       -H "X-API-Key: $API_KEY" \
-       -d "$JSON_PAYLOAD" > /dev/null; then
-        echo "[OK] Agent version updated in bot database!"
-    else
-        echo "[WARNING] Could not update version in bot database"
-    fi
-
-    echo "[*] Ensuring key is registered in backend database..."
-    if register_key_with_api "$SECRET_KEY" "$AGENT_VERSION" "$OS_INFO" "$HOSTNAME"; then
-        echo "[OK] Backend registration ensured"
-    else
-        echo "[WARNING] Could not register key in backend"
-    fi
+    echo "[OK] Configuration preserved for update"
+    echo "[INFO] Existing server_key will be used"
 else
-    # Generate secret key and config for new installation
-    echo "[*] Generating secret key..."
-    SECRET_KEY=$(openssl rand -hex 16 | sed 's/^/srv_/')
+    # New installation - register server with API and get server_key
+    echo "[*] Registering server with ServerEye API..."
+    
+    # Get system information
+    AGENT_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'ServerEye Agent v\K[0-9.]+' || echo "unknown")
     HOSTNAME=$(hostname)
+    
+    # Get operating system information
+    if [ -f /etc/os-release ]; then
+        # For Linux systems with /etc/os-release
+        . /etc/os-release
+        OPERATING_SYSTEM="$PRETTY_NAME"
+    elif command -v uname >/dev/null 2>&1; then
+        # Fallback to uname
+        OPERATING_SYSTEM="$(uname -s) $(uname -r)"
+    else
+        OPERATING_SYSTEM="Unknown"
+    fi
+    
+    echo "[INFO] Agent Version: $AGENT_VERSION"
+    echo "[INFO] Hostname: $HOSTNAME"
+    echo "[INFO] Operating System: $OPERATING_SYSTEM"
+    
+    # Register server with API and get server_key
+    SERVER_KEY=$(register_server_with_api "$AGENT_VERSION" "$OPERATING_SYSTEM" "$HOSTNAME")
+    
+    if [ $? -eq 0 ] && [ -n "$SERVER_KEY" ]; then
+        echo "[OK] Server registered successfully!"
+        SECRET_KEY="$SERVER_KEY"
+    else
+        echo "[ERROR] Failed to register server with API"
+        echo "[INFO] Please check your network connection and API credentials"
+        echo "[INFO] BACKEND_URL: $BACKEND_URL"
+        exit 1
+    fi
 
     # Create configuration file
     echo "[*] Creating configuration..."
     
-    # Create HTTP-only configuration
+    # Create HTTP-only configuration with received server_key
     cat > "$CONFIG_DIR/config.yaml" << EOF
 server:
   name: "$HOSTNAME"
@@ -346,43 +431,15 @@ logging:
   level: "info"
   file: "$LOG_DIR/agent.log"
 EOF
-    echo "[OK] HTTP-only configuration created"
+    echo "[OK] Configuration created with server-provided key"
 
     chown root:$AGENT_USER "$CONFIG_DIR/config.yaml"
     chmod 640 "$CONFIG_DIR/config.yaml"
 
-    # Register key with bot
-    echo "[*] Registering key with ServerEye bot..."
-    AGENT_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'ServerEye Agent v\K[0-9.]+' || echo "unknown")
-    OS_INFO=$(uname -s)" "$(uname -m)
-    HOSTNAME=$(hostname)
-
-    JSON_PAYLOAD=$(cat << EOF
-{
-  "secret_key": "$SECRET_KEY",
-  "agent_version": "$AGENT_VERSION",
-  "os_info": "$OS_INFO",
-  "hostname": "$HOSTNAME"
-}
-EOF
-)
-
-    if curl -s -X POST "$BACKEND_URL/api/v1/register-key" \
-       -H "Content-Type: application/json" \
-       -H "X-API-Key: $API_KEY" \
-       -d "$JSON_PAYLOAD" > /dev/null; then
-        echo "[OK] Key registered with ServerEye bot!"
-    else
-        echo "[WARNING] Could not register key with bot (bot may be offline)"
-        echo "   You can still use the key manually: $SECRET_KEY"
-    fi
-
-    echo "[*] Registering key with backend API..."
-    if register_key_with_api "$SECRET_KEY" "$AGENT_VERSION" "$OS_INFO" "$HOSTNAME"; then
-        echo "[OK] Key registered with backend"
-    else
-        echo "[WARNING] Backend registration failed; agent will retry on start"
-    fi
+    echo "[OK] ServerEye agent installation completed successfully!"
+    echo "[INFO] Configuration file: $CONFIG_DIR/config.yaml"
+    echo "[INFO] Log directory: $LOG_DIR"
+    echo "[INFO] Agent binary: $AGENT_DIR/servereye-agent"
 fi
 
 # Install systemd service
