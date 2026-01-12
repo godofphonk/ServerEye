@@ -80,7 +80,7 @@ EOF
     response_file=$(mktemp)
     local http_code
     
-    echo "[*] Registering server with API at $BACKEND_URL"
+    echo "[*] Registering server with API at $BACKEND_URL" >&2
     
     # Use new API endpoint
     local endpoint="$BACKEND_URL/RegisterKey"
@@ -114,25 +114,25 @@ EOF
         
         # Validate response
         if [ "$status" = "registered" ] && [ -n "$server_key" ]; then
-            echo "[OK] Server registered successfully"
-            echo "[INFO] Server ID: $server_id"
-            echo "[INFO] Server Key: ${server_key:0:20}..."
+            echo "[OK] Server registered successfully" >&2
+            echo "[INFO] Server ID: $server_id" >&2
+            echo "[INFO] Server Key: ${server_key:0:20}..." >&2
             
-            # Return server_key and server_id
+            # Return server_key only to stdout
             echo "$server_key"
             return 0
         else
-            echo "[ERROR] Invalid response from API"
+            echo "[ERROR] Invalid response from API" >&2
             if [ -f "$response_file" ]; then
-                echo "[DEBUG] Response: $(cat "$response_file")"
+                echo "[DEBUG] Response: $(cat "$response_file")" >&2
                 rm -f "$response_file"
             fi
             return 1
         fi
     else
-        echo "[ERROR] API request failed with HTTP code: $http_code"
+        echo "[ERROR] API request failed with HTTP code: $http_code" >&2
         if [ -f "$response_file" ]; then
-            echo "[DEBUG] Response: $(cat "$response_file")"
+            echo "[DEBUG] Response: $(cat "$response_file")" >&2
             rm -f "$response_file"
         fi
         return 1
@@ -376,7 +376,7 @@ else
     echo "[*] Registering server with ServerEye API..."
     
     # Get system information
-    AGENT_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'ServerEye Agent v\K[0-9.]+' || echo "unknown")
+    AGENT_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | awk '{print $3}' | sed 's/^v//' | cut -d'-' -f1 || echo "unknown")
     HOSTNAME=$(hostname)
     
     # Get operating system information
