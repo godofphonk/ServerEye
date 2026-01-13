@@ -63,17 +63,7 @@ jobs:
             
             ---
             
-            ### 🐳 Docker Images
-            
-            Production images are automatically built and available:
-            
-            ```bash
-            # Agent (stable production version)
-            docker pull ghcr.io/godofphonk/servereye-agent:stable
-            docker pull ghcr.io/godofphonk/servereye-agent:${{ steps.version.outputs.VERSION }}
-            ```
-            
-            ---
+      
             
             ### 📝 Installation (Linux)
             
