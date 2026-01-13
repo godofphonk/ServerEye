@@ -446,7 +446,7 @@ websocket:
 
 metrics:
   cpu_usage: false
-  memory_usage: false
+  memory_usage: true
   disk_usage: false
   cpu_temperature: true
   interval: "30s"
