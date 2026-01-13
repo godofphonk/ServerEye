@@ -194,7 +194,7 @@ func BenchmarkAgentCreation(b *testing.B) {
 
 	b.Run("WithDI", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			agent, err := InitializeAgent(ctx, configPath)
+			agent, err := InitializeAgentEnhanced(ctx, configPath)
 			if err != nil {
 				b.Fatal(err)
 			}

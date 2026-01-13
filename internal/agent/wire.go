@@ -20,8 +20,7 @@ import (
 // ProviderSet is a collection of providers for the agent package
 var ProviderSet = wire.NewSet(
 	provideLogger,
-	provideConfig,
-	provideAgentConfig,
+	provideUnifiedConfig,
 	provideWebSocketClient,
 	provideMetricsCollector,
 	provideSystemMonitor,
@@ -29,9 +28,11 @@ var ProviderSet = wire.NewSet(
 	provideMetricsPublisher,
 	provideCommandConsumer,
 	provideAgent,
+	provideConfigValidator,
+	provideCommandHandler,
 )
 
-// InitializeAgent creates a new agent with dependency injection
+// InitializeAgent creates a new agent with dependency injection using Google Wire
 func InitializeAgent(ctx context.Context, configPath string) (*Agent, error) {
 	wire.Build(
 		ProviderSet,
@@ -39,7 +40,16 @@ func InitializeAgent(ctx context.Context, configPath string) (*Agent, error) {
 	return nil, nil // This will be replaced by Wire
 }
 
-// provideLogger creates a new logger instance
+// InitializeAgentEnhanced creates a new agent with enhanced configuration
+func InitializeAgentEnhanced(ctx context.Context, configPath string) (*Agent, error) {
+	wire.Build(
+		ProviderSet,
+		wire.Bind(new(interfaces.CommandHandlerInterface), new(*Agent)),
+	)
+	return nil, nil // This will be replaced by Wire
+}
+
+// provideLogger creates a new logger instance with proper configuration
 func provideLogger() interfaces.Logger {
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.TextFormatter{
@@ -49,53 +59,37 @@ func provideLogger() interfaces.Logger {
 	return interfaces.NewLogrusAdapter(logger)
 }
 
-// provideConfig creates a new config service
-func provideConfig(configPath string) (*config.ConfigService, error) {
-	return config.NewConfigService(), nil
+// provideUnifiedConfig creates a new unified configuration
+func provideUnifiedConfig(configPath string) (*config.UnifiedConfig, error) {
+	return config.LoadUnifiedConfig(configPath)
 }
 
-// provideAgentConfig creates a new agent config
-func provideAgentConfig(configPath string, configService *config.ConfigService) (*config.AgentConfig, error) {
-	return configService.LoadAgentConfig(configPath)
+// provideConfigValidator creates a configuration validator
+func provideConfigValidator() *config.ConfigValidator {
+	return config.NewConfigValidator()
 }
 
-// provideWebSocketClient creates a new WebSocket client
-func provideWebSocketClient(cfg *config.AgentConfig, logger interfaces.Logger) *websocket.Client {
-	// Convert adapter back to logrus for now (temporary solution)
+// provideCommandHandler creates a command handler (will be the agent itself)
+func provideCommandHandler(agent *Agent) interfaces.CommandHandlerInterface {
+	return agent
+}
+
+// provideWebSocketClient creates a new WebSocket client with unified config
+func provideWebSocketClient(cfg *config.UnifiedConfig, logger interfaces.Logger) *websocket.Client {
+	// Convert adapter back to logrus for WebSocket client
 	logrusLogger := logger.(*interfaces.LogrusAdapter).Entry.Logger
-	// Parse WebSocket URL
-	wsURL := cfg.WebSocket.URL
-	if wsURL == "" {
-		// Fallback to API URL with WebSocket protocol
-		wsURL = "ws" + cfg.API.BaseURL[4:] + "/ws"
-	}
-
-	// Parse durations with defaults
-	reconnectInterval := parseDuration(cfg.WebSocket.ReconnectInterval, 5*time.Second)
-	maxReconnectAttempts := cfg.WebSocket.MaxReconnectAttempts
-	if maxReconnectAttempts == 0 {
-		maxReconnectAttempts = 10
-	}
-	pingInterval := parseDuration(cfg.WebSocket.PingInterval, 30*time.Second)
-	writeTimeout := parseDuration(cfg.WebSocket.WriteTimeout, 10*time.Second)
-	readTimeout := parseDuration(cfg.WebSocket.ReadTimeout, 10*time.Second)
-	handshakeTimeout := parseDuration(cfg.WebSocket.HandshakeTimeout, 10*time.Second)
-	bufferSize := cfg.WebSocket.BufferSize
-	if bufferSize == 0 {
-		bufferSize = 1000
-	}
 
 	wsConfig := websocket.Config{
-		URL:                  wsURL,
+		URL:                  cfg.GetWebSocketURL(),
 		ServerID:             cfg.Server.ServerID,
 		ServerKey:            cfg.Server.SecretKey,
-		ReconnectInterval:    reconnectInterval,
-		MaxReconnectAttempts: maxReconnectAttempts,
-		PingInterval:         pingInterval,
-		WriteTimeout:         writeTimeout,
-		ReadTimeout:          readTimeout,
-		HandshakeTimeout:     handshakeTimeout,
-		BufferSize:           bufferSize,
+		ReconnectInterval:    parseDuration(cfg.WebSocket.ReconnectInterval, 5*time.Second),
+		MaxReconnectAttempts: cfg.WebSocket.MaxReconnectAttempts,
+		PingInterval:         parseDuration(cfg.WebSocket.PingInterval, 30*time.Second),
+		WriteTimeout:         parseDuration(cfg.WebSocket.WriteTimeout, 10*time.Second),
+		ReadTimeout:          parseDuration(cfg.WebSocket.ReadTimeout, 10*time.Second),
+		HandshakeTimeout:     parseDuration(cfg.WebSocket.HandshakeTimeout, 10*time.Second),
+		BufferSize:           cfg.WebSocket.BufferSize,
 		EnableCompression:    cfg.WebSocket.EnableCompression,
 		APIURL:               cfg.API.BaseURL,
 		APIKey:               cfg.API.APIKey,
@@ -125,51 +119,25 @@ func provideDockerManager(logger interfaces.Logger) interfaces.DockerManager {
 	return interfaces.NewDockerManagerAdapter(client)
 }
 
-// provideMetricsPublisher creates a new metrics publisher
-func provideMetricsPublisher(cfg *config.AgentConfig, wsClient *websocket.Client, logger interfaces.Logger) interfaces.MetricsPublisher {
-	// Convert adapter back to logrus for now (temporary solution)
+// provideMetricsPublisher creates a new metrics publisher with unified config
+func provideMetricsPublisher(cfg *config.UnifiedConfig, logger interfaces.Logger) interfaces.MetricsPublisher {
+	// Convert adapter back to logrus for metrics publisher
 	logrusLogger := logger.(*interfaces.LogrusAdapter).Entry.Logger
-	// Parse WebSocket URL
-	wsURL := cfg.WebSocket.URL
-	if wsURL == "" {
-		// Fallback to API URL with WebSocket protocol
-		wsURL = "ws" + cfg.API.BaseURL[4:] + "/ws"
-	}
-
-	// Parse durations with defaults
-	reconnectInterval := parseDuration(cfg.WebSocket.ReconnectInterval, 5*time.Second)
-	maxReconnectAttempts := cfg.WebSocket.MaxReconnectAttempts
-	if maxReconnectAttempts == 0 {
-		maxReconnectAttempts = 10
-	}
-	pingInterval := parseDuration(cfg.WebSocket.PingInterval, 30*time.Second)
-	writeTimeout := parseDuration(cfg.WebSocket.WriteTimeout, 10*time.Second)
-	readTimeout := parseDuration(cfg.WebSocket.ReadTimeout, 10*time.Second)
-	handshakeTimeout := parseDuration(cfg.WebSocket.HandshakeTimeout, 10*time.Second)
-	bufferSize := cfg.WebSocket.BufferSize
-	if bufferSize == 0 {
-		bufferSize = 1000
-	}
-	metricBufferSize := cfg.WebSocket.MetricBufferSize
-	if metricBufferSize == 0 {
-		metricBufferSize = 100
-	}
-	metricBufferFlush := parseDuration(cfg.WebSocket.MetricBufferFlush, 30*time.Second)
 
 	metricsConfig := metrics.Config{
-		URL:                  wsURL,
+		URL:                  cfg.GetWebSocketURL(),
 		ServerID:             cfg.Server.ServerID,
 		ServerKey:            cfg.Server.SecretKey,
-		ReconnectInterval:    reconnectInterval,
-		MaxReconnectAttempts: maxReconnectAttempts,
-		PingInterval:         pingInterval,
-		WriteTimeout:         writeTimeout,
-		ReadTimeout:          readTimeout,
-		HandshakeTimeout:     handshakeTimeout,
-		BufferSize:           bufferSize,
+		ReconnectInterval:    parseDuration(cfg.WebSocket.ReconnectInterval, 5*time.Second),
+		MaxReconnectAttempts: cfg.WebSocket.MaxReconnectAttempts,
+		PingInterval:         parseDuration(cfg.WebSocket.PingInterval, 30*time.Second),
+		WriteTimeout:         parseDuration(cfg.WebSocket.WriteTimeout, 10*time.Second),
+		ReadTimeout:          parseDuration(cfg.WebSocket.ReadTimeout, 10*time.Second),
+		HandshakeTimeout:     parseDuration(cfg.WebSocket.HandshakeTimeout, 10*time.Second),
+		BufferSize:           cfg.WebSocket.BufferSize,
 		EnableCompression:    cfg.WebSocket.EnableCompression,
-		MetricBufferSize:     metricBufferSize,
-		MetricBufferFlush:    metricBufferFlush,
+		MetricBufferSize:     cfg.WebSocket.MetricBufferSize,
+		MetricBufferFlush:    parseDuration(cfg.WebSocket.MetricBufferFlush, 30*time.Second),
 		APIURL:               cfg.API.BaseURL,
 		APIKey:               cfg.API.APIKey,
 	}
@@ -177,65 +145,37 @@ func provideMetricsPublisher(cfg *config.AgentConfig, wsClient *websocket.Client
 	return metrics.NewWebSocketPublisher(metricsConfig, logrusLogger)
 }
 
-// provideCommandConsumer creates a new command consumer
-func provideCommandConsumer(cfg *config.AgentConfig, wsClient *websocket.Client, logger interfaces.Logger) interfaces.CommandConsumer {
-	// Convert adapter back to logrus for now (temporary solution)
+// provideCommandConsumer creates a new command consumer with unified config
+func provideCommandConsumer(cfg *config.UnifiedConfig, logger interfaces.Logger, handler interfaces.CommandHandlerInterface) interfaces.CommandConsumer {
+	// Convert adapter back to logrus for command consumer
 	logrusLogger := logger.(*interfaces.LogrusAdapter).Entry.Logger
-	// Parse WebSocket URL
-	wsURL := cfg.WebSocket.URL
-	if wsURL == "" {
-		// Fallback to API URL with WebSocket protocol
-		wsURL = "ws" + cfg.API.BaseURL[4:] + "/ws"
-	}
-
-	// Parse durations with defaults
-	reconnectInterval := parseDuration(cfg.WebSocket.ReconnectInterval, 5*time.Second)
-	maxReconnectAttempts := cfg.WebSocket.MaxReconnectAttempts
-	if maxReconnectAttempts == 0 {
-		maxReconnectAttempts = 10
-	}
-	pingInterval := parseDuration(cfg.WebSocket.PingInterval, 30*time.Second)
-	writeTimeout := parseDuration(cfg.WebSocket.WriteTimeout, 10*time.Second)
-	readTimeout := parseDuration(cfg.WebSocket.ReadTimeout, 10*time.Second)
-	handshakeTimeout := parseDuration(cfg.WebSocket.HandshakeTimeout, 10*time.Second)
-	bufferSize := cfg.WebSocket.BufferSize
-	if bufferSize == 0 {
-		bufferSize = 1000
-	}
-	commandQueueSize := cfg.WebSocket.CommandQueueSize
-	if commandQueueSize == 0 {
-		commandQueueSize = 100
-	}
-	commandTimeout := parseDuration(cfg.WebSocket.CommandTimeout, 30*time.Second)
 
 	commandsConfig := commands.Config{
-		URL:                  wsURL,
+		URL:                  cfg.GetWebSocketURL(),
 		ServerID:             cfg.Server.ServerID,
 		ServerKey:            cfg.Server.SecretKey,
-		ReconnectInterval:    reconnectInterval,
-		MaxReconnectAttempts: maxReconnectAttempts,
-		PingInterval:         pingInterval,
-		WriteTimeout:         writeTimeout,
-		ReadTimeout:          readTimeout,
-		HandshakeTimeout:     handshakeTimeout,
-		BufferSize:           bufferSize,
+		ReconnectInterval:    parseDuration(cfg.WebSocket.ReconnectInterval, 5*time.Second),
+		MaxReconnectAttempts: cfg.WebSocket.MaxReconnectAttempts,
+		PingInterval:         parseDuration(cfg.WebSocket.PingInterval, 30*time.Second),
+		WriteTimeout:         parseDuration(cfg.WebSocket.WriteTimeout, 10*time.Second),
+		ReadTimeout:          parseDuration(cfg.WebSocket.ReadTimeout, 10*time.Second),
+		HandshakeTimeout:     parseDuration(cfg.WebSocket.HandshakeTimeout, 10*time.Second),
+		BufferSize:           cfg.WebSocket.BufferSize,
 		EnableCompression:    cfg.WebSocket.EnableCompression,
-		CommandQueueSize:     commandQueueSize,
-		CommandTimeout:       commandTimeout,
+		CommandQueueSize:     cfg.WebSocket.CommandQueueSize,
+		CommandTimeout:       parseDuration(cfg.WebSocket.CommandTimeout, 30*time.Second),
 		APIURL:               cfg.API.BaseURL,
 		APIKey:               cfg.API.APIKey,
 	}
 
-	// Create a temporary handler that will be set later
-	consumer := commands.NewWebSocketCommandConsumer(commandsConfig, nil, logrusLogger)
-	return consumer
+	return commands.NewWebSocketCommandConsumer(commandsConfig, handler, logrusLogger)
 }
 
-// provideAgent creates a new agent with all dependencies
+// provideAgent creates a new agent with all dependencies injected
 func provideAgent(
 	ctx context.Context,
 	configPath string,
-	configService *config.ConfigService,
+	cfg *config.UnifiedConfig,
 	logger interfaces.Logger,
 	metricsCollector interfaces.MetricsCollector,
 	systemMonitor interfaces.SystemMonitor,
@@ -243,17 +183,14 @@ func provideAgent(
 	metricsPublisher interfaces.MetricsPublisher,
 	commandConsumer interfaces.CommandConsumer,
 ) (*Agent, error) {
-	// Load configuration
-	cfg, err := configService.LoadAgentConfig(configPath)
-	if err != nil {
-		return nil, err
-	}
+	// Convert unified config to legacy config for backward compatibility
+	legacyConfig := cfg.ToAgentConfig()
 
-	// Convert adapter back to logrus for now (temporary solution)
+	// Convert adapter back to logrus for agent
 	logrusLogger := logger.(*interfaces.LogrusAdapter).Entry.Logger
 
 	agent := &Agent{
-		config:            cfg,
+		config:            legacyConfig,
 		logger:            interfaces.NewLogrusAdapter(logrusLogger),
 		wsPublisher:       metricsPublisher,
 		wsCommandConsumer: commandConsumer,
@@ -268,4 +205,15 @@ func provideAgent(
 	agent.ctx, agent.cancel = context.WithCancel(ctx)
 
 	return agent, nil
+}
+
+// parseDuration parses a duration string with fallback
+func parseDuration(str string, fallback time.Duration) time.Duration {
+	if str == "" {
+		return fallback
+	}
+	if duration, err := time.ParseDuration(str); err == nil {
+		return duration
+	}
+	return fallback
 }
