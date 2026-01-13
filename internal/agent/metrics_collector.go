@@ -1,7 +1,42 @@
 package agent
 
-// collectAndSendMetrics собирает и отправляет все метрики
+import (
+	"time"
+)
+
+// collectAndSendMetrics собирает и отправляет все метрики в цикле
 func (a *Agent) collectAndSendMetrics() {
+	a.logger.Info("Starting metrics collection loop")
+
+	// Parse metrics interval from config
+	interval := 30 * time.Second // default
+	if a.config.Metrics.Interval != "" {
+		if parsedInterval, err := time.ParseDuration(a.config.Metrics.Interval); err == nil {
+			interval = parsedInterval
+		} else {
+			a.logger.WithError(err).Warn("Failed to parse metrics interval, using default 30s")
+		}
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	// Send first metrics immediately
+	a.collectAndSendMetricsOnce()
+
+	for {
+		select {
+		case <-ticker.C:
+			a.collectAndSendMetricsOnce()
+		case <-a.ctx.Done():
+			a.logger.Info("Metrics collection stopped")
+			return
+		}
+	}
+}
+
+// collectAndSendMetricsOnce собирает и отправляет метрики один раз
+func (a *Agent) collectAndSendMetricsOnce() {
 	a.logger.Info("collectAndSendMetrics() called - starting metrics collection")
 
 	// Check if WebSocket publisher is available
