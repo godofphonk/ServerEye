@@ -79,7 +79,7 @@ coverage.html
 # *.md
 
 # WorkDocs directory
-WorkDocs/
+# WorkDocs/
 
 # Local installation script (exclude from version control)
 # scripts/install-local.sh
