@@ -225,6 +225,13 @@ if ! id "$AGENT_USER" &>/dev/null; then
     useradd -r -s /bin/false -d "$AGENT_DIR" "$AGENT_USER"
 fi
 
+# Create proper home directory for servereye user to fix systemd namespace issues
+if [ ! -d "/home/$AGENT_USER" ]; then
+    echo "[*] Creating home directory for $AGENT_USER..."
+    mkdir -p "/home/$AGENT_USER"
+    chown "$AGENT_USER:$AGENT_USER" "/home/$AGENT_USER"
+fi
+
 # Add servereye user to docker group (if docker exists)
 if command -v docker &> /dev/null; then
     echo "[*] Adding servereye user to docker group..."
