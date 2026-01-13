@@ -89,34 +89,6 @@ func (a *Agent) collectAndSendMetricsOnce() {
 		}
 	}
 
-	// Network метрики (временно отключены для dev тестирования)
-	// TODO: Добавить NetworkUsage поле в конфигурацию
-	/*
-		if a.config.Metrics.NetworkUsage && a.systemMonitor != nil {
-			if networkInfo, err := a.systemMonitor.GetNetworkInfo(); err == nil {
-				for _, iface := range networkInfo.Interfaces {
-					tags := map[string]string{
-						"interface": iface.Name,
-					}
-
-					// Bytes sent/recv в GB
-					bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
-					bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
-
-					metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
-					if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-						a.logger.WithError(err).Error("Failed to send network metric")
-					}
-
-					metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
-					if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-						a.logger.WithError(err).Error("Failed to send network metric")
-					}
-				}
-			}
-		}
-	*/
-
 	// Docker containers метрики
 	a.logger.Info("Checking docker client for containers metrics")
 	if a.dockerClient != nil {

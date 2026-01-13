@@ -10,6 +10,7 @@ import (
 	"github.com/godofphonk/ServerEye/pkg/docker"
 	"github.com/godofphonk/ServerEye/pkg/metrics"
 	"github.com/godofphonk/ServerEye/pkg/protocol"
+	"github.com/godofphonk/ServerEye/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,6 +26,7 @@ type Agent struct {
 	dockerClient      *docker.Client
 	ctx               context.Context
 	cancel            context.CancelFunc
+	startTime         time.Time // Start time for uptime calculation
 }
 
 // initializeWebSocketPublisher создает WebSocket publisher для метрик
@@ -175,6 +177,7 @@ func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
 		dockerClient:      docker.NewClient(logger),
 		ctx:               ctx,
 		cancel:            cancel,
+		startTime:         time.Now(),
 	}
 
 	return agent, nil
@@ -286,6 +289,37 @@ func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*prot
 	}
 
 	return response, nil
+}
+
+// CreateMetricFromData создает метрику из данных
+func (a *Agent) CreateMetricFromData(metricType string, value interface{}, tags map[string]string) *types.Metric {
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+
+	metric := &types.Metric{
+		ServerID:   a.config.Server.ServerID,
+		ServerKey:  a.config.Server.SecretKey,
+		ServerName: a.config.Server.Name,
+		Type:       metricType,
+		Version:    "1.0",
+		Value:      value,
+		Timestamp:  time.Now(),
+		Tags:       tags,
+	}
+
+	// If value is a complex type, put it in Data
+	switch v := value.(type) {
+	case map[string]interface{}:
+		metric.Data = v
+		metric.Value = nil
+	default:
+		metric.Data = map[string]interface{}{
+			"value": value,
+		}
+	}
+
+	return metric
 }
 
 // Command handlers are in separate files:

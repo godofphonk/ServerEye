@@ -77,3 +77,9 @@ coverage.html
 
 # Documentation files (exclude from git root)
 # *.md
+
+# WorkDocs directory
+WorkDocs/
+
+# Local installation script (exclude from version control)
+scripts/install-local.sh

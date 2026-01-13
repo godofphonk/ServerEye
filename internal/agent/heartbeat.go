@@ -36,11 +36,14 @@ func (a *Agent) sendHeartbeat() {
 		return
 	}
 
+	// Calculate uptime
+	uptime := time.Since(a.startTime).String()
+
 	// Create heartbeat metric
 	heartbeatData := map[string]interface{}{
 		"status":    "alive",
 		"timestamp": time.Now().Unix(),
-		"uptime":    "unknown", // TODO: добавить реальный uptime
+		"uptime":    uptime,
 	}
 
 	tags := map[string]string{
