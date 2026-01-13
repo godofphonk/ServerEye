@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -16,10 +17,9 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/lib/pq"
 	"github.com/godofphonk/ServerEye/internal/agent"
-	"github.com/godofphonk/ServerEye/internal/config"
 	"github.com/godofphonk/ServerEye/internal/version"
+	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 )
 
@@ -73,14 +73,8 @@ func main() {
 	// Setup logger
 	logger := setupLogger(*logLevel)
 
-	// Load configuration
-	cfg, err := config.LoadAgentConfig(*configPath)
-	if err != nil {
-		logger.WithError(err).Fatal("Failed to load configuration")
-	}
-
-	// Create and start agent
-	agentInstance, err := agent.New(cfg, logger)
+	// Create and start agent with dependency injection
+	agentInstance, err := agent.InitializeAgent(context.Background(), *configPath)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to create agent")
 	}
