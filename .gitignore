@@ -82,4 +82,4 @@ coverage.html
 WorkDocs/
 
 # Local installation script (exclude from version control)
-scripts/install-local.sh
+# scripts/install-local.sh
