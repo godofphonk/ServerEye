@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/godofphonk/ServerEye/internal/config"
+	"github.com/godofphonk/ServerEye/internal/interfaces"
 	"github.com/godofphonk/ServerEye/pkg/commands"
-	"github.com/godofphonk/ServerEye/pkg/docker"
 	"github.com/godofphonk/ServerEye/pkg/metrics"
 	"github.com/godofphonk/ServerEye/pkg/protocol"
 	"github.com/godofphonk/ServerEye/pkg/types"
@@ -17,13 +17,13 @@ import (
 // Agent представляет агент ServerEye
 type Agent struct {
 	config            *config.AgentConfig
-	logger            *logrus.Logger
-	wsPublisher       *metrics.WebSocketPublisher        // WebSocket publisher
-	wsCommandConsumer *commands.WebSocketCommandConsumer // WebSocket consumer
-	useWebSocket      bool                               // Use WebSocket instead of HTTP
-	cpuMetrics        *metrics.CPUMetrics
-	systemMonitor     *metrics.SystemMonitor
-	dockerClient      *docker.Client
+	logger            interfaces.Logger
+	wsPublisher       interfaces.MetricsPublisher // Interface instead of concrete type
+	wsCommandConsumer interfaces.CommandConsumer  // Interface instead of concrete type
+	useWebSocket      bool                        // Use WebSocket instead of HTTP
+	cpuMetrics        interfaces.MetricsCollector // Interface instead of concrete type
+	systemMonitor     interfaces.SystemMonitor    // Interface instead of concrete type
+	dockerClient      interfaces.DockerManager    // Interface instead of concrete type
 	ctx               context.Context
 	cancel            context.CancelFunc
 	startTime         time.Time // Start time for uptime calculation
@@ -137,50 +137,11 @@ func parseDuration(str string, fallback time.Duration) time.Duration {
 	return fallback
 }
 
-// New создает новый агент
+// New creates a new agent (deprecated - use InitializeAgent with Wire)
+// This function is kept for backward compatibility
 func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Initialize WebSocket components (always enabled now)
-	wsPub, err := initializeWebSocketPublisher(cfg, logger)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("не удалось инициализировать WebSocket publisher: %v", err)
-	}
-
-	// Create temp agent for command handling
-	tempAgent := &Agent{
-		config:        cfg,
-		logger:        logger,
-		cpuMetrics:    metrics.NewCPUMetrics(),
-		systemMonitor: metrics.NewSystemMonitor(logger),
-		dockerClient:  docker.NewClient(logger),
-	}
-
-	wsCons, err := initializeWebSocketCommandConsumer(cfg, tempAgent, logger)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("не удалось инициализировать WebSocket command consumer: %v", err)
-	}
-
-	logger.Info("WebSocket components initialized")
-
-	// Create agent instance
-	agent := &Agent{
-		config:            cfg,
-		logger:            logger,
-		wsPublisher:       wsPub,
-		wsCommandConsumer: wsCons,
-		useWebSocket:      true,
-		cpuMetrics:        metrics.NewCPUMetrics(),
-		systemMonitor:     metrics.NewSystemMonitor(logger),
-		dockerClient:      docker.NewClient(logger),
-		ctx:               ctx,
-		cancel:            cancel,
-		startTime:         time.Now(),
-	}
-
-	return agent, nil
+	ctx := context.Background()
+	return InitializeAgent(ctx, "")
 }
 
 // Start запускает агент
