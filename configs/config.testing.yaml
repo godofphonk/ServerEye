@@ -1,0 +1,44 @@
+# Testing Environment Configuration
+# Overrides base configuration for testing
+
+server:
+  name: "Test ServerEye Agent"
+  description: "Test monitoring agent"
+
+api:
+  base_url: "http://localhost:8080"
+  timeout: "5s"
+
+websocket:
+  enabled: false
+
+metrics:
+  cpu_usage: false
+  memory_usage: false
+  disk_usage: false
+  cpu_temperature: false
+  interval: "1s"
+
+logging:
+  level: "error"
+  file: "/tmp/test-agent.log"
+
+# Testing-specific settings
+features:
+  auto_updates: false
+  telemetry: false
+  remote_commands: false
+  alerting: false
+  docker_monitoring: false
+
+security:
+  enable_tls: false
+  rate_limit_per_sec: 1
+  max_connections: 10
+
+performance:
+  worker_count: 1
+  queue_size: 100
+  batch_size: 10
+  flush_interval: "1s"
+  connection_timeout: "5s"

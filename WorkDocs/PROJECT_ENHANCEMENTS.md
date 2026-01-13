@@ -6,7 +6,7 @@ This document outlines strategic improvements for the ServerEye project focusing
 
 ## Architectural Improvements
 
-### 1. Dependency Injection with Wire
+### 1. Dependency Injection with Wire ready
 
 #### Текущее состояние
 - Manual dependency initialization in `agent.go`

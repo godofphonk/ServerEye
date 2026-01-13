@@ -8,9 +8,11 @@ import (
 	"github.com/godofphonk/ServerEye/internal/config"
 	"github.com/godofphonk/ServerEye/internal/interfaces"
 	"github.com/godofphonk/ServerEye/pkg/commands"
+	"github.com/godofphonk/ServerEye/pkg/docker"
 	"github.com/godofphonk/ServerEye/pkg/metrics"
 	"github.com/godofphonk/ServerEye/pkg/protocol"
 	"github.com/godofphonk/ServerEye/pkg/types"
+	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,9 +23,9 @@ type Agent struct {
 	wsPublisher       interfaces.MetricsPublisher // Interface instead of concrete type
 	wsCommandConsumer interfaces.CommandConsumer  // Interface instead of concrete type
 	useWebSocket      bool                        // Use WebSocket instead of HTTP
-	cpuMetrics        interfaces.MetricsCollector // Interface instead of concrete type
-	systemMonitor     interfaces.SystemMonitor    // Interface instead of concrete type
-	dockerClient      interfaces.DockerManager    // Interface instead of concrete type
+	cpuMetrics        *metrics.CPUMetrics         // Concrete type for now
+	systemMonitor     *metrics.SystemMonitor      // Concrete type for now
+	dockerClient      *docker.Client              // Concrete type for now
 	ctx               context.Context
 	cancel            context.CancelFunc
 	startTime         time.Time // Start time for uptime calculation
@@ -137,11 +139,76 @@ func parseDuration(str string, fallback time.Duration) time.Duration {
 	return fallback
 }
 
-// New creates a new agent (deprecated - use InitializeAgent with Wire)
-// This function is kept for backward compatibility
-func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
-	ctx := context.Background()
-	return InitializeAgent(ctx, "")
+// InitializeAgentEnhanced creates a new agent with enhanced configuration management
+func InitializeAgentEnhanced(ctx context.Context, configPath string) (*Agent, error) {
+	// Create configuration provider with enhanced features
+	logger := logrus.New()
+	provider, err := config.NewConfigBuilder().
+		WithConfigPath(configPath).
+		WithEnvironment(config.DetermineEnvironmentFromPath(configPath)).
+		WithHotReload(true).
+		WithLogger(logger).
+		Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config provider: %w", err)
+	}
+
+	// Get configuration
+	cfg := provider.GetConfig()
+
+	// Setup logger with configuration
+	setupLoggerFromConfig(cfg, logger)
+
+	// Create agent with dependency injection
+	agent := &Agent{
+		config:       cfg,
+		logger:       interfaces.NewLogrusAdapter(logger),
+		ctx:          ctx,
+		startTime:    time.Now(),
+		useWebSocket: cfg.WebSocket.Enabled,
+	}
+
+	// Initialize WebSocket components if enabled
+	if cfg.WebSocket.Enabled {
+		// Create WebSocket publisher
+		if wsPublisher, err := initializeWebSocketPublisher(cfg, logger); err == nil {
+			agent.wsPublisher = wsPublisher
+		} else {
+			logger.WithError(err).Warn("Failed to initialize WebSocket publisher")
+		}
+
+		// Create WebSocket command consumer
+		if wsCommandConsumer, err := initializeWebSocketCommandConsumer(cfg, agent, logger); err == nil {
+			agent.wsCommandConsumer = wsCommandConsumer
+		} else {
+			logger.WithError(err).Warn("Failed to initialize WebSocket command consumer")
+		}
+	}
+
+	// Initialize metrics collectors
+	agent.cpuMetrics = metrics.NewCPUMetrics()
+	agent.systemMonitor = metrics.NewSystemMonitor(logger)
+	agent.dockerClient = docker.NewClient(logger)
+
+	// Setup configuration reload callback
+	provider.AddReloadCallback(func(newConfig *config.AgentConfig) {
+		logger.Info("Configuration reloaded, updating agent...")
+		agent.config = newConfig
+		agent.useWebSocket = newConfig.WebSocket.Enabled
+
+		// Reinitialize components if needed
+		if newConfig.WebSocket.Enabled && agent.wsPublisher == nil {
+			if wsPublisher, err := initializeWebSocketPublisher(newConfig, logger); err == nil {
+				agent.wsPublisher = wsPublisher
+				logger.Info("WebSocket publisher initialized after config reload")
+			}
+		}
+	})
+
+	// Store provider for cleanup
+	// Note: In a real implementation, you might want to store this as a field
+
+	return agent, nil
 }
 
 // Start запускает агент

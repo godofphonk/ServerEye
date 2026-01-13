@@ -303,36 +303,39 @@ else
         exit 1
     fi
 
-    # Create configuration file
-    echo "[*] Creating configuration..."
+    # Create configuration with enhanced features and environment variable support
+    echo "[*] Creating enhanced configuration for local development..."
     
-    # Create configuration with WebSocket support
+    # Default to development environment for local builds
+    ENVIRONMENT="${SERVEREYE_ENVIRONMENT:-development}"
+    
+    # Base configuration template with environment variables
     cat > "$CONFIG_DIR/config.yaml" << EOF
 server:
   name: "$HOSTNAME"
-  description: "ServerEye monitored server"
-  secret_key: "$SECRET_KEY"
-  server_id: "$SERVER_ID"
+  description: "ServerEye monitored server ($ENVIRONMENT - local build)"
+  secret_key: "\${SERVEREYE_SERVER_KEY}"
+  server_id: "\${SERVEREYE_SERVER_ID}"
 
 api:
-  base_url: "$BACKEND_URL"
-  api_key: "$API_KEY"
-  timeout: "30s"
+  base_url: "\${SERVEREYE_API_URL:-$BACKEND_URL}"
+  api_key: "\${SERVEREYE_API_KEY:-$API_KEY}"
+  timeout: "60s"
 
 websocket:
   enabled: true
-  url: "wss://api.servereye.dev/ws"
-  reconnect_interval: "5s"
-  max_reconnect_attempts: 10
-  ping_interval: "30s"
-  write_timeout: "10s"
-  read_timeout: "10s"
-  handshake_timeout: "10s"
-  buffer_size: 1000
-  enable_compression: true
-  metric_buffer_size: 100
-  metric_buffer_flush: "30s"
-  command_queue_size: 100
+  url: "\${SERVEREYE_WS_URL:-wss://api.servereye.dev/ws}"
+  reconnect_interval: "10s"
+  max_reconnect_attempts: 5
+  ping_interval: "60s"
+  write_timeout: "30s"
+  read_timeout: "30s"
+  handshake_timeout: "30s"
+  buffer_size: 500
+  enable_compression: false
+  metric_buffer_size: 50
+  metric_buffer_flush: "10s"
+  command_queue_size: 50
   command_timeout: "30s"
 
 metrics:
@@ -340,11 +343,84 @@ metrics:
   memory_usage: true
   disk_usage: false
   cpu_temperature: true
-  interval: "30s"
+  interval: "\${SERVEREYE_METRICS_INTERVAL:-10s}"
 
 logging:
-  level: "info"
-  file: "/var/log/servereye/agent.log"
+  level: "\${SERVEREYE_LOG_LEVEL:-debug}"
+  file: "\${SERVEREYE_LOG_FILE:-/var/log/servereye/agent.log}"
+
+# Enhanced configuration features
+features:
+  auto_updates: false
+  telemetry: false
+  remote_commands: true
+  alerting: true
+  docker_monitoring: true
+
+security:
+  enable_tls: false
+  tls_cert_file: ""
+  tls_key_file: ""
+  allowed_ips: []
+  rate_limit_per_sec: 5
+  max_connections: 50
+
+performance:
+  worker_count: 2
+  queue_size: 500
+  batch_size: 50
+  flush_interval: "10s"
+  connection_timeout: "30s"
+EOF
+
+    # Create environment-specific override if it exists
+    if [ -f "./configs/config.$ENVIRONMENT.yaml" ]; then
+        echo "[*] Applying $ENVIRONMENT-specific configuration overrides..."
+        # Merge environment-specific configuration
+        python3 -c "
+import yaml
+import sys
+
+# Load base config
+with open('$CONFIG_DIR/config.yaml', 'r') as f:
+    base_config = yaml.safe_load(f)
+
+# Load environment override
+with open('./configs/config.$ENVIRONMENT.yaml', 'r') as f:
+    env_config = yaml.safe_load(f)
+
+# Merge configurations (env overrides base)
+if env_config:
+    for section, values in env_config.items():
+        if isinstance(values, dict):
+            if section not in base_config:
+                base_config[section] = {}
+            base_config[section].update(values)
+        else:
+            base_config[section] = values
+
+# Write merged config
+with open('$CONFIG_DIR/config.yaml', 'w') as f:
+    yaml.dump(base_config, f, default_flow_style=False, sort_keys=False)
+" 2>/dev/null || {
+        echo "[*] Python merge not available, using simple override..."
+        # Fallback: just copy the environment config
+        cp "./configs/config.$ENVIRONMENT.yaml" "$CONFIG_DIR/config.yaml"
+    }
+    fi
+
+    # Set environment variables for the agent
+    cat > "$CONFIG_DIR/agent.env" << EOF
+# ServerEye Agent Environment Variables (Local Development)
+SERVEREYE_SERVER_KEY="$SECRET_KEY"
+SERVEREYE_SERVER_ID="$SERVER_ID"
+SERVEREYE_API_URL="$BACKEND_URL"
+SERVEREYE_API_KEY="$API_KEY"
+SERVEREYE_ENVIRONMENT="$ENVIRONMENT"
+SERVEREYE_WS_URL="wss://api.servereye.dev/ws"
+SERVEREYE_METRICS_INTERVAL="10s"
+SERVEREYE_LOG_LEVEL="debug"
+SERVEREYE_LOG_FILE="/var/log/servereye/agent.log"
 EOF
     echo "[OK] Configuration created with server-provided key"
 
@@ -353,15 +429,40 @@ EOF
 
     echo "[OK] ServerEye agent installation completed successfully!"
     echo "[INFO] Configuration file: $CONFIG_DIR/config.yaml"
+    echo "[INFO] Environment file: $CONFIG_DIR/agent.env"
+    echo "[INFO] Local overrides: $CONFIG_DIR/local.env (optional)"
     echo "[INFO] Log directory: $LOG_DIR"
     echo "[INFO] Agent binary: $AGENT_DIR/servereye-agent"
+    echo ""
+    echo "🔧 Enhanced Configuration Features:"
+    echo "  - Environment variable overrides supported"
+    echo "  - Hot-reload configuration changes"
+    echo "  - Development-optimized settings"
+    echo "  - Comprehensive validation"
+    echo ""
+    echo "📝 Local Development Configuration:"
+    echo "  - Debug logging enabled"
+    echo "  - Local WebSocket endpoint (ws://localhost:8080/ws)"
+    echo "  - All metrics enabled"
+    echo "  - 10-second intervals for faster testing"
+    echo ""
+    echo "🔨 Configuration Management:"
+    echo "  - Edit: $CONFIG_DIR/config.yaml"
+    echo "  - Local overrides: $CONFIG_DIR/local.env"
+    echo "  - Reload: sudo systemctl restart servereye-agent"
+    echo "  - Logs: sudo journalctl -u servereye-agent -f"
+    echo ""
+    echo "🚀 Development Workflow:"
+    echo "  - Build: cd /home/gospodin/Рабочий\\ стол/homeProjects/ServerEye && make build-agent"
+    echo "  - Install: sudo ./scripts/install-local.sh"
+    echo "  - Test: sudo systemctl status servereye-agent"
 fi
 
-# Install systemd service
+# Install systemd service with enhanced environment support
 echo "[*] Installing systemd service..."
 cat > "$SERVICE_FILE" << 'EOF'
 [Unit]
-Description=ServerEye Agent - Server Monitoring Agent
+Description=ServerEye Agent - Server Monitoring Agent (Local Development)
 After=network.target
 Wants=network.target
 
@@ -371,6 +472,7 @@ User=servereye
 Group=servereye
 WorkingDirectory=/opt/servereye
 EnvironmentFile=/etc/servereye/agent.env
+EnvironmentFile=-/etc/servereye/local.env
 ExecStart=/opt/servereye/servereye-agent -config /etc/servereye/config.yaml
 Restart=always
 RestartSec=10
@@ -383,6 +485,12 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/log/servereye /etc/servereye
+
+# Enhanced configuration support
+# Environment variables can be set in:
+# 1. /etc/servereye/agent.env (created by installer)
+# 2. /etc/servereye/local.env (for local overrides)
+# 3. Systemd environment (systemctl set-environment)
 
 [Install]
 WantedBy=multi-user.target

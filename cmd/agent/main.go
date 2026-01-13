@@ -74,7 +74,7 @@ func main() {
 	logger := setupLogger(*logLevel)
 
 	// Create and start agent with dependency injection
-	agentInstance, err := agent.InitializeAgent(context.Background(), *configPath)
+	agentInstance, err := agent.InitializeAgentEnhanced(context.Background(), *configPath)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to create agent")
 	}
