@@ -94,10 +94,7 @@ jobs:
             
             ---
             
-            ### 🔗 Links
-            
-            - [Documentation](https://github.com/godofphonk/ServerEye#readme)
-            - [Security Audit](https://github.com/godofphonk/ServerEye/blob/master/docs/SECURITY.md)
+        
           files: |
             servereye-agent-*
             checksums.txt

@@ -63,6 +63,25 @@ func (a *Agent) collectAndSendMetricsOnce() {
 		}).Info("CPU temperature collection skipped")
 	}
 
+	// CPU Usage (detailed statistics)
+	if a.cpuMetrics != nil {
+		a.logger.Info("Attempting to collect detailed CPU usage")
+		if cpuUsage, err := a.cpuMetrics.GetDetailedUsage(); err == nil {
+			a.logger.WithField("cpu_usage", cpuUsage).Info("Detailed CPU usage collected")
+			// Send as complex metric
+			metric := a.CreateMetricFromData("cpu_usage", cpuUsage, nil)
+			if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
+				a.logger.WithError(err).Error("Failed to send cpu_usage metric")
+			} else {
+				a.logger.Info("CPU usage metric sent successfully")
+			}
+		} else {
+			a.logger.WithError(err).Error("Failed to get detailed CPU usage")
+		}
+	} else {
+		a.logger.Info("CPU metrics not available, skipping cpu_usage")
+	}
+
 	// Memory метрики (if enabled and systemMonitor available)
 	if a.config.Metrics.MemoryUsage && a.systemMonitor != nil {
 		if memInfo, err := a.systemMonitor.GetMemoryInfo(); err == nil {
