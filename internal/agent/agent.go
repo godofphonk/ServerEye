@@ -341,6 +341,23 @@ func (a *Agent) CreateMetricFromData(metricType string, value interface{}, tags 
 	case map[string]interface{}:
 		metric.Data = v
 		metric.Value = nil
+	case *metrics.CPUUsageInfo:
+		metric.Data = map[string]interface{}{
+			"usage_total":  v.UsageTotal,
+			"usage_user":   v.UsageUser,
+			"usage_system": v.UsageSystem,
+			"usage_idle":   v.UsageIdle,
+			"cores":        v.Cores,
+			"frequency":    v.Frequency,
+		}
+		if v.LoadAverage != nil {
+			metric.Data["load_average"] = map[string]interface{}{
+				"load_1min":  v.LoadAverage.Load1Min,
+				"load_5min":  v.LoadAverage.Load5Min,
+				"load_15min": v.LoadAverage.Load15Min,
+			}
+		}
+		metric.Value = nil
 	default:
 		metric.Data = map[string]interface{}{
 			"value": value,

@@ -339,9 +339,9 @@ websocket:
   command_timeout: "30s"
 
 metrics:
-  cpu_usage: false
+  cpu_usage: true
   memory_usage: true
-  disk_usage: false
+  disk_usage: true
   cpu_temperature: true
   interval: "\${SERVEREYE_METRICS_INTERVAL:-10s}"
 
