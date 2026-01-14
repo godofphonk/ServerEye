@@ -80,6 +80,7 @@ type ServerMetrics struct {
 	DiskDetails        interface{}   `json:"disk_details,omitempty"`        // Detailed disk statistics
 	NetworkDetails     interface{}   `json:"network_details,omitempty"`     // Detailed network statistics
 	TemperatureDetails interface{}   `json:"temperature_details,omitempty"` // Detailed temperature statistics
+	SystemDetails      interface{}   `json:"system_details,omitempty"`      // Detailed system statistics
 	Time               time.Time     `json:"time"`                          // Timestamp when metrics were collected
 }
 

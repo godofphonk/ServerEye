@@ -271,6 +271,34 @@ func (a *Agent) collectAndSendUnifiedMetrics() {
 		a.logger.Error("Temperature metrics is nil - temperature metrics collection skipped")
 	}
 
+	// Collect system information (detailed statistics)
+	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check for system details")
+	if a.systemMonitor != nil {
+		if systemDetails, err := a.systemMonitor.GetSystemDetails(); err == nil {
+			a.logger.WithField("system_details", systemDetails).Info("System details collected")
+
+			// Add system metrics to unified structure
+			systemDetailsMap := map[string]interface{}{
+				"hostname":           systemDetails.Hostname,
+				"os":                 systemDetails.OS,
+				"kernel":             systemDetails.Kernel,
+				"architecture":       systemDetails.Architecture,
+				"uptime_seconds":     systemDetails.UptimeSeconds,
+				"uptime_human":       systemDetails.UptimeHuman,
+				"boot_time":          systemDetails.BootTime,
+				"processes_total":    systemDetails.ProcessesTotal,
+				"processes_running":  systemDetails.ProcessesRunning,
+				"processes_sleeping": systemDetails.ProcessesSleeping,
+			}
+			metrics["system_details"] = systemDetailsMap
+			a.logger.WithField("system_details", systemDetailsMap).Debug("System details added to metrics")
+		} else {
+			a.logger.WithError(err).Error("Failed to get system details")
+		}
+	} else {
+		a.logger.Error("System monitor is nil - system details collection skipped")
+	}
+
 	// Create unified metric message
 	unifiedMetric := &types.Metric{
 		ServerID:   a.config.Server.ServerID,
