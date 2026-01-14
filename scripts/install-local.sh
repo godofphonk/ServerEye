@@ -14,7 +14,7 @@ LOCAL_BINARY="/home/gospodin/Рабочий стол/homeProjects/ServerEye/buil
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
 AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
 # Backend API configuration
-DEFAULT_BACKEND_URL="https://api.servereye.dev"
+DEFAULT_BACKEND_URL="http://localhost:8080"
 BACKEND_URL="${SERVEREYE_BACKEND_URL:-$DEFAULT_BACKEND_URL}"
 API_KEY="${SERVEREYE_API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}"
 
@@ -300,6 +300,7 @@ else
         echo "[ERROR] Failed to register server with API"
         echo "[INFO] Please check your network connection and API credentials"
         echo "[INFO] BACKEND_URL: $BACKEND_URL"
+        echo "[INFO] Make sure local API server is running on localhost:8080"
         exit 1
     fi
 
@@ -318,13 +319,13 @@ server:
   server_id: "\${SERVEREYE_SERVER_ID}"
 
 api:
-  base_url: "\${SERVEREYE_API_URL:-$BACKEND_URL}"
+  base_url: "\${SERVEREYE_API_URL:-http://localhost:8080}"
   api_key: "\${SERVEREYE_API_KEY:-$API_KEY}"
   timeout: "60s"
 
 websocket:
   enabled: true
-  url: "\${SERVEREYE_WS_URL:-wss://api.servereye.dev/ws}"
+  url: "\${SERVEREYE_WS_URL:-ws://localhost:8080/ws}"
   reconnect_interval: "10s"
   max_reconnect_attempts: 5
   ping_interval: "60s"
@@ -414,13 +415,14 @@ with open('$CONFIG_DIR/config.yaml', 'w') as f:
 # ServerEye Agent Environment Variables (Local Development)
 SERVEREYE_SERVER_KEY="$SECRET_KEY"
 SERVEREYE_SERVER_ID="$SERVER_ID"
-SERVEREYE_API_URL="$BACKEND_URL"
+SERVEREYE_API_URL="http://localhost:8080"
 SERVEREYE_API_KEY="$API_KEY"
 SERVEREYE_ENVIRONMENT="$ENVIRONMENT"
-SERVEREYE_WS_URL="wss://api.servereye.dev/ws"
+SERVEREYE_WS_URL="ws://localhost:8080/ws"
 SERVEREYE_METRICS_INTERVAL="10s"
 SERVEREYE_LOG_LEVEL="debug"
 SERVEREYE_LOG_FILE="/var/log/servereye/agent.log"
+BACKEND_URL="http://localhost:8080"
 EOF
     echo "[OK] Configuration created with server-provided key"
 

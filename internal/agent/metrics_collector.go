@@ -164,6 +164,65 @@ func (a *Agent) collectAndSendUnifiedMetrics() {
 		}
 	}
 
+	// Collect memory usage (detailed statistics)
+	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check")
+	if a.systemMonitor != nil {
+		if memInfo, err := a.systemMonitor.GetMemoryInfo(); err == nil {
+			a.logger.WithField("memory_info", memInfo).Info("Memory info collected")
+
+			// Add memory metrics to unified structure
+			metrics["memory"] = memInfo.UsedPercent // For backward compatibility
+			memoryDetails := map[string]interface{}{
+				"total_gb":     float64(memInfo.Total) / 1024 / 1024 / 1024,
+				"used_gb":      float64(memInfo.Used) / 1024 / 1024 / 1024,
+				"available_gb": float64(memInfo.Available) / 1024 / 1024 / 1024,
+				"free_gb":      float64(memInfo.Free) / 1024 / 1024 / 1024,
+				"buffers_gb":   float64(memInfo.Buffers) / 1024 / 1024 / 1024,
+				"cached_gb":    float64(memInfo.Cached) / 1024 / 1024 / 1024,
+				"used_percent": memInfo.UsedPercent,
+			}
+			metrics["memory_details"] = memoryDetails
+			a.logger.WithField("memory_details", memoryDetails).Debug("Memory details added to metrics")
+		} else {
+			a.logger.WithError(err).Error("Failed to get memory info")
+		}
+	} else {
+		a.logger.Error("System monitor is nil - memory metrics collection skipped")
+	}
+
+	// Collect disk usage (detailed statistics)
+	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check for disk")
+	if a.systemMonitor != nil {
+		if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
+			a.logger.WithField("disk_info", diskInfo).Info("Disk info collected")
+
+			// Convert disk info for unified structure
+			disks := make([]map[string]interface{}, len(diskInfo.Disks))
+			for i, disk := range diskInfo.Disks {
+				disks[i] = map[string]interface{}{
+					"path":         disk.Path,
+					"total_gb":     float64(disk.Total) / 1024 / 1024 / 1024,
+					"used_gb":      float64(disk.Used) / 1024 / 1024 / 1024,
+					"free_gb":      float64(disk.Free) / 1024 / 1024 / 1024,
+					"used_percent": disk.UsedPercent,
+					"filesystem":   disk.Filesystem,
+				}
+			}
+
+			// Add disk metrics to unified structure
+			if len(disks) > 0 {
+				// Use first disk for backward compatibility
+				metrics["disk"] = disks[0]["used_percent"]
+				metrics["disk_details"] = disks
+				a.logger.WithField("disk_details", disks).Debug("Disk details added to metrics")
+			}
+		} else {
+			a.logger.WithError(err).Error("Failed to get disk info")
+		}
+	} else {
+		a.logger.Error("System monitor is nil - disk metrics collection skipped")
+	}
+
 	// Create unified metric message
 	unifiedMetric := &types.Metric{
 		ServerID:   a.config.Server.ServerID,

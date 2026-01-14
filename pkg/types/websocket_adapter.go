@@ -102,6 +102,16 @@ func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message 
 						}
 					}
 				}
+
+				// Extract memory details
+				if memoryDetails, ok := metrics["memory_details"]; ok {
+					serverMetrics.MemoryDetails = memoryDetails
+				}
+
+				// Extract disk details
+				if diskDetails, ok := metrics["disk_details"]; ok {
+					serverMetrics.DiskDetails = diskDetails
+				}
 			}
 		}
 	}

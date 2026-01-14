@@ -70,12 +70,14 @@ type MetricsData struct {
 
 // ServerMetrics represents server performance metrics
 type ServerMetrics struct {
-	CPU      float64       `json:"cpu"`                 // CPU usage percentage (0-100)
-	Memory   float64       `json:"memory"`              // Memory usage percentage (0-100)
-	Disk     float64       `json:"disk"`                // Disk usage percentage (0-100)
-	Network  float64       `json:"network"`             // Network usage in MB/s
-	CPUUsage *CPUUsageInfo `json:"cpu_usage,omitempty"` // Detailed CPU usage statistics
-	Time     time.Time     `json:"time"`                // Timestamp when metrics were collected
+	CPU           float64       `json:"cpu"`                      // CPU usage percentage (0-100)
+	Memory        float64       `json:"memory"`                   // Memory usage percentage (0-100)
+	Disk          float64       `json:"disk"`                     // Disk usage percentage (0-100)
+	Network       float64       `json:"network"`                  // Network usage in MB/s
+	CPUUsage      *CPUUsageInfo `json:"cpu_usage,omitempty"`      // Detailed CPU usage statistics
+	MemoryDetails interface{}   `json:"memory_details,omitempty"` // Detailed memory statistics
+	DiskDetails   interface{}   `json:"disk_details,omitempty"`   // Detailed disk statistics
+	Time          time.Time     `json:"time"`                     // Timestamp when metrics were collected
 }
 
 // SystemInfo represents system information
