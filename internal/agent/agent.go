@@ -25,6 +25,7 @@ type Agent struct {
 	useWebSocket      bool                        // Use WebSocket instead of HTTP
 	cpuMetrics        *metrics.CPUMetrics         // Concrete type for now
 	systemMonitor     *metrics.SystemMonitor      // Concrete type for now
+	networkMetrics    *metrics.NetworkMetrics     // Concrete type for now
 	dockerClient      *docker.Client              // Concrete type for now
 	ctx               context.Context
 	cancel            context.CancelFunc
@@ -188,6 +189,7 @@ func InitializeAgentEnhanced(ctx context.Context, configPath string) (*Agent, er
 	// Initialize metrics collectors
 	agent.cpuMetrics = metrics.NewCPUMetrics()
 	agent.systemMonitor = metrics.NewSystemMonitor(logger)
+	agent.networkMetrics = metrics.NewNetworkMetrics(logger)
 	agent.dockerClient = docker.NewClient(logger)
 
 	// Setup configuration reload callback

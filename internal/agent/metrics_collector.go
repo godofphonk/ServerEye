@@ -223,6 +223,28 @@ func (a *Agent) collectAndSendUnifiedMetrics() {
 		a.logger.Error("System monitor is nil - disk metrics collection skipped")
 	}
 
+	// Collect network usage (detailed statistics)
+	a.logger.WithField("networkMetrics", a.networkMetrics != nil).Debug("Network metrics check")
+	if a.networkMetrics != nil {
+		if networkInfo, err := a.networkMetrics.GetNetworkInfo(); err == nil {
+			a.logger.WithField("network_info", networkInfo).Info("Network info collected")
+
+			// Add network metrics to unified structure
+			metrics["network"] = networkInfo.TotalRxMbps + networkInfo.TotalTxMbps // For backward compatibility
+			networkDetails := map[string]interface{}{
+				"interfaces":    networkInfo.Interfaces,
+				"total_rx_mbps": networkInfo.TotalRxMbps,
+				"total_tx_mbps": networkInfo.TotalTxMbps,
+			}
+			metrics["network_details"] = networkDetails
+			a.logger.WithField("network_details", networkDetails).Debug("Network details added to metrics")
+		} else {
+			a.logger.WithError(err).Error("Failed to get network info")
+		}
+	} else {
+		a.logger.Error("Network metrics is nil - network metrics collection skipped")
+	}
+
 	// Create unified metric message
 	unifiedMetric := &types.Metric{
 		ServerID:   a.config.Server.ServerID,

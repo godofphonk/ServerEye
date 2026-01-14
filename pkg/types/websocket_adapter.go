@@ -112,6 +112,11 @@ func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message 
 				if diskDetails, ok := metrics["disk_details"]; ok {
 					serverMetrics.DiskDetails = diskDetails
 				}
+
+				// Extract network details
+				if networkDetails, ok := metrics["network_details"]; ok {
+					serverMetrics.NetworkDetails = networkDetails
+				}
 			}
 		}
 	}
