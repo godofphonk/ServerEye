@@ -242,8 +242,8 @@ func (c *CPUMetrics) getCPUFrequency() (float64, error) {
 	for _, line := range lines {
 		if strings.Contains(line, "cpu MHz") {
 			fields := strings.Fields(line)
-			if len(fields) >= 3 {
-				freq, err := strconv.ParseFloat(fields[2], 64)
+			if len(fields) >= 4 {
+				freq, err := strconv.ParseFloat(fields[3], 64)
 				if err == nil {
 					return freq, nil
 				}
@@ -261,13 +261,19 @@ func (c *CPUMetrics) getCPUFrequency() (float64, error) {
 
 // getFrequencyFromSysfs tries to get CPU frequency from sysfs
 func (c *CPUMetrics) getFrequencyFromSysfs() (float64, error) {
-	// Try to read from cpuinfo_cur_freq on first CPU
-	freqPath := "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq"
-	if freq, err := c.readFrequencyFromFile(freqPath); err == nil {
+	// Try scaling_cur_freq first (more accessible)
+	scalingFreqPath := "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+	if freq, err := c.readFrequencyFromFile(scalingFreqPath); err == nil {
 		return freq, nil
 	}
 
-	// Try base_freq as fallback
+	// Try cpuinfo_max_freq as fallback
+	maxFreqPath := "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+	if freq, err := c.readFrequencyFromFile(maxFreqPath); err == nil {
+		return freq, nil
+	}
+
+	// Try base_freq as another fallback
 	baseFreqPath := "/sys/devices/system/cpu/cpu0/cpufreq/base_freq"
 	if freq, err := c.readFrequencyFromFile(baseFreqPath); err == nil {
 		return freq, nil
