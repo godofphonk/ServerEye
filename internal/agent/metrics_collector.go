@@ -245,6 +245,32 @@ func (a *Agent) collectAndSendUnifiedMetrics() {
 		a.logger.Error("Network metrics is nil - network metrics collection skipped")
 	}
 
+	// Collect temperature metrics (detailed statistics)
+	a.logger.WithField("temperatureMetrics", a.temperatureMetrics != nil).Debug("Temperature metrics check")
+	if a.temperatureMetrics != nil {
+		if tempInfo, err := a.temperatureMetrics.GetTemperatureInfo(); err == nil {
+			a.logger.WithField("temperature_info", tempInfo).Info("Temperature info collected")
+
+			// Add temperature metrics to unified structure
+			// Use highest temperature for backward compatibility
+			metrics["temperature"] = tempInfo.HighestTemperature
+			temperatureDetails := map[string]interface{}{
+				"cpu_temperature":      tempInfo.CPUTemperature,
+				"gpu_temperature":      tempInfo.GPUTemperature,
+				"system_temperature":   tempInfo.SystemTemperature,
+				"storage_temperatures": tempInfo.StorageTemperatures,
+				"highest_temperature":  tempInfo.HighestTemperature,
+				"temperature_unit":     tempInfo.TemperatureUnit,
+			}
+			metrics["temperature_details"] = temperatureDetails
+			a.logger.WithField("temperature_details", temperatureDetails).Debug("Temperature details added to metrics")
+		} else {
+			a.logger.WithError(err).Error("Failed to get temperature info")
+		}
+	} else {
+		a.logger.Error("Temperature metrics is nil - temperature metrics collection skipped")
+	}
+
 	// Create unified metric message
 	unifiedMetric := &types.Metric{
 		ServerID:   a.config.Server.ServerID,

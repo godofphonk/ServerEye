@@ -117,6 +117,11 @@ func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message 
 				if networkDetails, ok := metrics["network_details"]; ok {
 					serverMetrics.NetworkDetails = networkDetails
 				}
+
+				// Extract temperature details
+				if temperatureDetails, ok := metrics["temperature_details"]; ok {
+					serverMetrics.TemperatureDetails = temperatureDetails
+				}
 			}
 		}
 	}

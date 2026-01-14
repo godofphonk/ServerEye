@@ -18,18 +18,19 @@ import (
 
 // Agent представляет агент ServerEye
 type Agent struct {
-	config            *config.AgentConfig
-	logger            interfaces.Logger
-	wsPublisher       interfaces.MetricsPublisher // Interface instead of concrete type
-	wsCommandConsumer interfaces.CommandConsumer  // Interface instead of concrete type
-	useWebSocket      bool                        // Use WebSocket instead of HTTP
-	cpuMetrics        *metrics.CPUMetrics         // Concrete type for now
-	systemMonitor     *metrics.SystemMonitor      // Concrete type for now
-	networkMetrics    *metrics.NetworkMetrics     // Concrete type for now
-	dockerClient      *docker.Client              // Concrete type for now
-	ctx               context.Context
-	cancel            context.CancelFunc
-	startTime         time.Time // Start time for uptime calculation
+	config             *config.AgentConfig
+	logger             interfaces.Logger
+	wsPublisher        interfaces.MetricsPublisher // Interface instead of concrete type
+	wsCommandConsumer  interfaces.CommandConsumer  // Interface instead of concrete type
+	useWebSocket       bool                        // Use WebSocket instead of HTTP
+	cpuMetrics         *metrics.CPUMetrics         // Concrete type for now
+	systemMonitor      *metrics.SystemMonitor      // Concrete type for now
+	networkMetrics     *metrics.NetworkMetrics     // Concrete type for now
+	temperatureMetrics *metrics.TemperatureMetrics // Concrete type for now
+	dockerClient       *docker.Client              // Concrete type for now
+	ctx                context.Context
+	cancel             context.CancelFunc
+	startTime          time.Time // Start time for uptime calculation
 }
 
 // initializeWebSocketPublisher создает WebSocket publisher для метрик
@@ -190,6 +191,7 @@ func InitializeAgentEnhanced(ctx context.Context, configPath string) (*Agent, er
 	agent.cpuMetrics = metrics.NewCPUMetrics()
 	agent.systemMonitor = metrics.NewSystemMonitor(logger)
 	agent.networkMetrics = metrics.NewNetworkMetrics(logger)
+	agent.temperatureMetrics = metrics.NewTemperatureMetrics(logger)
 	agent.dockerClient = docker.NewClient(logger)
 
 	// Setup configuration reload callback
