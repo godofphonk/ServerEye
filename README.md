@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Go Report Card]([https://goreportcard.com/badge/github.com/godofphonk/ServerEye](https://goreportcard.com/report/github.com/godofphonk/ServerEye))
+[![Go Report Card](https://goreportcard.com/badge/github.com/godofphonk/ServerEye)](https://goreportcard.com/report/github.com/godofphonk/ServerEye)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 ![Release](https://img.shields.io/github/v/release/godofphonk/ServerEye?style=for-the-badge&logo=github)
 
