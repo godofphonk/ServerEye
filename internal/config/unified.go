@@ -63,11 +63,10 @@ func DefaultConfig() *UnifiedConfig {
 			File:  "/var/log/servereye/agent.log",
 		},
 		Features: FeaturesConfig{
-			AutoUpdates:      false,
-			Telemetry:        true,
-			RemoteCommands:   true,
-			Alerting:         true,
-			DockerMonitoring: true,
+			AutoUpdates:    false,
+			Telemetry:      true,
+			RemoteCommands: true,
+			Alerting:       true,
 		},
 		Security: SecurityConfig{
 			RateLimitPerSec: 10,

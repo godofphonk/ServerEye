@@ -29,7 +29,6 @@ features:
   telemetry: false
   remote_commands: false
   alerting: false
-  docker_monitoring: false
 
 security:
   rate_limit_per_sec: 10

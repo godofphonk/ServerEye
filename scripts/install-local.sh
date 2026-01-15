@@ -356,7 +356,6 @@ features:
   telemetry: false
   remote_commands: true
   alerting: true
-  docker_monitoring: true
 
 security:
   allowed_ips: []

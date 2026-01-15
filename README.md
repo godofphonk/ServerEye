@@ -20,7 +20,6 @@ ServerEye Agent is a lightweight, high-performance monitoring agent designed for
 ### Key Features
 
 - 🚀 **Real-time Metrics** - CPU, memory, disk, network, and temperature monitoring
-- 🐳 **Docker Integration** - Container status and resource monitoring
 - 🔐 **Secure Communication** - WebSocket with TLS and authentication
 - ⚡ **High Performance** - Minimal resource footprint and efficient data transmission
 - 🔧 **Flexible Configuration** - YAML-based config with hot reload support
@@ -32,7 +31,6 @@ ServerEye Agent is a lightweight, high-performance monitoring agent designed for
 
 - Linux (x86_64 or ARM64)
 - Systemd (for service installation)
-- Docker (optional, for container monitoring)
 
 ### Installation
 
@@ -148,7 +146,6 @@ features:
   telemetry: true         # Anonymous usage telemetry and statistics
   remote_commands: true   # Allow remote command execution via API
   alerting: true         # Enable alert notifications
-  docker_monitoring: true # Monitor Docker containers and resources
 
 security:
   allowed_ips: []          # Whitelist of allowed IP addresses
@@ -244,36 +241,7 @@ sudo rm -rf /opt/servereye /etc/servereye /var/log/servereye /home/servereye
 sudo userdel servereye 2>/dev/null || true
 ```
 
-## 🐳 Docker Support
-
-### Container Monitoring
-
-The agent automatically detects and monitors Docker containers when Docker is available.
-
-```yaml
-features:
-  docker_monitoring: true
-  
-metrics:
-  docker_stats: true
-  container_health: true
-```
-
-### Docker Installation
-
-```bash
-# Build Docker image
-docker build -f deployments/Dockerfile.agent -t servereye/agent .
-
-# Run with custom config
-docker run -d \
-  --name servereye-agent \
-  -v /etc/servereye:/etc/servereye:ro \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  servereye/agent
-```
-
-## 📈 Performance
+##  Performance
 
 ### Resource Usage
 

@@ -335,11 +335,10 @@ func (cm *ConfigMigration) MigrateFromLegacy(legacyConfig *AgentConfig) *Enhance
 
 		// Set sensible defaults for new fields
 		Features: FeaturesConfig{
-			AutoUpdates:      false,
-			Telemetry:        true,
-			RemoteCommands:   true,
-			Alerting:         true,
-			DockerMonitoring: true,
+			AutoUpdates:    false,
+			Telemetry:      true,
+			RemoteCommands: true,
+			Alerting:       true,
 		},
 		Security: SecurityConfig{
 			RateLimitPerSec: 10,

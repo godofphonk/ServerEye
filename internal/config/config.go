@@ -69,13 +69,12 @@ type LoggingConfig struct {
 	File  string `yaml:"file"`
 }
 
-// FeaturesConfig controls optional features
+// FeaturesConfig contains feature toggle settings
 type FeaturesConfig struct {
-	AutoUpdates      bool `yaml:"auto_updates,omitempty"`
-	Telemetry        bool `yaml:"telemetry,omitempty"`
-	RemoteCommands   bool `yaml:"remote_commands,omitempty"`
-	Alerting         bool `yaml:"alerting,omitempty"`
-	DockerMonitoring bool `yaml:"docker_monitoring,omitempty"`
+	AutoUpdates    bool `yaml:"auto_updates,omitempty"`
+	Telemetry      bool `yaml:"telemetry,omitempty"`
+	RemoteCommands bool `yaml:"remote_commands,omitempty"`
+	Alerting       bool `yaml:"alerting,omitempty"`
 }
 
 // SecurityConfig contains security-related settings

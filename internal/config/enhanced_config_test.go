@@ -676,7 +676,6 @@ func TestGetDefaultConfig(t *testing.T) {
 	assert.True(t, config.Features.Telemetry)
 	assert.True(t, config.Features.RemoteCommands)
 	assert.True(t, config.Features.Alerting)
-	assert.True(t, config.Features.DockerMonitoring)
 
 	// Check security defaults
 	assert.Equal(t, 10, config.Security.RateLimitPerSec)
