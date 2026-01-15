@@ -1,0 +1,22 @@
+name: Go Report Card
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  go-report-card:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Go Report Card
+      uses: creekorful/goreportcard-action@v1.0
+      with:
+        path: .
+        fail_on_threshold: true
+        threshold: 90
