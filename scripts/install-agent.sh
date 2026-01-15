@@ -270,7 +270,7 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
             echo "Your secret key: $SECRET_KEY"
             echo ""
             echo "To connect to Telegram bot:"
-            echo "1. Find @ServerEyeBot in Telegram"
+            echo "1. Find @ServereyeTG_bot in Telegram"
             echo "2. Send /start command"
             echo "3. Send: /add $SECRET_KEY"
         fi
@@ -543,7 +543,7 @@ if systemctl is-active --quiet servereye-agent; then
         echo "Your secret key: $SECRET_KEY"
         echo ""
         echo "To connect to Telegram bot:"
-        echo "1. Find @ServerEyeBot in Telegram"
+        echo "1. Find @ServereyeTG_bot in Telegram"
         echo "2. Send /start command"
         echo "3. Send: /add $SECRET_KEY"
     else
@@ -552,7 +552,7 @@ if systemctl is-active --quiet servereye-agent; then
         echo "Your secret key: $SECRET_KEY"
         echo ""
         echo "To connect to Telegram bot:"
-        echo "1. Find @ServerEyeBot in Telegram"
+        echo "1. Find @ServereyeTG_bot in Telegram"
         echo "2. Send /start command"
         echo "3. Send: /add $SECRET_KEY"
     fi

@@ -19,7 +19,7 @@ ServerEye Agent is a lightweight, high-performance monitoring agent designed for
 ### Key Features
 
 - 🚀 **Real-time Metrics** - CPU, memory, disk, network, and temperature monitoring
-- � **Telegram Integration** - Monitor servers via @ServerEyeBot with instant notifications
+- � **Telegram Integration** - Monitor servers via @ServereyeTG_bot with instant notifications
 - �🔐 **Secure Communication** - WebSocket with TLS and authentication
 - ⚡ **High Performance** - Minimal resource footprint and efficient data transmission
 - 🔧 **Flexible Configuration** - YAML-based config with hot reload support
@@ -68,7 +68,7 @@ sha256sum -c checksums.txt
 
 ```bash
 After installation, connect your server to Telegram:
-1. Find @ServerEyeBot in Telegram
+1. Find @ServereyeTG_bot in Telegram
 2. Send: /start
 3. Send: /add YOUR_SECRET_KEY(key_123123)
 
@@ -318,7 +318,7 @@ The easiest way to monitor your server and view logs is through the **ServerEye 
 
 ### Setup
 
-1. **Find the bot**: Search for `@ServerEyeBot` in Telegram
+1. **Find the bot**: Search for `@ServereyeTG_bot` in Telegram
 2. **Start the bot**: Send `/start` command
 3. **Add your server**: Send `/add YOUR_SECRET_KEY`
 
