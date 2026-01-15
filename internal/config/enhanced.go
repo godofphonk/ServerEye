@@ -217,7 +217,7 @@ func matchesPattern(value, pattern string) bool {
 	switch pattern {
 	case `^[a-zA-Z0-9._-]+$`:
 		for _, r := range value {
-			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-') {
+			if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '.' && r != '_' && r != '-' {
 				return false
 			}
 		}

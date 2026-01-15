@@ -17,8 +17,34 @@ func NewWebSocketAdapter() *WebSocketAdapter {
 // ToWebSocketMessage converts Metric to WebSocket metrics message
 func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message {
 	serverMetrics := websocket.ServerMetrics{
-		Time: time.Now(),
+		Time: metric.Timestamp,
 	}
+	systemInfo := a.extractSystemInfo(metric)
+
+	// Handle different metric types
+	a.processMetricType(metric, &serverMetrics)
+
+	// Create metrics data
+	metricsData := websocket.MetricsData{
+		ServerID: metric.ServerID,
+		Metrics:  serverMetrics,
+		System:   systemInfo,
+	}
+
+	return websocket.Message{
+		Type:     websocket.MessageTypeMetrics,
+		ServerID: metric.ServerID,
+		Data: map[string]interface{}{
+			"server_id": metricsData.ServerID,
+			"metrics":   metricsData.Metrics,
+			"system":    metricsData.System,
+		},
+		Timestamp: time.Now().Unix(),
+	}
+}
+
+// extractSystemInfo extracts system information from metric data
+func (a *WebSocketAdapter) extractSystemInfo(metric *Metric) websocket.SystemInfo {
 	systemInfo := websocket.SystemInfo{
 		Hostname: metric.ServerName,
 	}
@@ -39,114 +65,112 @@ func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message 
 		}
 	}
 
-	// Create server metrics based on metric type
-	serverMetrics.Time = metric.Timestamp
+	return systemInfo
+}
 
-	// Handle different metric types
+// processMetricType processes metric based on its type
+func (a *WebSocketAdapter) processMetricType(metric *Metric, serverMetrics *websocket.ServerMetrics) {
 	switch metric.Type {
-	case "cpu_temperature":
-		if temp, ok := metric.Value.(float64); ok {
-			serverMetrics.CPU = temp
-		}
-	case "cpu_usage":
-		if usage, ok := metric.Value.(float64); ok {
-			serverMetrics.CPU = usage
+	case "cpu_temperature", "cpu_usage":
+		if value, ok := metric.Value.(float64); ok {
+			serverMetrics.CPU = value
 		}
 	case "memory_usage":
-		if usage, ok := metric.Value.(float64); ok {
-			serverMetrics.Memory = usage
+		if value, ok := metric.Value.(float64); ok {
+			serverMetrics.Memory = value
 		}
 	case "disk_usage":
-		if usage, ok := metric.Value.(float64); ok {
-			serverMetrics.Disk = usage
+		if value, ok := metric.Value.(float64); ok {
+			serverMetrics.Disk = value
 		}
 	case "network_usage":
-		if usage, ok := metric.Value.(float64); ok {
-			serverMetrics.Network = usage
+		if value, ok := metric.Value.(float64); ok {
+			serverMetrics.Network = value
 		}
 	case "metrics":
-		// Handle unified metrics structure
-		if metric.Data != nil {
-			if metrics, ok := metric.Data["metrics"].(map[string]interface{}); ok {
-				// Extract CPU metrics
-				if cpu, ok := metrics["cpu"].(float64); ok {
-					serverMetrics.CPU = cpu
-				}
-				if memory, ok := metrics["memory"].(float64); ok {
-					serverMetrics.Memory = memory
-				}
-				if disk, ok := metrics["disk"].(float64); ok {
-					serverMetrics.Disk = disk
-				}
-				if network, ok := metrics["network"].(float64); ok {
-					serverMetrics.Network = network
-				}
-				// Extract CPU usage details
-				if cpuUsage, ok := metrics["cpu_usage"].(map[string]interface{}); ok {
-					usageTotal := getFloat64(cpuUsage, "usage_total")
-					serverMetrics.CPU = usageTotal // Set CPU from cpu_usage.usage_total
-					serverMetrics.CPUUsage = &websocket.CPUUsageInfo{
-						UsageTotal:  usageTotal,
-						UsageUser:   getFloat64(cpuUsage, "usage_user"),
-						UsageSystem: getFloat64(cpuUsage, "usage_system"),
-						UsageIdle:   getFloat64(cpuUsage, "usage_idle"),
-						Cores:       getInt(cpuUsage, "cores"),
-						Frequency:   getFloat64(cpuUsage, "frequency"),
-					}
-					// Extract load average if available
-					if loadAvg, ok := cpuUsage["load_average"].(map[string]interface{}); ok {
-						serverMetrics.CPUUsage.LoadAverage = &websocket.LoadAverageInfo{
-							Load1Min:  getFloat64(loadAvg, "load_1min"),
-							Load5Min:  getFloat64(loadAvg, "load_5min"),
-							Load15Min: getFloat64(loadAvg, "load_15min"),
-						}
-					}
-				}
+		a.processUnifiedMetrics(metric, serverMetrics)
+	}
+}
 
-				// Extract memory details
-				if memoryDetails, ok := metrics["memory_details"]; ok {
-					serverMetrics.MemoryDetails = memoryDetails
-				}
+// processUnifiedMetrics processes unified metrics structure
+func (a *WebSocketAdapter) processUnifiedMetrics(metric *Metric, serverMetrics *websocket.ServerMetrics) {
+	if metric.Data == nil {
+		return
+	}
 
-				// Extract disk details
-				if diskDetails, ok := metrics["disk_details"]; ok {
-					serverMetrics.DiskDetails = diskDetails
-				}
+	metrics, ok := metric.Data["metrics"].(map[string]interface{})
+	if !ok {
+		return
+	}
 
-				// Extract network details
-				if networkDetails, ok := metrics["network_details"]; ok {
-					serverMetrics.NetworkDetails = networkDetails
-				}
+	// Extract basic metrics
+	a.extractBasicMetrics(metrics, serverMetrics)
 
-				// Extract temperature details
-				if temperatureDetails, ok := metrics["temperature_details"]; ok {
-					serverMetrics.TemperatureDetails = temperatureDetails
-				}
+	// Extract detailed metrics
+	a.extractCPUUsageDetails(metrics, serverMetrics)
+	a.extractOtherDetails(metrics, serverMetrics)
+}
 
-				// Extract system details
-				if systemDetails, ok := metrics["system_details"]; ok {
-					serverMetrics.SystemDetails = systemDetails
-				}
-			}
+// extractBasicMetrics extracts basic metrics values
+func (a *WebSocketAdapter) extractBasicMetrics(metrics map[string]interface{}, serverMetrics *websocket.ServerMetrics) {
+	if cpu, ok := metrics["cpu"].(float64); ok {
+		serverMetrics.CPU = cpu
+	}
+	if memory, ok := metrics["memory"].(float64); ok {
+		serverMetrics.Memory = memory
+	}
+	if disk, ok := metrics["disk"].(float64); ok {
+		serverMetrics.Disk = disk
+	}
+	if network, ok := metrics["network"].(float64); ok {
+		serverMetrics.Network = network
+	}
+}
+
+// extractCPUUsageDetails extracts CPU usage details
+func (a *WebSocketAdapter) extractCPUUsageDetails(metrics map[string]interface{}, serverMetrics *websocket.ServerMetrics) {
+	cpuUsage, ok := metrics["cpu_usage"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	usageTotal := getFloat64(cpuUsage, "usage_total")
+	serverMetrics.CPU = usageTotal
+	serverMetrics.CPUUsage = &websocket.CPUUsageInfo{
+		UsageTotal:  usageTotal,
+		UsageUser:   getFloat64(cpuUsage, "usage_user"),
+		UsageSystem: getFloat64(cpuUsage, "usage_system"),
+		UsageIdle:   getFloat64(cpuUsage, "usage_idle"),
+		Cores:       getInt(cpuUsage, "cores"),
+		Frequency:   getFloat64(cpuUsage, "frequency"),
+	}
+
+	// Extract load average if available
+	if loadAvg, ok := cpuUsage["load_average"].(map[string]interface{}); ok {
+		serverMetrics.CPUUsage.LoadAverage = &websocket.LoadAverageInfo{
+			Load1Min:  getFloat64(loadAvg, "load_1min"),
+			Load5Min:  getFloat64(loadAvg, "load_5min"),
+			Load15Min: getFloat64(loadAvg, "load_15min"),
 		}
 	}
+}
 
-	// Create metrics data
-	metricsData := websocket.MetricsData{
-		ServerID: metric.ServerID,
-		Metrics:  serverMetrics,
-		System:   systemInfo,
+// extractOtherDetails extracts other detailed metrics
+func (a *WebSocketAdapter) extractOtherDetails(metrics map[string]interface{}, serverMetrics *websocket.ServerMetrics) {
+	details := map[string]interface{}{
+		"memory_details":      &serverMetrics.MemoryDetails,
+		"disk_details":        &serverMetrics.DiskDetails,
+		"network_details":     &serverMetrics.NetworkDetails,
+		"temperature_details": &serverMetrics.TemperatureDetails,
+		"system_details":      &serverMetrics.SystemDetails,
 	}
 
-	return websocket.Message{
-		Type:     websocket.MessageTypeMetrics,
-		ServerID: metric.ServerID,
-		Data: map[string]interface{}{
-			"server_id": metricsData.ServerID,
-			"metrics":   metricsData.Metrics,
-			"system":    metricsData.System,
-		},
-		Timestamp: time.Now().Unix(),
+	for detailKey, target := range details {
+		if detail, ok := metrics[detailKey]; ok {
+			if ptr, ok := target.(*interface{}); ok {
+				*ptr = detail
+			}
+		}
 	}
 }
 

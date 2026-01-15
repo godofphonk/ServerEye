@@ -101,6 +101,8 @@ func (a *Agent) collectAndSendMetricsOnce() {
 }
 
 // sendMetric отправляет метрику через publisher
+//
+//nolint:unused // This function is used within the same file
 func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 	// Check if WebSocket publisher is available
 	if a.wsPublisher == nil {

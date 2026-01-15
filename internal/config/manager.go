@@ -357,93 +357,114 @@ func (cm *ConfigManager) applyEnvVariableOverrides(config *AgentConfig) {
 
 // mergeConfig merges source config into destination config
 func (cm *ConfigManager) mergeConfig(dest *AgentConfig, src AgentConfig) {
-	if src.Server.Name != "" {
-		dest.Server.Name = src.Server.Name
-	}
-	if src.Server.Description != "" {
-		dest.Server.Description = src.Server.Description
-	}
-	if src.Server.SecretKey != "" {
-		dest.Server.SecretKey = src.Server.SecretKey
-	}
-	if src.Server.ServerID != "" {
-		dest.Server.ServerID = src.Server.ServerID
-	}
+	cm.mergeServerConfig(&dest.Server, src.Server)
+	cm.mergeAPIConfig(&dest.API, src.API)
+	cm.mergeWebSocketConfig(&dest.WebSocket, src.WebSocket)
+	cm.mergeMetricsConfig(&dest.Metrics, src.Metrics)
+	cm.mergeLoggingConfig(&dest.Logging, src.Logging)
+}
 
-	if src.API.BaseURL != "" {
-		dest.API.BaseURL = src.API.BaseURL
+// mergeServerConfig merges server configuration
+func (cm *ConfigManager) mergeServerConfig(dest *ServerConfig, src ServerConfig) {
+	if src.Name != "" {
+		dest.Name = src.Name
 	}
-	if src.API.APIKey != "" {
-		dest.API.APIKey = src.API.APIKey
+	if src.Description != "" {
+		dest.Description = src.Description
 	}
-	if src.API.Timeout != "" {
-		dest.API.Timeout = src.API.Timeout
+	if src.SecretKey != "" {
+		dest.SecretKey = src.SecretKey
 	}
+	if src.ServerID != "" {
+		dest.ServerID = src.ServerID
+	}
+}
 
-	if src.WebSocket.Enabled {
-		dest.WebSocket.Enabled = src.WebSocket.Enabled
+// mergeAPIConfig merges API configuration
+func (cm *ConfigManager) mergeAPIConfig(dest *APIConfig, src APIConfig) {
+	if src.BaseURL != "" {
+		dest.BaseURL = src.BaseURL
 	}
-	if src.WebSocket.URL != "" {
-		dest.WebSocket.URL = src.WebSocket.URL
+	if src.APIKey != "" {
+		dest.APIKey = src.APIKey
 	}
-	if src.WebSocket.ReconnectInterval != "" {
-		dest.WebSocket.ReconnectInterval = src.WebSocket.ReconnectInterval
+	if src.Timeout != "" {
+		dest.Timeout = src.Timeout
 	}
-	if src.WebSocket.MaxReconnectAttempts != 0 {
-		dest.WebSocket.MaxReconnectAttempts = src.WebSocket.MaxReconnectAttempts
-	}
-	if src.WebSocket.PingInterval != "" {
-		dest.WebSocket.PingInterval = src.WebSocket.PingInterval
-	}
-	if src.WebSocket.WriteTimeout != "" {
-		dest.WebSocket.WriteTimeout = src.WebSocket.WriteTimeout
-	}
-	if src.WebSocket.ReadTimeout != "" {
-		dest.WebSocket.ReadTimeout = src.WebSocket.ReadTimeout
-	}
-	if src.WebSocket.HandshakeTimeout != "" {
-		dest.WebSocket.HandshakeTimeout = src.WebSocket.HandshakeTimeout
-	}
-	if src.WebSocket.BufferSize != 0 {
-		dest.WebSocket.BufferSize = src.WebSocket.BufferSize
-	}
-	if src.WebSocket.EnableCompression {
-		dest.WebSocket.EnableCompression = src.WebSocket.EnableCompression
-	}
-	if src.WebSocket.MetricBufferSize != 0 {
-		dest.WebSocket.MetricBufferSize = src.WebSocket.MetricBufferSize
-	}
-	if src.WebSocket.MetricBufferFlush != "" {
-		dest.WebSocket.MetricBufferFlush = src.WebSocket.MetricBufferFlush
-	}
-	if src.WebSocket.CommandQueueSize != 0 {
-		dest.WebSocket.CommandQueueSize = src.WebSocket.CommandQueueSize
-	}
-	if src.WebSocket.CommandTimeout != "" {
-		dest.WebSocket.CommandTimeout = src.WebSocket.CommandTimeout
-	}
+}
 
-	if src.Metrics.CPUUsage {
-		dest.Metrics.CPUUsage = src.Metrics.CPUUsage
+// mergeWebSocketConfig merges WebSocket configuration
+func (cm *ConfigManager) mergeWebSocketConfig(dest *WebSocketConfig, src WebSocketConfig) {
+	if src.Enabled {
+		dest.Enabled = src.Enabled
 	}
-	if src.Metrics.MemoryUsage {
-		dest.Metrics.MemoryUsage = src.Metrics.MemoryUsage
+	if src.URL != "" {
+		dest.URL = src.URL
 	}
-	if src.Metrics.DiskUsage {
-		dest.Metrics.DiskUsage = src.Metrics.DiskUsage
+	if src.ReconnectInterval != "" {
+		dest.ReconnectInterval = src.ReconnectInterval
 	}
-	if src.Metrics.CPUTemperature {
-		dest.Metrics.CPUTemperature = src.Metrics.CPUTemperature
+	if src.MaxReconnectAttempts != 0 {
+		dest.MaxReconnectAttempts = src.MaxReconnectAttempts
 	}
-	if src.Metrics.Interval != "" {
-		dest.Metrics.Interval = src.Metrics.Interval
+	if src.PingInterval != "" {
+		dest.PingInterval = src.PingInterval
 	}
+	if src.WriteTimeout != "" {
+		dest.WriteTimeout = src.WriteTimeout
+	}
+	if src.ReadTimeout != "" {
+		dest.ReadTimeout = src.ReadTimeout
+	}
+	if src.HandshakeTimeout != "" {
+		dest.HandshakeTimeout = src.HandshakeTimeout
+	}
+	if src.BufferSize != 0 {
+		dest.BufferSize = src.BufferSize
+	}
+	if src.EnableCompression {
+		dest.EnableCompression = src.EnableCompression
+	}
+	if src.MetricBufferSize != 0 {
+		dest.MetricBufferSize = src.MetricBufferSize
+	}
+	if src.MetricBufferFlush != "" {
+		dest.MetricBufferFlush = src.MetricBufferFlush
+	}
+	if src.CommandQueueSize != 0 {
+		dest.CommandQueueSize = src.CommandQueueSize
+	}
+	if src.CommandTimeout != "" {
+		dest.CommandTimeout = src.CommandTimeout
+	}
+}
 
-	if src.Logging.Level != "" {
-		dest.Logging.Level = src.Logging.Level
+// mergeMetricsConfig merges metrics configuration
+func (cm *ConfigManager) mergeMetricsConfig(dest *MetricsConfig, src MetricsConfig) {
+	if src.CPUUsage {
+		dest.CPUUsage = src.CPUUsage
 	}
-	if src.Logging.File != "" {
-		dest.Logging.File = src.Logging.File
+	if src.MemoryUsage {
+		dest.MemoryUsage = src.MemoryUsage
+	}
+	if src.DiskUsage {
+		dest.DiskUsage = src.DiskUsage
+	}
+	if src.CPUTemperature {
+		dest.CPUTemperature = src.CPUTemperature
+	}
+	if src.Interval != "" {
+		dest.Interval = src.Interval
+	}
+}
+
+// mergeLoggingConfig merges logging configuration
+func (cm *ConfigManager) mergeLoggingConfig(dest *LoggingConfig, src LoggingConfig) {
+	if src.Level != "" {
+		dest.Level = src.Level
+	}
+	if src.File != "" {
+		dest.File = src.File
 	}
 }
 
