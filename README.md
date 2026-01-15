@@ -2,8 +2,7 @@
 
 <div align="center">
 
-![ServerEye Logo](https://img.shields.io/badge/ServerEye-Agent-blue?style=for-the-badge&logo=servereye)
-![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go)
+![Go Report Card](https://goreportcard.com/badge/github.com/godofphonk/ServerEye?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 ![Release](https://img.shields.io/github/v/release/godofphonk/ServerEye?style=for-the-badge&logo=github)
 
