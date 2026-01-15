@@ -138,169 +138,209 @@ func (a *Agent) collectAndSendUnifiedMetrics() {
 		"time": time.Now().Format(time.RFC3339),
 	}
 
-	// Collect CPU usage (detailed statistics)
-	if a.cpuMetrics != nil {
-		if cpuUsage, err := a.cpuMetrics.GetDetailedUsage(); err == nil {
-			a.logger.WithField("cpu_usage", cpuUsage).Info("Detailed CPU usage collected")
+	// Collect all metric types
+	a.collectCPUMetrics(metrics)
+	a.collectMemoryMetrics(metrics)
+	a.collectDiskMetrics(metrics)
+	a.collectNetworkMetrics(metrics)
+	a.collectTemperatureMetrics(metrics)
+	a.collectSystemMetrics(metrics)
 
-			// Add CPU metrics to unified structure
-			metrics["cpu"] = cpuUsage.UsageTotal // For backward compatibility
-			metrics["cpu_usage"] = map[string]interface{}{
-				"usage_total":  cpuUsage.UsageTotal,
-				"usage_user":   cpuUsage.UsageUser,
-				"usage_system": cpuUsage.UsageSystem,
-				"usage_idle":   cpuUsage.UsageIdle,
-				"cores":        cpuUsage.Cores,
-				"frequency":    cpuUsage.Frequency,
-			}
+	// Create and send unified metric message
+	a.sendUnifiedMetrics(metrics)
+}
 
-			if cpuUsage.LoadAverage != nil {
-				metrics["cpu_usage"].(map[string]interface{})["load_average"] = map[string]interface{}{
-					"load_1min":  cpuUsage.LoadAverage.Load1Min,
-					"load_5min":  cpuUsage.LoadAverage.Load5Min,
-					"load_15min": cpuUsage.LoadAverage.Load15Min,
-				}
-			}
-		} else {
-			a.logger.WithError(err).Error("Failed to get detailed CPU usage")
-		}
+// collectCPUMetrics collects CPU metrics and adds them to the unified structure
+func (a *Agent) collectCPUMetrics(metrics map[string]interface{}) {
+	if a.cpuMetrics == nil {
+		return
 	}
 
-	// Collect memory usage (detailed statistics)
-	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check")
-	if a.systemMonitor != nil {
-		if memInfo, err := a.systemMonitor.GetMemoryInfo(); err == nil {
-			a.logger.WithField("memory_info", memInfo).Info("Memory info collected")
+	cpuUsage, err := a.cpuMetrics.GetDetailedUsage()
+	if err != nil {
+		a.logger.WithError(err).Error("Failed to get detailed CPU usage")
+		return
+	}
 
-			// Add memory metrics to unified structure
-			metrics["memory"] = memInfo.UsedPercent // For backward compatibility
-			memoryDetails := map[string]interface{}{
-				"total_gb":     float64(memInfo.Total) / 1024 / 1024 / 1024,
-				"used_gb":      float64(memInfo.Used) / 1024 / 1024 / 1024,
-				"available_gb": float64(memInfo.Available) / 1024 / 1024 / 1024,
-				"free_gb":      float64(memInfo.Free) / 1024 / 1024 / 1024,
-				"buffers_gb":   float64(memInfo.Buffers) / 1024 / 1024 / 1024,
-				"cached_gb":    float64(memInfo.Cached) / 1024 / 1024 / 1024,
-				"used_percent": memInfo.UsedPercent,
-			}
-			metrics["memory_details"] = memoryDetails
-			a.logger.WithField("memory_details", memoryDetails).Debug("Memory details added to metrics")
-		} else {
-			a.logger.WithError(err).Error("Failed to get memory info")
+	a.logger.WithField("cpu_usage", cpuUsage).Info("Detailed CPU usage collected")
+
+	// Add CPU metrics to unified structure
+	metrics["cpu"] = cpuUsage.UsageTotal // For backward compatibility
+	metrics["cpu_usage"] = map[string]interface{}{
+		"usage_total":  cpuUsage.UsageTotal,
+		"usage_user":   cpuUsage.UsageUser,
+		"usage_system": cpuUsage.UsageSystem,
+		"usage_idle":   cpuUsage.UsageIdle,
+		"cores":        cpuUsage.Cores,
+		"frequency":    cpuUsage.Frequency,
+	}
+
+	if cpuUsage.LoadAverage != nil {
+		metrics["cpu_usage"].(map[string]interface{})["load_average"] = map[string]interface{}{
+			"load_1min":  cpuUsage.LoadAverage.Load1Min,
+			"load_5min":  cpuUsage.LoadAverage.Load5Min,
+			"load_15min": cpuUsage.LoadAverage.Load15Min,
 		}
-	} else {
+	}
+}
+
+// collectMemoryMetrics collects memory metrics and adds them to the unified structure
+func (a *Agent) collectMemoryMetrics(metrics map[string]interface{}) {
+	if a.systemMonitor == nil {
 		a.logger.Error("System monitor is nil - memory metrics collection skipped")
+		return
 	}
 
-	// Collect disk usage (detailed statistics)
-	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check for disk")
-	if a.systemMonitor != nil {
-		if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
-			a.logger.WithField("disk_info", diskInfo).Info("Disk info collected")
+	memInfo, err := a.systemMonitor.GetMemoryInfo()
+	if err != nil {
+		a.logger.WithError(err).Error("Failed to get memory info")
+		return
+	}
 
-			// Convert disk info for unified structure
-			disks := make([]map[string]interface{}, len(diskInfo.Disks))
-			for i, disk := range diskInfo.Disks {
-				disks[i] = map[string]interface{}{
-					"path":         disk.Path,
-					"total_gb":     float64(disk.Total) / 1024 / 1024 / 1024,
-					"used_gb":      float64(disk.Used) / 1024 / 1024 / 1024,
-					"free_gb":      float64(disk.Free) / 1024 / 1024 / 1024,
-					"used_percent": disk.UsedPercent,
-					"filesystem":   disk.Filesystem,
-				}
-			}
+	a.logger.WithField("memory_info", memInfo).Info("Memory info collected")
 
-			// Add disk metrics to unified structure
-			if len(disks) > 0 {
-				// Use first disk for backward compatibility
-				metrics["disk"] = disks[0]["used_percent"]
-				metrics["disk_details"] = disks
-				a.logger.WithField("disk_details", disks).Debug("Disk details added to metrics")
-			}
-		} else {
-			a.logger.WithError(err).Error("Failed to get disk info")
-		}
-	} else {
+	// Add memory metrics to unified structure
+	metrics["memory"] = memInfo.UsedPercent // For backward compatibility
+	memoryDetails := map[string]interface{}{
+		"total_gb":     float64(memInfo.Total) / 1024 / 1024 / 1024,
+		"used_gb":      float64(memInfo.Used) / 1024 / 1024 / 1024,
+		"available_gb": float64(memInfo.Available) / 1024 / 1024 / 1024,
+		"free_gb":      float64(memInfo.Free) / 1024 / 1024 / 1024,
+		"buffers_gb":   float64(memInfo.Buffers) / 1024 / 1024 / 1024,
+		"cached_gb":    float64(memInfo.Cached) / 1024 / 1024 / 1024,
+		"used_percent": memInfo.UsedPercent,
+	}
+	metrics["memory_details"] = memoryDetails
+	a.logger.WithField("memory_details", memoryDetails).Debug("Memory details added to metrics")
+}
+
+// collectDiskMetrics collects disk metrics and adds them to the unified structure
+func (a *Agent) collectDiskMetrics(metrics map[string]interface{}) {
+	if a.systemMonitor == nil {
 		a.logger.Error("System monitor is nil - disk metrics collection skipped")
+		return
 	}
 
-	// Collect network usage (detailed statistics)
-	a.logger.WithField("networkMetrics", a.networkMetrics != nil).Debug("Network metrics check")
-	if a.networkMetrics != nil {
-		if networkInfo, err := a.networkMetrics.GetNetworkInfo(); err == nil {
-			a.logger.WithField("network_info", networkInfo).Info("Network info collected")
+	diskInfo, err := a.systemMonitor.GetDiskInfo()
+	if err != nil {
+		a.logger.WithError(err).Error("Failed to get disk info")
+		return
+	}
 
-			// Add network metrics to unified structure
-			metrics["network"] = networkInfo.TotalRxMbps + networkInfo.TotalTxMbps // For backward compatibility
-			networkDetails := map[string]interface{}{
-				"interfaces":    networkInfo.Interfaces,
-				"total_rx_mbps": networkInfo.TotalRxMbps,
-				"total_tx_mbps": networkInfo.TotalTxMbps,
-			}
-			metrics["network_details"] = networkDetails
-			a.logger.WithField("network_details", networkDetails).Debug("Network details added to metrics")
-		} else {
-			a.logger.WithError(err).Error("Failed to get network info")
+	a.logger.WithField("disk_info", diskInfo).Info("Disk info collected")
+
+	// Convert disk info for unified structure
+	disks := make([]map[string]interface{}, len(diskInfo.Disks))
+	for i, disk := range diskInfo.Disks {
+		disks[i] = map[string]interface{}{
+			"path":         disk.Path,
+			"total_gb":     float64(disk.Total) / 1024 / 1024 / 1024,
+			"used_gb":      float64(disk.Used) / 1024 / 1024 / 1024,
+			"free_gb":      float64(disk.Free) / 1024 / 1024 / 1024,
+			"used_percent": disk.UsedPercent,
+			"filesystem":   disk.Filesystem,
 		}
-	} else {
+	}
+
+	// Add disk metrics to unified structure
+	if len(disks) > 0 {
+		// Use first disk for backward compatibility
+		metrics["disk"] = disks[0]["used_percent"]
+		metrics["disk_details"] = disks
+		a.logger.WithField("disk_details", disks).Debug("Disk details added to metrics")
+	}
+}
+
+// collectNetworkMetrics collects network metrics and adds them to the unified structure
+func (a *Agent) collectNetworkMetrics(metrics map[string]interface{}) {
+	if a.networkMetrics == nil {
 		a.logger.Error("Network metrics is nil - network metrics collection skipped")
+		return
 	}
 
-	// Collect temperature metrics (detailed statistics)
-	a.logger.WithField("temperatureMetrics", a.temperatureMetrics != nil).Debug("Temperature metrics check")
-	if a.temperatureMetrics != nil {
-		if tempInfo, err := a.temperatureMetrics.GetTemperatureInfo(); err == nil {
-			a.logger.WithField("temperature_info", tempInfo).Info("Temperature info collected")
+	networkInfo, err := a.networkMetrics.GetNetworkInfo()
+	if err != nil {
+		a.logger.WithError(err).Error("Failed to get network info")
+		return
+	}
 
-			// Add temperature metrics to unified structure
-			// Use highest temperature for backward compatibility
-			metrics["temperature"] = tempInfo.HighestTemperature
-			temperatureDetails := map[string]interface{}{
-				"cpu_temperature":      tempInfo.CPUTemperature,
-				"gpu_temperature":      tempInfo.GPUTemperature,
-				"system_temperature":   tempInfo.SystemTemperature,
-				"storage_temperatures": tempInfo.StorageTemperatures,
-				"highest_temperature":  tempInfo.HighestTemperature,
-				"temperature_unit":     tempInfo.TemperatureUnit,
-			}
-			metrics["temperature_details"] = temperatureDetails
-			a.logger.WithField("temperature_details", temperatureDetails).Debug("Temperature details added to metrics")
-		} else {
-			a.logger.WithError(err).Error("Failed to get temperature info")
-		}
-	} else {
+	a.logger.WithField("network_info", networkInfo).Info("Network info collected")
+
+	// Add network metrics to unified structure
+	metrics["network"] = networkInfo.TotalRxMbps + networkInfo.TotalTxMbps // For backward compatibility
+	networkDetails := map[string]interface{}{
+		"interfaces":    networkInfo.Interfaces,
+		"total_rx_mbps": networkInfo.TotalRxMbps,
+		"total_tx_mbps": networkInfo.TotalTxMbps,
+	}
+	metrics["network_details"] = networkDetails
+	a.logger.WithField("network_details", networkDetails).Debug("Network details added to metrics")
+}
+
+// collectTemperatureMetrics collects temperature metrics and adds them to the unified structure
+func (a *Agent) collectTemperatureMetrics(metrics map[string]interface{}) {
+	if a.temperatureMetrics == nil {
 		a.logger.Error("Temperature metrics is nil - temperature metrics collection skipped")
+		return
 	}
 
-	// Collect system information (detailed statistics)
-	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check for system details")
-	if a.systemMonitor != nil {
-		if systemDetails, err := a.systemMonitor.GetSystemDetails(); err == nil {
-			a.logger.WithField("system_details", systemDetails).Info("System details collected")
+	tempInfo, err := a.temperatureMetrics.GetTemperatureInfo()
+	if err != nil {
+		a.logger.WithError(err).Error("Failed to get temperature info")
+		return
+	}
 
-			// Add system metrics to unified structure
-			systemDetailsMap := map[string]interface{}{
-				"hostname":           systemDetails.Hostname,
-				"os":                 systemDetails.OS,
-				"kernel":             systemDetails.Kernel,
-				"architecture":       systemDetails.Architecture,
-				"uptime_seconds":     systemDetails.UptimeSeconds,
-				"uptime_human":       systemDetails.UptimeHuman,
-				"boot_time":          systemDetails.BootTime,
-				"processes_total":    systemDetails.ProcessesTotal,
-				"processes_running":  systemDetails.ProcessesRunning,
-				"processes_sleeping": systemDetails.ProcessesSleeping,
-			}
-			metrics["system_details"] = systemDetailsMap
-			a.logger.WithField("system_details", systemDetailsMap).Debug("System details added to metrics")
-		} else {
-			a.logger.WithError(err).Error("Failed to get system details")
-		}
-	} else {
+	a.logger.WithField("temperature_info", tempInfo).Info("Temperature info collected")
+
+	// Add temperature metrics to unified structure
+	// Use highest temperature for backward compatibility
+	metrics["temperature"] = tempInfo.HighestTemperature
+	temperatureDetails := map[string]interface{}{
+		"cpu_temperature":      tempInfo.CPUTemperature,
+		"gpu_temperature":      tempInfo.GPUTemperature,
+		"system_temperature":   tempInfo.SystemTemperature,
+		"storage_temperatures": tempInfo.StorageTemperatures,
+		"highest_temperature":  tempInfo.HighestTemperature,
+		"temperature_unit":     tempInfo.TemperatureUnit,
+	}
+	metrics["temperature_details"] = temperatureDetails
+	a.logger.WithField("temperature_details", temperatureDetails).Debug("Temperature details added to metrics")
+}
+
+// collectSystemMetrics collects system metrics and adds them to the unified structure
+func (a *Agent) collectSystemMetrics(metrics map[string]interface{}) {
+	if a.systemMonitor == nil {
 		a.logger.Error("System monitor is nil - system details collection skipped")
+		return
 	}
 
+	systemDetails, err := a.systemMonitor.GetSystemDetails()
+	if err != nil {
+		a.logger.WithError(err).Error("Failed to get system details")
+		return
+	}
+
+	a.logger.WithField("system_details", systemDetails).Info("System details collected")
+
+	// Add system metrics to unified structure
+	systemDetailsMap := map[string]interface{}{
+		"hostname":           systemDetails.Hostname,
+		"os":                 systemDetails.OS,
+		"kernel":             systemDetails.Kernel,
+		"architecture":       systemDetails.Architecture,
+		"uptime_seconds":     systemDetails.UptimeSeconds,
+		"uptime_human":       systemDetails.UptimeHuman,
+		"boot_time":          systemDetails.BootTime,
+		"processes_total":    systemDetails.ProcessesTotal,
+		"processes_running":  systemDetails.ProcessesRunning,
+		"processes_sleeping": systemDetails.ProcessesSleeping,
+	}
+	metrics["system_details"] = systemDetailsMap
+	a.logger.WithField("system_details", systemDetailsMap).Debug("System details added to metrics")
+}
+
+// sendUnifiedMetrics creates and sends the unified metrics message
+func (a *Agent) sendUnifiedMetrics(metrics map[string]interface{}) {
 	// Create unified metric message
 	unifiedMetric := &types.Metric{
 		ServerID:   a.config.Server.ServerID,
