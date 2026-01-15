@@ -41,7 +41,6 @@ features:
   docker_monitoring: true
 
 security:
-  enable_tls: false
   rate_limit_per_sec: 5
   max_connections: 50
 

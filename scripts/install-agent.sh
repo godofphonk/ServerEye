@@ -205,13 +205,6 @@ for cmd in wget curl openssl systemctl sha256sum; do
     fi
 done
 
-# Check for netcat (optional, for Kafka auto-detection)
-if ! command -v nc &> /dev/null; then
-    echo "[INFO] netcat not found - Kafka auto-detection will be limited"
-    NETCAT_AVAILABLE=false
-else
-    NETCAT_AVAILABLE=true
-fi
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
@@ -451,9 +444,9 @@ websocket:
   command_timeout: "30s"
 
 metrics:
-  cpu_usage: false
+  cpu_usage: true
   memory_usage: true
-  disk_usage: false
+  disk_usage: true
   cpu_temperature: true
   interval: "\${SERVEREYE_METRICS_INTERVAL:-30s}"
 
@@ -470,9 +463,6 @@ features:
   docker_monitoring: true
 
 security:
-  enable_tls: false
-  tls_cert_file: ""
-  tls_key_file: ""
   allowed_ips: []
   rate_limit_per_sec: 10
   max_connections: 100

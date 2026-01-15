@@ -80,9 +80,6 @@ type FeaturesConfig struct {
 
 // SecurityConfig contains security-related settings
 type SecurityConfig struct {
-	EnableTLS       bool     `yaml:"enable_tls,omitempty"`
-	TLSCertFile     string   `yaml:"tls_cert_file,omitempty"`
-	TLSKeyFile      string   `yaml:"tls_key_file,omitempty"`
 	AllowedIPs      []string `yaml:"allowed_ips,omitempty"`
 	RateLimitPerSec int      `yaml:"rate_limit_per_sec,omitempty"`
 	MaxConnections  int      `yaml:"max_connections,omitempty"`

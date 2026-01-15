@@ -342,7 +342,6 @@ func (cm *ConfigMigration) MigrateFromLegacy(legacyConfig *AgentConfig) *Enhance
 			DockerMonitoring: true,
 		},
 		Security: SecurityConfig{
-			EnableTLS:       false,
 			RateLimitPerSec: 10,
 			MaxConnections:  100,
 		},

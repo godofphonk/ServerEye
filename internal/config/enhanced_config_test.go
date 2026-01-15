@@ -306,15 +306,15 @@ func TestValidateEnvironmentSpecificConfig(t *testing.T) {
 					SecretKey: "secure-key-1234567890",
 				},
 				Security: SecurityConfig{
-					EnableTLS: true,
+					RateLimitPerSec: 10,
+					MaxConnections:  100,
 				},
 				Logging: LoggingConfig{
 					Level: "info",
 				},
 			},
 			env:         Production,
-			expectError: true,
-			errorMsg:    "TLS certificate and key files required",
+			expectError: false,
 		},
 		{
 			name: "valid production config",
@@ -328,8 +328,8 @@ func TestValidateEnvironmentSpecificConfig(t *testing.T) {
 					URL:     "wss://secure.com",
 				},
 				Security: SecurityConfig{
-					EnableTLS:      false,
-					MaxConnections: 100,
+					RateLimitPerSec: 10,
+					MaxConnections:  100,
 				},
 				Logging: LoggingConfig{
 					Level: "info",
@@ -608,7 +608,6 @@ func TestConfigMigration(t *testing.T) {
 		assert.False(t, enhanced.Features.AutoUpdates)
 		assert.True(t, enhanced.Features.Telemetry)
 		assert.True(t, enhanced.Features.RemoteCommands)
-		assert.False(t, enhanced.Security.EnableTLS)
 		assert.Equal(t, 10, enhanced.Security.RateLimitPerSec)
 		assert.Equal(t, 4, enhanced.Performance.WorkerCount)
 		assert.Equal(t, 1000, enhanced.Performance.QueueSize)
@@ -629,7 +628,8 @@ func TestConfigMigration(t *testing.T) {
 				Telemetry:   false,
 			},
 			Security: SecurityConfig{
-				EnableTLS: true,
+				RateLimitPerSec: 10,
+				MaxConnections:  100,
 			},
 			Performance: PerformanceConfig{
 				WorkerCount: 8,
@@ -679,7 +679,6 @@ func TestGetDefaultConfig(t *testing.T) {
 	assert.True(t, config.Features.DockerMonitoring)
 
 	// Check security defaults
-	assert.False(t, config.Security.EnableTLS)
 	assert.Equal(t, 10, config.Security.RateLimitPerSec)
 	assert.Equal(t, 100, config.Security.MaxConnections)
 

@@ -70,7 +70,6 @@ func DefaultConfig() *UnifiedConfig {
 			DockerMonitoring: true,
 		},
 		Security: SecurityConfig{
-			EnableTLS:       false,
 			RateLimitPerSec: 10,
 			MaxConnections:  100,
 		},
@@ -184,7 +183,6 @@ func (c *UnifiedConfig) applyEnvironmentOverrides() {
 		c.Features.Telemetry = false
 		c.Features.AutoUpdates = false
 		c.Performance.WorkerCount = 8
-		c.Security.EnableTLS = true
 	case "staging":
 		c.Logging.Level = "info"
 		c.Features.Telemetry = true

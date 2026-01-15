@@ -359,9 +359,6 @@ features:
   docker_monitoring: true
 
 security:
-  enable_tls: false
-  tls_cert_file: ""
-  tls_key_file: ""
   allowed_ips: []
   rate_limit_per_sec: 5
   max_connections: 50

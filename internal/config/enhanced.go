@@ -252,9 +252,6 @@ func ValidateEnvironmentSpecificConfig(config *EnhancedAgentConfig, env Environm
 		if config.WebSocket.Enabled && strings.HasPrefix(config.WebSocket.URL, "ws://") {
 			return fmt.Errorf("unsecure WebSocket (ws://) not recommended in production")
 		}
-		if config.Security.EnableTLS && (config.Security.TLSCertFile == "" || config.Security.TLSKeyFile == "") {
-			return fmt.Errorf("TLS certificate and key files required when TLS is enabled")
-		}
 
 	case Development:
 		// Development-specific validations
@@ -318,7 +315,6 @@ func GetDefaultConfig() *EnhancedAgentConfig {
 			DockerMonitoring: true,
 		},
 		Security: SecurityConfig{
-			EnableTLS:       false,
 			RateLimitPerSec: 10,
 			MaxConnections:  100,
 		},
