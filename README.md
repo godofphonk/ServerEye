@@ -3,7 +3,7 @@
 <div align="center">
 
 ![ServerEye Logo](https://img.shields.io/badge/ServerEye-Agent-blue?style=for-the-badge&logo=servereye)
-![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go)
+![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 ![Release](https://img.shields.io/github/v/release/godofphonk/ServerEye?style=for-the-badge&logo=github)
 
@@ -20,7 +20,8 @@ ServerEye Agent is a lightweight, high-performance monitoring agent designed for
 ### Key Features
 
 - 🚀 **Real-time Metrics** - CPU, memory, disk, network, and temperature monitoring
-- 🔐 **Secure Communication** - WebSocket with TLS and authentication
+- � **Telegram Integration** - Monitor servers via @ServerEyeBot with instant notifications
+- �🔐 **Secure Communication** - WebSocket with TLS and authentication
 - ⚡ **High Performance** - Minimal resource footprint and efficient data transmission
 - 🔧 **Flexible Configuration** - YAML-based config with hot reload support
 - 📊 **Production Ready** - Structured logging, graceful shutdown, and reliable operation
@@ -63,20 +64,17 @@ sha256sum -c checksums.txt
 # Expected: servereye-agent-linux-amd64: OK
 ```
 
-### Initial Setup
 
-The installation script automatically configures and starts the agent:
+### 📱 Connect to Telegram Bot
 
 ```bash
-# The installer automatically:
-# 1. Downloads and installs the agent binary
-# 2. Creates configuration files
-# 3. Sets up systemd service
-# 4. Generates and registers server key
-# 5. Starts the agent service
+After installation, connect your server to Telegram:
+1. Find @ServerEyeBot in Telegram
+2. Send: /start
+3. Send: /add YOUR_SECRET_KEY(key_123123)
 
-# Installation is complete after running the script above
-# Your secret key will be displayed at the end
+Your secret key is shown at the end of installation
+Or find it in: /etc/servereye/config.yaml
 ```
 
 ### Manual Service Management
@@ -249,8 +247,8 @@ sudo userdel servereye 2>/dev/null || true
 |--------|---------------|---------|
 | CPU | < 1% | < 2% |
 | Memory | < 50MB | < 100MB |
-| Network | < 1MB/min | < 5MB/min |
-| Disk | < 10MB/day | < 50MB/day |
+| Network | < 20KB/min | < 250KB/min |
+| Disk | Logs only | Logs grow over time* |
 
 ### Optimization
 
@@ -258,6 +256,8 @@ sudo userdel servereye 2>/dev/null || true
 - Batched data transmission
 - Connection pooling and reuse
 - Minimal system call overhead
+
+> **Note**: Disk usage is only for log files. Logs grow over time as the agent writes to `/var/log/servereye/agent.log` without rotation. Monitor log file size and clean up periodically.
 
 ## 🚨 Troubleshooting
 
@@ -274,20 +274,7 @@ ls -la /etc/servereye/
 ls -la /var/log/servereye/
 ```
 
-#### Connection issues
 
-```bash
-# Test WebSocket connection
-curl -i -N -H "Connection: Upgrade" \
-     -H "Upgrade: websocket" \
-     -H "Sec-WebSocket-Key: test" \
-     -H "Sec-WebSocket-Version: 13" \
-     https://api.servereye.com/ws
-
-# Check network connectivity
-ping api.servereye.com
-telnet api.servereye.com 443
-```
 
 #### High resource usage
 
@@ -319,9 +306,54 @@ sudo journalctl -u servereye-agent --since "1 hour ago"
 # Filter by log level
 sudo journalctl -u servereye-agent -p err
 
-# Monitor in real-time
+# Follow logs in real-time
 sudo journalctl -u servereye-agent -f
+
+# Check log file directly
+sudo tail -f /var/log/servereye/agent.log
 ```
+
+## 📱 Telegram Bot Integration
+
+The easiest way to monitor your server and view logs is through the **ServerEye Telegram Bot**.
+
+### Setup
+
+1. **Find the bot**: Search for `@ServerEyeBot` in Telegram
+2. **Start the bot**: Send `/start` command
+3. **Add your server**: Send `/add YOUR_SECRET_KEY`
+
+> **Your secret key** is displayed during installation and can be found in `/etc/servereye/config.yaml`
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `/temp` | Get CPU temperature |
+| `/memory` | Get memory usage statistics |
+| `/disk` | Get disk space and I/O stats |
+| `/status` | Get complete server status |
+| `/logs` | View recent agent logs* |
+| `/help` | Show all available commands |
+
+### Real-time Monitoring
+
+The Telegram bot provides:
+- **📊 Live metrics** - Real-time system statistics
+- **📋 Log viewing** - Recent agent logs and errors
+- **🚨 Alerts** - Automatic notifications for issues
+- **📈 History** - Historical performance data
+- **⚡ Instant commands** - Quick server management
+
+### Benefits
+
+- **No SSH required** - Monitor from anywhere
+- **Mobile friendly** - Works on Telegram mobile/desktop
+- **Real-time updates** - Instant metric notifications
+- **Easy troubleshooting** - Quick access to logs and errors
+- **Multiple servers** - Monitor all your servers in one place
+
+> **Note**: The `/logs` command shows the most recent log entries. For complete log analysis, use `sudo journalctl -u servereye-agent -f` on the server.
 
 ## 📚 API Reference
 
@@ -339,60 +371,16 @@ sudo journalctl -u servereye-agent -f
 
 See [Configuration Reference](docs/configuration.md) for detailed configuration options.
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Setup
-
-```bash
-# Clone repository
-git clone https://github.com/godofphonk/ServerEye.git
-cd ServerEye
-
-# Install dependencies
-go mod download
-
-# Run tests
-make test
-
-# Build development version
-make build-agent
-
-# Run in development mode
-make dev-agent
-```
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
-
-- 📖 [Documentation](https://docs.servereye.com)
-- 🐛 [Issue Tracker](https://github.com/godofphonk/ServerEye/issues)
-- 💬 [Discussions](https://github.com/godofphonk/ServerEye/discussions)
-- 📧 [Email Support](mailto:support@servereye.com)
-
-## 🗺️ Roadmap
-
-- [ ] GPU monitoring support
-- [ ] Process-level metrics
-- [ ] Custom metric collectors
-- [ ] Kubernetes integration
-- [ ] Web dashboard
-- [ ] Alerting system
 
 ---
 
 <div align="center">
 
-**Built with ❤️ by the ServerEye Team**
-
-[![ServerEye](https://img.shields.io/badge/ServerEye-Enterprise%20Monitoring-blue?style=flat-square)](https://servereye.com)
+[![ServerEye](https://img.shields.io/badge/ServerEye-blue?style=flat-square)](https://servereye.com)
 
 </div>

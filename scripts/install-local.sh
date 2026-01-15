@@ -146,7 +146,6 @@ if [ ! -f "$LOCAL_BINARY" ]; then
 fi
 
 # Check dependencies
-echo "[*] Checking dependencies..."
 for cmd in curl systemctl; do
     if ! command -v $cmd &> /dev/null; then
         echo "[ERROR] Required command '$cmd' not found. Please install it first."
@@ -162,28 +161,24 @@ fi
 
 # Create servereye user if doesn't exist
 if ! id "$AGENT_USER" &>/dev/null; then
-    echo "[*] Creating servereye user..."
     useradd -r -s /bin/false -d "$AGENT_DIR" "$AGENT_USER"
 fi
 
 # Create proper home directory for servereye user to fix systemd namespace issues
 if [ ! -d "/home/$AGENT_USER" ]; then
-    echo "[*] Creating home directory for $AGENT_USER..."
     mkdir -p "/home/$AGENT_USER"
     chown "$AGENT_USER:$AGENT_USER" "/home/$AGENT_USER"
 fi
 
 # Add servereye user to docker group (if docker exists)
 if command -v docker &> /dev/null; then
-    echo "[*] Adding servereye user to docker group..."
-    usermod -aG docker "$AGENT_USER" 2>/dev/null || echo "[WARNING] Could not add user to docker group (docker group may not exist)"
+    usermod -aG docker "$AGENT_USER" 2>/dev/null || true
 fi
 
 # Clean up old user service if exists (check for user who called sudo)
 REAL_USER="${SUDO_USER:-$USER}"
 USER_HOME=$(eval echo "~$REAL_USER")
 if [ -f "$USER_HOME/.config/systemd/user/servereye-agent.service" ]; then
-    echo "[*] Removing old user service for $REAL_USER..."
     su - "$REAL_USER" -c "systemctl --user stop servereye-agent 2>/dev/null || true"
     su - "$REAL_USER" -c "systemctl --user disable servereye-agent 2>/dev/null || true"
     rm -f "$USER_HOME/.config/systemd/user/servereye-agent.service"
@@ -194,14 +189,11 @@ fi
 UPDATE_MODE=false
 if systemctl is-active --quiet servereye-agent 2>/dev/null; then
     UPDATE_MODE=true
-    echo "[*] Existing installation detected - running in UPDATE mode"
-    echo "[*] Stopping agent service..."
     systemctl stop servereye-agent
     sleep 1
 fi
 
 # Create directories
-echo "[*] Creating directories..."
 mkdir -p "$AGENT_DIR" "$CONFIG_DIR" "$LOG_DIR"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR" "$LOG_DIR"
 chmod 755 "$CONFIG_DIR"
@@ -212,7 +204,6 @@ export BACKEND_URL API_KEY DATABASE_URL
 
 # Check version if updating
 if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
-    echo "[*] Checking installed version..."
     INSTALLED_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'version \K[0-9.]+' || echo "unknown")
     
     # Get local build version
@@ -220,7 +211,6 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
     
     if [ "$INSTALLED_VERSION" != "unknown" ] && [ "$LOCAL_VERSION" != "unknown" ] && [ "$INSTALLED_VERSION" = "$LOCAL_VERSION" ]; then
         echo "[OK] You already have the same version ($INSTALLED_VERSION)!"
-        echo ""
         
         # Show existing key
         if [ -f "$CONFIG_DIR/config.yaml" ]; then
@@ -231,24 +221,16 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
             echo "1. Find @ServerEyeBot in Telegram"
             echo "2. Send /start command"
             echo "3. Send: /add $SECRET_KEY"
-            echo ""
         fi
         
-        echo "Service status:"
         systemctl status servereye-agent --no-pager -l
         exit 0
     fi
     
-    if [ "$INSTALLED_VERSION" != "unknown" ] && [ "$LOCAL_VERSION" != "unknown" ]; then
-        echo "[*] Updating from version $INSTALLED_VERSION to $LOCAL_VERSION..."
-    fi
-    
-    echo "[*] Backing up current binary..."
     cp "$AGENT_DIR/servereye-agent" "$AGENT_DIR/servereye-agent.backup"
 fi
 
 # Copy local binary
-echo "[*] Installing local ServerEye agent..."
 cp "$LOCAL_BINARY" "$AGENT_DIR/servereye-agent"
 chmod +x "$AGENT_DIR/servereye-agent"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR/servereye-agent"
@@ -262,7 +244,6 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
     echo "[INFO] Existing server_key will be used"
 else
     # New installation - register server with API and get server_key
-    echo "[*] Registering server with ServerEye API..."
     
     # Get system information
     AGENT_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | awk '{print $3}' | sed 's/^v//' | cut -d'-' -f1 || echo "unknown")
@@ -270,19 +251,13 @@ else
     
     # Get operating system information
     if [ -f /etc/os-release ]; then
-        # For Linux systems with /etc/os-release
         . /etc/os-release
         OPERATING_SYSTEM="$PRETTY_NAME"
     elif command -v uname >/dev/null 2>&1; then
-        # Fallback to uname
         OPERATING_SYSTEM="$(uname -s) $(uname -r)"
     else
         OPERATING_SYSTEM="Unknown"
     fi
-    
-    echo "[INFO] Agent Version: $AGENT_VERSION"
-    echo "[INFO] Hostname: $HOSTNAME"
-    echo "[INFO] Operating System: $OPERATING_SYSTEM"
     
     # Register server with API and get server_id and server_key
     REGISTRATION_RESULT=$(register_server_with_api "$AGENT_VERSION" "$OPERATING_SYSTEM" "$HOSTNAME")
@@ -291,21 +266,14 @@ else
         # Parse registration result: "server_id|server_key"
         SERVER_ID=$(echo "$REGISTRATION_RESULT" | cut -d'|' -f1)
         SERVER_KEY=$(echo "$REGISTRATION_RESULT" | cut -d'|' -f2)
-        
-        echo "[OK] Server registered successfully!"
-        echo "[INFO] Server ID: $SERVER_ID"
-        echo "[INFO] Server Key: ${SERVER_KEY:0:20}..."
         SECRET_KEY="$SERVER_KEY"
     else
         echo "[ERROR] Failed to register server with API"
-        echo "[INFO] Please check your network connection and API credentials"
-        echo "[INFO] BACKEND_URL: $BACKEND_URL"
-        echo "[INFO] Make sure local API server is running on localhost:8080"
+        echo "[*] Make sure local API server is running on localhost:8080"
         exit 1
     fi
 
     # Create configuration with enhanced features and environment variable support
-    echo "[*] Creating enhanced configuration for local development..."
     
     # Default to development environment for local builds
     ENVIRONMENT="${SERVEREYE_ENVIRONMENT:-development}"
@@ -372,7 +340,6 @@ EOF
 
     # Create environment-specific override if it exists
     if [ -f "./configs/config.$ENVIRONMENT.yaml" ]; then
-        echo "[*] Applying $ENVIRONMENT-specific configuration overrides..."
         # Merge environment-specific configuration
         python3 -c "
 import yaml
@@ -400,7 +367,6 @@ if env_config:
 with open('$CONFIG_DIR/config.yaml', 'w') as f:
     yaml.dump(base_config, f, default_flow_style=False, sort_keys=False)
 " 2>/dev/null || {
-        echo "[*] Python merge not available, using simple override..."
         # Fallback: just copy the environment config
         cp "./configs/config.$ENVIRONMENT.yaml" "$CONFIG_DIR/config.yaml"
     }
@@ -426,38 +392,9 @@ EOF
     chmod 640 "$CONFIG_DIR/config.yaml"
 
     echo "[OK] ServerEye agent installation completed successfully!"
-    echo "[INFO] Configuration file: $CONFIG_DIR/config.yaml"
-    echo "[INFO] Environment file: $CONFIG_DIR/agent.env"
-    echo "[INFO] Local overrides: $CONFIG_DIR/local.env (optional)"
-    echo "[INFO] Log directory: $LOG_DIR"
-    echo "[INFO] Agent binary: $AGENT_DIR/servereye-agent"
-    echo ""
-    echo "🔧 Enhanced Configuration Features:"
-    echo "  - Environment variable overrides supported"
-    echo "  - Hot-reload configuration changes"
-    echo "  - Development-optimized settings"
-    echo "  - Comprehensive validation"
-    echo ""
-    echo "📝 Local Development Configuration:"
-    echo "  - Debug logging enabled"
-    echo "  - Local WebSocket endpoint (ws://localhost:8080/ws)"
-    echo "  - All metrics enabled"
-    echo "  - 10-second intervals for faster testing"
-    echo ""
-    echo "🔨 Configuration Management:"
-    echo "  - Edit: $CONFIG_DIR/config.yaml"
-    echo "  - Local overrides: $CONFIG_DIR/local.env"
-    echo "  - Reload: sudo systemctl restart servereye-agent"
-    echo "  - Logs: sudo journalctl -u servereye-agent -f"
-    echo ""
-    echo "🚀 Development Workflow:"
-    echo "  - Build: cd /home/gospodin/Рабочий\\ стол/homeProjects/ServerEye && make build-agent"
-    echo "  - Install: sudo ./scripts/install-local.sh"
-    echo "  - Test: sudo systemctl status servereye-agent"
 fi
 
 # Install systemd service with enhanced environment support
-echo "[*] Installing systemd service..."
 cat > "$SERVICE_FILE" << 'EOF'
 [Unit]
 Description=ServerEye Agent - Server Monitoring Agent (Local Development)
@@ -499,10 +436,8 @@ systemctl daemon-reload
 systemctl enable servereye-agent
 
 if [ "$UPDATE_MODE" = true ]; then
-    echo "[*] Restarting ServerEye agent service..."
     systemctl start servereye-agent
 else
-    echo "[*] Starting ServerEye agent service..."
     systemctl start servereye-agent
 fi
 
@@ -510,26 +445,12 @@ fi
 sleep 2
 if systemctl is-active --quiet servereye-agent; then
     if [ "$UPDATE_MODE" = true ]; then
-        echo "[OK] ServerEye Agent updated successfully!"
-        echo ""
         echo "Your secret key: $SECRET_KEY"
         echo ""
-        echo "What was updated:"
-        echo "  - Agent binary updated to local build"
-        echo "  - Configuration preserved"
-        echo "  - Service restarted"
-        echo "  - Previous version backed up"
-        echo ""
-        echo "Service management:"
-        echo "  - Status: sudo systemctl status servereye-agent"
-        echo "  - Restart: sudo systemctl restart servereye-agent"
-        echo "  - Stop: sudo systemctl stop servereye-agent"
-        echo "  - Start: sudo systemctl start servereye-agent"
-        echo "  - Logs: sudo journalctl -u servereye-agent -f"
-        echo "  - Enable: sudo systemctl enable servereye-agent"
-        echo "  - Disable: sudo systemctl disable servereye-agent"
-        echo ""
-        echo "Update complete!"
+        echo "To connect to Telegram bot:"
+        echo "1. Find @ServerEyeBot in Telegram"
+        echo "2. Send /start command"
+        echo "3. Send: /add $SECRET_KEY"
     else
         echo "[OK] ServerEye Agent installed and started successfully!"
         echo ""
@@ -539,31 +460,6 @@ if systemctl is-active --quiet servereye-agent; then
         echo "1. Find @ServerEyeBot in Telegram"
         echo "2. Send /start command"
         echo "3. Send: /add $SECRET_KEY"
-        echo ""
-        echo "Available commands after connection:"
-        echo "  - /temp - Get CPU temperature"
-        echo "  - /memory - Get memory usage"
-        echo "  - /disk - Get disk usage"
-        echo "  - /containers - List Docker containers"
-        echo "  - /status - Get server status"
-        echo ""
-        echo "Service management:"
-        echo "  - Status: sudo systemctl status servereye-agent"
-        echo "  - Restart: sudo systemctl restart servereye-agent"
-        echo "  - Stop: sudo systemctl stop servereye-agent"
-        echo "  - Start: sudo systemctl start servereye-agent"
-        echo "  - Logs: sudo journalctl -u servereye-agent -f"
-        echo "  - Enable: sudo systemctl enable servereye-agent"
-        echo "  - Disable: sudo systemctl disable servereye-agent"
-        echo ""
-        echo "Complete uninstallation:"
-        echo "  sudo systemctl stop servereye-agent"
-        echo "  sudo systemctl disable servereye-agent"
-        echo "  sudo rm -f /etc/systemd/system/servereye-agent.service"
-        echo "  sudo systemctl daemon-reload"
-        echo "  sudo rm -rf /opt/servereye /etc/servereye /var/log/servereye"
-        echo ""
-        echo "Installation complete!"
     fi
 else
     echo "[ERROR] Service failed to start. Check logs:"

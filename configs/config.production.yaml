@@ -38,12 +38,8 @@ features:
   telemetry: true
   remote_commands: true
   alerting: true
-  docker_monitoring: true
 
 security:
-  enable_tls: true
-  tls_cert_file: "/etc/ssl/certs/servereye.crt"
-  tls_key_file: "/etc/ssl/private/servereye.key"
   allowed_ips: []
   rate_limit_per_sec: 20
   max_connections: 200
