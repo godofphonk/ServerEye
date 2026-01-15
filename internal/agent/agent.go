@@ -6,25 +6,31 @@ import (
 	"time"
 
 	"github.com/godofphonk/ServerEye/internal/config"
+	"github.com/godofphonk/ServerEye/internal/interfaces"
 	"github.com/godofphonk/ServerEye/pkg/commands"
 	"github.com/godofphonk/ServerEye/pkg/docker"
 	"github.com/godofphonk/ServerEye/pkg/metrics"
 	"github.com/godofphonk/ServerEye/pkg/protocol"
+	"github.com/godofphonk/ServerEye/pkg/types"
+	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 )
 
 // Agent представляет агент ServerEye
 type Agent struct {
-	config            *config.AgentConfig
-	logger            *logrus.Logger
-	wsPublisher       *metrics.WebSocketPublisher        // WebSocket publisher
-	wsCommandConsumer *commands.WebSocketCommandConsumer // WebSocket consumer
-	useWebSocket      bool                               // Use WebSocket instead of HTTP
-	cpuMetrics        *metrics.CPUMetrics
-	systemMonitor     *metrics.SystemMonitor
-	dockerClient      *docker.Client
-	ctx               context.Context
-	cancel            context.CancelFunc
+	config             *config.AgentConfig
+	logger             interfaces.Logger
+	wsPublisher        interfaces.MetricsPublisher // Interface instead of concrete type
+	wsCommandConsumer  interfaces.CommandConsumer  // Interface instead of concrete type
+	useWebSocket       bool                        // Use WebSocket instead of HTTP
+	cpuMetrics         *metrics.CPUMetrics         // Concrete type for now
+	systemMonitor      *metrics.SystemMonitor      // Concrete type for now
+	networkMetrics     *metrics.NetworkMetrics     // Concrete type for now
+	temperatureMetrics *metrics.TemperatureMetrics // Concrete type for now
+	dockerClient       *docker.Client              // Concrete type for now
+	ctx                context.Context
+	cancel             context.CancelFunc
+	startTime          time.Time // Start time for uptime calculation
 }
 
 // initializeWebSocketPublisher создает WebSocket publisher для метрик
@@ -135,47 +141,76 @@ func parseDuration(str string, fallback time.Duration) time.Duration {
 	return fallback
 }
 
-// New создает новый агент
-func New(cfg *config.AgentConfig, logger *logrus.Logger) (*Agent, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Initialize WebSocket components (always enabled now)
-	wsPub, err := initializeWebSocketPublisher(cfg, logger)
+// InitializeAgentEnhanced creates a new agent with enhanced configuration management
+func InitializeAgentEnhanced(ctx context.Context, configPath string) (*Agent, error) {
+	// Create configuration provider with enhanced features
+	logger := logrus.New()
+	provider, err := config.NewConfigBuilder().
+		WithConfigPath(configPath).
+		WithEnvironment(config.DetermineEnvironmentFromPath(configPath)).
+		WithHotReload(true).
+		WithLogger(logger).
+		Build()
 	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("не удалось инициализировать WebSocket publisher: %v", err)
+		return nil, fmt.Errorf("failed to create config provider: %w", err)
 	}
 
-	// Create temp agent for command handling
-	tempAgent := &Agent{
-		config:        cfg,
-		logger:        logger,
-		cpuMetrics:    metrics.NewCPUMetrics(),
-		systemMonitor: metrics.NewSystemMonitor(logger),
-		dockerClient:  docker.NewClient(logger),
-	}
+	// Get configuration
+	cfg := provider.GetConfig()
 
-	wsCons, err := initializeWebSocketCommandConsumer(cfg, tempAgent, logger)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("не удалось инициализировать WebSocket command consumer: %v", err)
-	}
+	// Setup logger with configuration
+	setupLoggerFromConfig(cfg, logger)
 
-	logger.Info("WebSocket components initialized")
-
-	// Create agent instance
+	// Create agent with dependency injection
 	agent := &Agent{
-		config:            cfg,
-		logger:            logger,
-		wsPublisher:       wsPub,
-		wsCommandConsumer: wsCons,
-		useWebSocket:      true,
-		cpuMetrics:        metrics.NewCPUMetrics(),
-		systemMonitor:     metrics.NewSystemMonitor(logger),
-		dockerClient:      docker.NewClient(logger),
-		ctx:               ctx,
-		cancel:            cancel,
+		config:       cfg,
+		logger:       interfaces.NewLogrusAdapter(logger),
+		ctx:          ctx,
+		startTime:    time.Now(),
+		useWebSocket: cfg.WebSocket.Enabled,
 	}
+
+	// Initialize WebSocket components if enabled
+	if cfg.WebSocket.Enabled {
+		// Create WebSocket publisher
+		if wsPublisher, err := initializeWebSocketPublisher(cfg, logger); err == nil {
+			agent.wsPublisher = wsPublisher
+		} else {
+			logger.WithError(err).Warn("Failed to initialize WebSocket publisher")
+		}
+
+		// Create WebSocket command consumer
+		if wsCommandConsumer, err := initializeWebSocketCommandConsumer(cfg, agent, logger); err == nil {
+			agent.wsCommandConsumer = wsCommandConsumer
+		} else {
+			logger.WithError(err).Warn("Failed to initialize WebSocket command consumer")
+		}
+	}
+
+	// Initialize metrics collectors
+	agent.cpuMetrics = metrics.NewCPUMetrics()
+	agent.systemMonitor = metrics.NewSystemMonitor(logger)
+	agent.networkMetrics = metrics.NewNetworkMetrics(logger)
+	agent.temperatureMetrics = metrics.NewTemperatureMetrics(logger)
+	agent.dockerClient = docker.NewClient(logger)
+
+	// Setup configuration reload callback
+	provider.AddReloadCallback(func(newConfig *config.AgentConfig) {
+		logger.Info("Configuration reloaded, updating agent...")
+		agent.config = newConfig
+		agent.useWebSocket = newConfig.WebSocket.Enabled
+
+		// Reinitialize components if needed
+		if newConfig.WebSocket.Enabled && agent.wsPublisher == nil {
+			if wsPublisher, err := initializeWebSocketPublisher(newConfig, logger); err == nil {
+				agent.wsPublisher = wsPublisher
+				logger.Info("WebSocket publisher initialized after config reload")
+			}
+		}
+	})
+
+	// Store provider for cleanup
+	// Note: In a real implementation, you might want to store this as a field
 
 	return agent, nil
 }
@@ -286,6 +321,54 @@ func (a *Agent) HandleCommand(ctx context.Context, msg *protocol.Message) (*prot
 	}
 
 	return response, nil
+}
+
+// CreateMetricFromData создает метрику из данных
+func (a *Agent) CreateMetricFromData(metricType string, value interface{}, tags map[string]string) *types.Metric {
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+
+	metric := &types.Metric{
+		ServerID:   a.config.Server.ServerID,
+		ServerKey:  a.config.Server.SecretKey,
+		ServerName: a.config.Server.Name,
+		Type:       metricType,
+		Version:    "1.0",
+		Value:      value,
+		Timestamp:  time.Now(),
+		Tags:       tags,
+	}
+
+	// If value is a complex type, put it in Data
+	switch v := value.(type) {
+	case map[string]interface{}:
+		metric.Data = v
+		metric.Value = nil
+	case *metrics.CPUUsageInfo:
+		metric.Data = map[string]interface{}{
+			"usage_total":  v.UsageTotal,
+			"usage_user":   v.UsageUser,
+			"usage_system": v.UsageSystem,
+			"usage_idle":   v.UsageIdle,
+			"cores":        v.Cores,
+			"frequency":    v.Frequency,
+		}
+		if v.LoadAverage != nil {
+			metric.Data["load_average"] = map[string]interface{}{
+				"load_1min":  v.LoadAverage.Load1Min,
+				"load_5min":  v.LoadAverage.Load5Min,
+				"load_15min": v.LoadAverage.Load15Min,
+			}
+		}
+		metric.Value = nil
+	default:
+		metric.Data = map[string]interface{}{
+			"value": value,
+		}
+	}
+
+	return metric
 }
 
 // Command handlers are in separate files:

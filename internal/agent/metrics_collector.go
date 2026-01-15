@@ -2,6 +2,8 @@ package agent
 
 import (
 	"time"
+
+	"github.com/godofphonk/ServerEye/pkg/types"
 )
 
 // collectAndSendMetrics собирает и отправляет все метрики в цикле
@@ -47,95 +49,55 @@ func (a *Agent) collectAndSendMetricsOnce() {
 
 	a.logger.Info("Publisher is available, proceeding with metrics collection")
 
-	// CPU Temperature (if enabled and cpuMetrics available)
-	if a.config.Metrics.CPUTemperature && a.cpuMetrics != nil {
-		a.logger.Info("Attempting to collect CPU temperature")
-		if temp, err := a.cpuMetrics.GetTemperature(); err == nil {
-			a.logger.WithField("temperature", temp).Info("CPU temperature collected")
-			a.sendMetric("cpu_temperature", temp, "°C")
-		} else {
-			a.logger.WithError(err).Error("Failed to get CPU temperature")
-		}
-	} else {
-		a.logger.WithFields(map[string]interface{}{
-			"enabled":    a.config.Metrics.CPUTemperature,
-			"cpuMetrics": a.cpuMetrics != nil,
-		}).Info("CPU temperature collection skipped")
-	}
+	// Collect all metrics and send as unified message
+	a.collectAndSendUnifiedMetrics()
 
-	// Memory метрики (if enabled and systemMonitor available)
-	if a.config.Metrics.MemoryUsage && a.systemMonitor != nil {
-		if memInfo, err := a.systemMonitor.GetMemoryInfo(); err == nil {
-			a.sendMetric("memory_usage", memInfo.UsedPercent, "%")
-			a.sendMetric("memory_total", float64(memInfo.Total)/1024/1024/1024, "GB")
-			a.sendMetric("memory_used", float64(memInfo.Used)/1024/1024/1024, "GB")
-			a.sendMetric("memory_available", float64(memInfo.Available)/1024/1024/1024, "GB")
-		}
+	// DISABLED: Individual metrics to avoid conflicts with unified metrics
+	// Only send unified metrics to prevent Redis overwrites
 
-		// Disk метрики (if enabled)
-		if a.config.Metrics.DiskUsage {
-			if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
-				for _, disk := range diskInfo.Disks {
-					// Отправляем информацию о каждом диске
-					tags := map[string]string{
-						"path": disk.Path,
-					}
-					metric := a.CreateMetricFromData("disk_usage", disk.UsedPercent, tags)
-					if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-						a.logger.WithError(err).Error("Failed to send disk metric")
-					}
-				}
-			}
-		}
-	}
-
-	// Network метрики (временно отключены для dev тестирования)
-	// TODO: Добавить NetworkUsage поле в конфигурацию
 	/*
-		if a.config.Metrics.NetworkUsage && a.systemMonitor != nil {
-			if networkInfo, err := a.systemMonitor.GetNetworkInfo(); err == nil {
-				for _, iface := range networkInfo.Interfaces {
-					tags := map[string]string{
-						"interface": iface.Name,
-					}
+		// CPU Temperature (if enabled and cpuMetrics available)
+		if a.config.Metrics.CPUTemperature && a.cpuMetrics != nil {
+			a.logger.Info("Attempting to collect CPU temperature")
+			if temp, err := a.cpuMetrics.GetTemperature(); err == nil {
+				a.logger.WithField("temperature", temp).Info("CPU temperature collected")
+				a.sendMetric("cpu_temperature", temp, "°C")
+			} else {
+				a.logger.WithError(err).Error("Failed to get CPU temperature")
+			}
+		} else {
+			a.logger.WithFields(map[string]interface{}{
+				"enabled":    a.config.Metrics.CPUTemperature,
+				"cpuMetrics": a.cpuMetrics != nil,
+			}).Info("CPU temperature collection skipped")
+		}
 
-					// Bytes sent/recv в GB
-					bytesSentGB := float64(iface.BytesSent) / 1024 / 1024 / 1024
-					bytesRecvGB := float64(iface.BytesRecv) / 1024 / 1024 / 1024
+		// Memory метрики (if enabled and systemMonitor available)
+		if a.config.Metrics.MemoryUsage && a.systemMonitor != nil {
+			if memInfo, err := a.systemMonitor.GetMemoryInfo(); err == nil {
+				a.sendMetric("memory_usage", memInfo.UsedPercent, "%")
+				a.sendMetric("memory_total", float64(memInfo.Total)/1024/1024/1024, "GB")
+				a.sendMetric("memory_used", float64(memInfo.Used)/1024/1024/1024, "GB")
+				a.sendMetric("memory_available", float64(memInfo.Available)/1024/1024/1024, "GB")
+			}
 
-					metric := a.CreateMetricFromData("network_bytes_sent", bytesSentGB, tags)
-					if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-						a.logger.WithError(err).Error("Failed to send network metric")
-					}
-
-					metric = a.CreateMetricFromData("network_bytes_recv", bytesRecvGB, tags)
-					if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-						a.logger.WithError(err).Error("Failed to send network metric")
+			// Disk метрики (if enabled)
+			if a.config.Metrics.DiskUsage {
+				if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
+					for _, disk := range diskInfo.Disks {
+						// Отправляем информацию о каждом диске
+						tags := map[string]string{
+							"path": disk.Path,
+						}
+						metric := a.CreateMetricFromData("disk_usage", disk.UsedPercent, tags)
+						if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
+							a.logger.WithError(err).Error("Failed to send disk metric")
+						}
 					}
 				}
 			}
 		}
 	*/
-
-	// Docker containers метрики
-	a.logger.Info("Checking docker client for containers metrics")
-	if a.dockerClient != nil {
-		a.logger.Info("Docker client is not nil, getting containers")
-		if containers, err := a.dockerClient.GetContainers(a.ctx); err == nil {
-			a.logger.WithField("containers_count", containers.Total).Info("Got containers payload, attempting to publish")
-			// Отправляем информацию о контейнерах как метрику
-			metric := a.CreateMetricFromData("containers", containers, nil)
-			if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-				a.logger.WithError(err).Error("Failed to send containers metric")
-			} else {
-				a.logger.WithField("containers_count", containers.Total).Info("Containers metric sent successfully")
-			}
-		} else {
-			a.logger.WithError(err).Info("Docker not available or no containers")
-		}
-	} else {
-		a.logger.Info("Docker client is nil, skipping containers metrics")
-	}
 }
 
 // sendMetric отправляет метрику через publisher
@@ -164,5 +126,198 @@ func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 		a.logger.WithError(err).WithField("type", metricType).Error("Failed to send metric")
 	} else {
 		a.logger.WithField("type", metricType).Info("Metric sent successfully")
+	}
+}
+
+// collectAndSendUnifiedMetrics collects all metrics and sends them as unified message
+func (a *Agent) collectAndSendUnifiedMetrics() {
+	// Create unified metrics structure
+	metrics := map[string]interface{}{
+		"time": time.Now().Format(time.RFC3339),
+	}
+
+	// Collect CPU usage (detailed statistics)
+	if a.cpuMetrics != nil {
+		if cpuUsage, err := a.cpuMetrics.GetDetailedUsage(); err == nil {
+			a.logger.WithField("cpu_usage", cpuUsage).Info("Detailed CPU usage collected")
+
+			// Add CPU metrics to unified structure
+			metrics["cpu"] = cpuUsage.UsageTotal // For backward compatibility
+			metrics["cpu_usage"] = map[string]interface{}{
+				"usage_total":  cpuUsage.UsageTotal,
+				"usage_user":   cpuUsage.UsageUser,
+				"usage_system": cpuUsage.UsageSystem,
+				"usage_idle":   cpuUsage.UsageIdle,
+				"cores":        cpuUsage.Cores,
+				"frequency":    cpuUsage.Frequency,
+			}
+
+			if cpuUsage.LoadAverage != nil {
+				metrics["cpu_usage"].(map[string]interface{})["load_average"] = map[string]interface{}{
+					"load_1min":  cpuUsage.LoadAverage.Load1Min,
+					"load_5min":  cpuUsage.LoadAverage.Load5Min,
+					"load_15min": cpuUsage.LoadAverage.Load15Min,
+				}
+			}
+		} else {
+			a.logger.WithError(err).Error("Failed to get detailed CPU usage")
+		}
+	}
+
+	// Collect memory usage (detailed statistics)
+	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check")
+	if a.systemMonitor != nil {
+		if memInfo, err := a.systemMonitor.GetMemoryInfo(); err == nil {
+			a.logger.WithField("memory_info", memInfo).Info("Memory info collected")
+
+			// Add memory metrics to unified structure
+			metrics["memory"] = memInfo.UsedPercent // For backward compatibility
+			memoryDetails := map[string]interface{}{
+				"total_gb":     float64(memInfo.Total) / 1024 / 1024 / 1024,
+				"used_gb":      float64(memInfo.Used) / 1024 / 1024 / 1024,
+				"available_gb": float64(memInfo.Available) / 1024 / 1024 / 1024,
+				"free_gb":      float64(memInfo.Free) / 1024 / 1024 / 1024,
+				"buffers_gb":   float64(memInfo.Buffers) / 1024 / 1024 / 1024,
+				"cached_gb":    float64(memInfo.Cached) / 1024 / 1024 / 1024,
+				"used_percent": memInfo.UsedPercent,
+			}
+			metrics["memory_details"] = memoryDetails
+			a.logger.WithField("memory_details", memoryDetails).Debug("Memory details added to metrics")
+		} else {
+			a.logger.WithError(err).Error("Failed to get memory info")
+		}
+	} else {
+		a.logger.Error("System monitor is nil - memory metrics collection skipped")
+	}
+
+	// Collect disk usage (detailed statistics)
+	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check for disk")
+	if a.systemMonitor != nil {
+		if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
+			a.logger.WithField("disk_info", diskInfo).Info("Disk info collected")
+
+			// Convert disk info for unified structure
+			disks := make([]map[string]interface{}, len(diskInfo.Disks))
+			for i, disk := range diskInfo.Disks {
+				disks[i] = map[string]interface{}{
+					"path":         disk.Path,
+					"total_gb":     float64(disk.Total) / 1024 / 1024 / 1024,
+					"used_gb":      float64(disk.Used) / 1024 / 1024 / 1024,
+					"free_gb":      float64(disk.Free) / 1024 / 1024 / 1024,
+					"used_percent": disk.UsedPercent,
+					"filesystem":   disk.Filesystem,
+				}
+			}
+
+			// Add disk metrics to unified structure
+			if len(disks) > 0 {
+				// Use first disk for backward compatibility
+				metrics["disk"] = disks[0]["used_percent"]
+				metrics["disk_details"] = disks
+				a.logger.WithField("disk_details", disks).Debug("Disk details added to metrics")
+			}
+		} else {
+			a.logger.WithError(err).Error("Failed to get disk info")
+		}
+	} else {
+		a.logger.Error("System monitor is nil - disk metrics collection skipped")
+	}
+
+	// Collect network usage (detailed statistics)
+	a.logger.WithField("networkMetrics", a.networkMetrics != nil).Debug("Network metrics check")
+	if a.networkMetrics != nil {
+		if networkInfo, err := a.networkMetrics.GetNetworkInfo(); err == nil {
+			a.logger.WithField("network_info", networkInfo).Info("Network info collected")
+
+			// Add network metrics to unified structure
+			metrics["network"] = networkInfo.TotalRxMbps + networkInfo.TotalTxMbps // For backward compatibility
+			networkDetails := map[string]interface{}{
+				"interfaces":    networkInfo.Interfaces,
+				"total_rx_mbps": networkInfo.TotalRxMbps,
+				"total_tx_mbps": networkInfo.TotalTxMbps,
+			}
+			metrics["network_details"] = networkDetails
+			a.logger.WithField("network_details", networkDetails).Debug("Network details added to metrics")
+		} else {
+			a.logger.WithError(err).Error("Failed to get network info")
+		}
+	} else {
+		a.logger.Error("Network metrics is nil - network metrics collection skipped")
+	}
+
+	// Collect temperature metrics (detailed statistics)
+	a.logger.WithField("temperatureMetrics", a.temperatureMetrics != nil).Debug("Temperature metrics check")
+	if a.temperatureMetrics != nil {
+		if tempInfo, err := a.temperatureMetrics.GetTemperatureInfo(); err == nil {
+			a.logger.WithField("temperature_info", tempInfo).Info("Temperature info collected")
+
+			// Add temperature metrics to unified structure
+			// Use highest temperature for backward compatibility
+			metrics["temperature"] = tempInfo.HighestTemperature
+			temperatureDetails := map[string]interface{}{
+				"cpu_temperature":      tempInfo.CPUTemperature,
+				"gpu_temperature":      tempInfo.GPUTemperature,
+				"system_temperature":   tempInfo.SystemTemperature,
+				"storage_temperatures": tempInfo.StorageTemperatures,
+				"highest_temperature":  tempInfo.HighestTemperature,
+				"temperature_unit":     tempInfo.TemperatureUnit,
+			}
+			metrics["temperature_details"] = temperatureDetails
+			a.logger.WithField("temperature_details", temperatureDetails).Debug("Temperature details added to metrics")
+		} else {
+			a.logger.WithError(err).Error("Failed to get temperature info")
+		}
+	} else {
+		a.logger.Error("Temperature metrics is nil - temperature metrics collection skipped")
+	}
+
+	// Collect system information (detailed statistics)
+	a.logger.WithField("systemMonitor", a.systemMonitor != nil).Debug("System monitor check for system details")
+	if a.systemMonitor != nil {
+		if systemDetails, err := a.systemMonitor.GetSystemDetails(); err == nil {
+			a.logger.WithField("system_details", systemDetails).Info("System details collected")
+
+			// Add system metrics to unified structure
+			systemDetailsMap := map[string]interface{}{
+				"hostname":           systemDetails.Hostname,
+				"os":                 systemDetails.OS,
+				"kernel":             systemDetails.Kernel,
+				"architecture":       systemDetails.Architecture,
+				"uptime_seconds":     systemDetails.UptimeSeconds,
+				"uptime_human":       systemDetails.UptimeHuman,
+				"boot_time":          systemDetails.BootTime,
+				"processes_total":    systemDetails.ProcessesTotal,
+				"processes_running":  systemDetails.ProcessesRunning,
+				"processes_sleeping": systemDetails.ProcessesSleeping,
+			}
+			metrics["system_details"] = systemDetailsMap
+			a.logger.WithField("system_details", systemDetailsMap).Debug("System details added to metrics")
+		} else {
+			a.logger.WithError(err).Error("Failed to get system details")
+		}
+	} else {
+		a.logger.Error("System monitor is nil - system details collection skipped")
+	}
+
+	// Create unified metric message
+	unifiedMetric := &types.Metric{
+		ServerID:   a.config.Server.ServerID,
+		ServerKey:  a.config.Server.SecretKey,
+		ServerName: a.config.Server.Name,
+		Type:       "metrics",
+		Version:    "1.0",
+		Value:      nil,
+		Timestamp:  time.Now(),
+		Data: map[string]interface{}{
+			"server_id": a.config.Server.ServerID,
+			"metrics":   metrics,
+		},
+	}
+
+	// Send unified metrics
+	if err := a.wsPublisher.Publish(a.ctx, unifiedMetric); err != nil {
+		a.logger.WithError(err).Error("Failed to send unified metrics")
+	} else {
+		a.logger.WithField("metrics_count", len(metrics)).Info("Unified metrics sent successfully")
 	}
 }

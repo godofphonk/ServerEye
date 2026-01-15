@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -109,6 +110,16 @@ func (p *WebSocketPublisher) Publish(ctx context.Context, metric *types.Metric) 
 
 	// Convert to WebSocket message
 	wsMsg := p.adapter.ToWebSocketMessage(metric)
+
+	// Log raw JSON before sending for debugging
+	if metric.Type == "metrics" {
+		jsonBytes, err := json.Marshal(wsMsg)
+		if err == nil {
+			p.logger.WithField("raw_json", string(jsonBytes)).Debug("Raw WebSocket message JSON")
+		} else {
+			p.logger.WithError(err).Error("Failed to marshal WebSocket message to JSON")
+		}
+	}
 
 	// Send message
 	if err := p.wsClient.SendMessage(wsMsg); err != nil {

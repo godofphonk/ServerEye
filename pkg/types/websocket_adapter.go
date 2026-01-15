@@ -16,7 +16,9 @@ func NewWebSocketAdapter() *WebSocketAdapter {
 
 // ToWebSocketMessage converts Metric to WebSocket metrics message
 func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message {
-	// Extract system info if available
+	serverMetrics := websocket.ServerMetrics{
+		Time: time.Now(),
+	}
 	systemInfo := websocket.SystemInfo{
 		Hostname: metric.ServerName,
 	}
@@ -38,9 +40,7 @@ func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message 
 	}
 
 	// Create server metrics based on metric type
-	serverMetrics := websocket.ServerMetrics{
-		Time: metric.Timestamp,
-	}
+	serverMetrics.Time = metric.Timestamp
 
 	// Handle different metric types
 	switch metric.Type {
@@ -64,21 +64,70 @@ func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message 
 		if usage, ok := metric.Value.(float64); ok {
 			serverMetrics.Network = usage
 		}
-	}
+	case "metrics":
+		// Handle unified metrics structure
+		if metric.Data != nil {
+			if metrics, ok := metric.Data["metrics"].(map[string]interface{}); ok {
+				// Extract CPU metrics
+				if cpu, ok := metrics["cpu"].(float64); ok {
+					serverMetrics.CPU = cpu
+				}
+				if memory, ok := metrics["memory"].(float64); ok {
+					serverMetrics.Memory = memory
+				}
+				if disk, ok := metrics["disk"].(float64); ok {
+					serverMetrics.Disk = disk
+				}
+				if network, ok := metrics["network"].(float64); ok {
+					serverMetrics.Network = network
+				}
+				// Extract CPU usage details
+				if cpuUsage, ok := metrics["cpu_usage"].(map[string]interface{}); ok {
+					usageTotal := getFloat64(cpuUsage, "usage_total")
+					serverMetrics.CPU = usageTotal // Set CPU from cpu_usage.usage_total
+					serverMetrics.CPUUsage = &websocket.CPUUsageInfo{
+						UsageTotal:  usageTotal,
+						UsageUser:   getFloat64(cpuUsage, "usage_user"),
+						UsageSystem: getFloat64(cpuUsage, "usage_system"),
+						UsageIdle:   getFloat64(cpuUsage, "usage_idle"),
+						Cores:       getInt(cpuUsage, "cores"),
+						Frequency:   getFloat64(cpuUsage, "frequency"),
+					}
+					// Extract load average if available
+					if loadAvg, ok := cpuUsage["load_average"].(map[string]interface{}); ok {
+						serverMetrics.CPUUsage.LoadAverage = &websocket.LoadAverageInfo{
+							Load1Min:  getFloat64(loadAvg, "load_1min"),
+							Load5Min:  getFloat64(loadAvg, "load_5min"),
+							Load15Min: getFloat64(loadAvg, "load_15min"),
+						}
+					}
+				}
 
-	// Extract metrics from data map
-	if metric.Data != nil {
-		if cpu, ok := metric.Data["cpu"].(float64); ok {
-			serverMetrics.CPU = cpu
-		}
-		if memory, ok := metric.Data["memory"].(float64); ok {
-			serverMetrics.Memory = memory
-		}
-		if disk, ok := metric.Data["disk"].(float64); ok {
-			serverMetrics.Disk = disk
-		}
-		if network, ok := metric.Data["network"].(float64); ok {
-			serverMetrics.Network = network
+				// Extract memory details
+				if memoryDetails, ok := metrics["memory_details"]; ok {
+					serverMetrics.MemoryDetails = memoryDetails
+				}
+
+				// Extract disk details
+				if diskDetails, ok := metrics["disk_details"]; ok {
+					serverMetrics.DiskDetails = diskDetails
+				}
+
+				// Extract network details
+				if networkDetails, ok := metrics["network_details"]; ok {
+					serverMetrics.NetworkDetails = networkDetails
+				}
+
+				// Extract temperature details
+				if temperatureDetails, ok := metrics["temperature_details"]; ok {
+					serverMetrics.TemperatureDetails = temperatureDetails
+				}
+
+				// Extract system details
+				if systemDetails, ok := metrics["system_details"]; ok {
+					serverMetrics.SystemDetails = systemDetails
+				}
+			}
 		}
 	}
 
@@ -154,4 +203,26 @@ func (a *WebSocketAdapter) CreateContainerMetrics(serverID string, containers []
 		},
 		Timestamp: time.Now().Unix(),
 	}
+}
+
+// Helper functions for type conversion
+func getFloat64(m map[string]interface{}, key string) float64 {
+	if val, ok := m[key]; ok {
+		if f, ok := val.(float64); ok {
+			return f
+		}
+	}
+	return 0
+}
+
+func getInt(m map[string]interface{}, key string) int {
+	if val, ok := m[key]; ok {
+		if i, ok := val.(int); ok {
+			return i
+		}
+		if f, ok := val.(float64); ok {
+			return int(f)
+		}
+	}
+	return 0
 }

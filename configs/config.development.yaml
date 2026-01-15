@@ -1,0 +1,53 @@
+# Development Environment Configuration
+# Overrides base configuration for development
+
+server:
+  name: "Development ServerEye Agent"
+  description: "Development monitoring agent"
+
+api:
+  base_url: "http://localhost:8080"
+  timeout: "60s"
+
+websocket:
+  enabled: true
+  url: "ws://localhost:8080/ws"
+  reconnect_interval: "10s"
+  max_reconnect_attempts: 5
+  ping_interval: "60s"
+  write_timeout: "30s"
+  read_timeout: "30s"
+  handshake_timeout: "30s"
+  buffer_size: 500
+  enable_compression: false
+
+metrics:
+  cpu_usage: true
+  memory_usage: true
+  disk_usage: true
+  cpu_temperature: true
+  interval: "10s"
+
+logging:
+  level: "debug"
+  file: "./logs/agent.log"
+
+# Development-specific settings
+features:
+  auto_updates: false
+  telemetry: false
+  remote_commands: true
+  alerting: true
+  docker_monitoring: true
+
+security:
+  enable_tls: false
+  rate_limit_per_sec: 5
+  max_connections: 50
+
+performance:
+  worker_count: 2
+  queue_size: 500
+  batch_size: 50
+  flush_interval: "10s"
+  connection_timeout: "30s"

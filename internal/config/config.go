@@ -12,8 +12,13 @@ type AgentConfig struct {
 	Server    ServerConfig    `yaml:"server"`
 	API       APIConfig       `yaml:"api,omitempty"`
 	WebSocket WebSocketConfig `yaml:"websocket,omitempty"`
-	Metrics   MetricsConfig   `yaml:"metrics"`
+	Metrics   MetricsConfig   `yaml:"metrics" json:"metrics" toml:"metrics"`
 	Logging   LoggingConfig   `yaml:"logging"`
+
+	// Enhanced configuration fields for backward compatibility
+	Features    FeaturesConfig    `yaml:"features,omitempty"`
+	Security    SecurityConfig    `yaml:"security,omitempty"`
+	Performance PerformanceConfig `yaml:"performance,omitempty"`
 }
 
 // ServerConfig конфигурация сервера
@@ -49,12 +54,12 @@ type WebSocketConfig struct {
 	CommandTimeout       string `yaml:"command_timeout,omitempty"`
 }
 
-// MetricsConfig конфигурация метрик
+// MetricsConfig конфигурация сбора метрик
 type MetricsConfig struct {
-	CPUUsage       bool   `yaml:"cpu_usage"`
-	MemoryUsage    bool   `yaml:"memory_usage"`
-	DiskUsage      bool   `yaml:"disk_usage"`
-	CPUTemperature bool   `yaml:"cpu_temperature"`
+	CPUUsage       bool   `yaml:"cpu_usage,omitempty"`
+	MemoryUsage    bool   `yaml:"memory_usage,omitempty"`
+	DiskUsage      bool   `yaml:"disk_usage,omitempty"`
+	CPUTemperature bool   `yaml:"cpu_temperature,omitempty"`
 	Interval       string `yaml:"interval"`
 }
 
@@ -62,6 +67,34 @@ type MetricsConfig struct {
 type LoggingConfig struct {
 	Level string `yaml:"level"`
 	File  string `yaml:"file"`
+}
+
+// FeaturesConfig controls optional features
+type FeaturesConfig struct {
+	AutoUpdates      bool `yaml:"auto_updates,omitempty"`
+	Telemetry        bool `yaml:"telemetry,omitempty"`
+	RemoteCommands   bool `yaml:"remote_commands,omitempty"`
+	Alerting         bool `yaml:"alerting,omitempty"`
+	DockerMonitoring bool `yaml:"docker_monitoring,omitempty"`
+}
+
+// SecurityConfig contains security-related settings
+type SecurityConfig struct {
+	EnableTLS       bool     `yaml:"enable_tls,omitempty"`
+	TLSCertFile     string   `yaml:"tls_cert_file,omitempty"`
+	TLSKeyFile      string   `yaml:"tls_key_file,omitempty"`
+	AllowedIPs      []string `yaml:"allowed_ips,omitempty"`
+	RateLimitPerSec int      `yaml:"rate_limit_per_sec,omitempty"`
+	MaxConnections  int      `yaml:"max_connections,omitempty"`
+}
+
+// PerformanceConfig contains performance tuning settings
+type PerformanceConfig struct {
+	WorkerCount       int    `yaml:"worker_count,omitempty"`
+	QueueSize         int    `yaml:"queue_size,omitempty"`
+	BatchSize         int    `yaml:"batch_size,omitempty"`
+	FlushInterval     string `yaml:"flush_interval,omitempty"`
+	ConnectionTimeout string `yaml:"connection_timeout,omitempty"`
 }
 
 // LoadAgentConfig загружает конфигурацию агента

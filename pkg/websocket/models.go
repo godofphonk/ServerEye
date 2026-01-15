@@ -1,6 +1,26 @@
 package websocket
 
-import "time"
+import (
+	"time"
+)
+
+// CPUUsageInfo represents detailed CPU usage statistics
+type CPUUsageInfo struct {
+	UsageTotal  float64          `json:"usage_total"`
+	UsageUser   float64          `json:"usage_user"`
+	UsageSystem float64          `json:"usage_system"`
+	UsageIdle   float64          `json:"usage_idle"`
+	LoadAverage *LoadAverageInfo `json:"load_average"`
+	Cores       int              `json:"cores"`
+	Frequency   float64          `json:"frequency"`
+}
+
+// LoadAverageInfo represents system load averages
+type LoadAverageInfo struct {
+	Load1Min  float64 `json:"load_1min"`
+	Load5Min  float64 `json:"load_5min"`
+	Load15Min float64 `json:"load_15min"`
+}
 
 // Message represents WebSocket message structure
 type Message struct {
@@ -50,11 +70,18 @@ type MetricsData struct {
 
 // ServerMetrics represents server performance metrics
 type ServerMetrics struct {
-	CPU     float64   `json:"cpu"`     // CPU usage percentage (0-100)
-	Memory  float64   `json:"memory"`  // Memory usage percentage (0-100)
-	Disk    float64   `json:"disk"`    // Disk usage percentage (0-100)
-	Network float64   `json:"network"` // Network usage in MB/s
-	Time    time.Time `json:"time"`    // Timestamp when metrics were collected
+	CPU                float64       `json:"cpu"`                           // CPU usage percentage (0-100)
+	Memory             float64       `json:"memory"`                        // Memory usage percentage (0-100)
+	Disk               float64       `json:"disk"`                          // Disk usage percentage (0-100)
+	Network            float64       `json:"network"`                       // Network usage in MB/s
+	Temperature        float64       `json:"temperature"`                   // Temperature in Celsius
+	CPUUsage           *CPUUsageInfo `json:"cpu_usage,omitempty"`           // Detailed CPU usage statistics
+	MemoryDetails      interface{}   `json:"memory_details,omitempty"`      // Detailed memory statistics
+	DiskDetails        interface{}   `json:"disk_details,omitempty"`        // Detailed disk statistics
+	NetworkDetails     interface{}   `json:"network_details,omitempty"`     // Detailed network statistics
+	TemperatureDetails interface{}   `json:"temperature_details,omitempty"` // Detailed temperature statistics
+	SystemDetails      interface{}   `json:"system_details,omitempty"`      // Detailed system statistics
+	Time               time.Time     `json:"time"`                          // Timestamp when metrics were collected
 }
 
 // SystemInfo represents system information

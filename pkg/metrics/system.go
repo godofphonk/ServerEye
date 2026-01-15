@@ -1,8 +1,11 @@
 package metrics
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +26,20 @@ type SystemMonitor struct {
 type networkStats struct {
 	bytesSent uint64
 	bytesRecv uint64
+}
+
+// SystemDetails represents detailed system information
+type SystemDetails struct {
+	Hostname          string `json:"hostname"`
+	OS                string `json:"os"`
+	Kernel            string `json:"kernel"`
+	Architecture      string `json:"architecture"`
+	UptimeSeconds     int64  `json:"uptime_seconds"`
+	UptimeHuman       string `json:"uptime_human"`
+	BootTime          string `json:"boot_time"`
+	ProcessesTotal    int    `json:"processes_total"`
+	ProcessesRunning  int    `json:"processes_running"`
+	ProcessesSleeping int    `json:"processes_sleeping"`
 }
 
 // NewSystemMonitor creates a new system monitor
@@ -426,4 +443,233 @@ func (s *SystemMonitor) parseHumanSize(sizeStr string) uint64 {
 		// Assume it's already in bytes
 		return uint64(value)
 	}
+}
+
+// GetSystemDetails collects detailed system information
+func (sm *SystemMonitor) GetSystemDetails() (*SystemDetails, error) {
+	details := &SystemDetails{}
+
+	// Get hostname
+	if hostname, err := sm.getHostname(); err == nil {
+		details.Hostname = hostname
+	}
+
+	// Get OS information
+	if os, err := sm.getOSInfo(); err == nil {
+		details.OS = os
+	}
+
+	// Get kernel version
+	if kernel, err := sm.getKernelVersion(); err == nil {
+		details.Kernel = kernel
+	}
+
+	// Get architecture
+	if arch, err := sm.getArchitecture(); err == nil {
+		details.Architecture = arch
+	}
+
+	// Get uptime information
+	if uptimeSeconds, uptimeHuman, bootTime, err := sm.getUptimeInfo(); err == nil {
+		details.UptimeSeconds = uptimeSeconds
+		details.UptimeHuman = uptimeHuman
+		details.BootTime = bootTime
+	}
+
+	// Get process information
+	if total, running, sleeping, err := sm.getProcessInfo(); err == nil {
+		details.ProcessesTotal = total
+		details.ProcessesRunning = running
+		details.ProcessesSleeping = sleeping
+	}
+
+	sm.logger.WithFields(map[string]interface{}{
+		"hostname":   details.Hostname,
+		"os":         details.OS,
+		"uptime_sec": details.UptimeSeconds,
+		"processes":  details.ProcessesTotal,
+	}).Debug("System details collected")
+
+	return details, nil
+}
+
+// getHostname gets system hostname
+func (sm *SystemMonitor) getHostname() (string, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "", err
+	}
+	return hostname, nil
+}
+
+// getOSInfo gets operating system information
+func (sm *SystemMonitor) getOSInfo() (string, error) {
+	// Try to read from /etc/os-release first
+	if osInfo, err := sm.readOSRelease(); err == nil {
+		return osInfo, nil
+	}
+
+	// Fallback to uname
+	cmd := exec.Command("uname", "-s")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// readOSRelease reads /etc/os-release file
+func (sm *SystemMonitor) readOSRelease() (string, error) {
+	file, err := os.Open("/etc/os-release")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "PRETTY_NAME=") {
+			// Remove PRETTY_NAME= and quotes
+			osName := strings.TrimPrefix(line, "PRETTY_NAME=")
+			osName = strings.Trim(osName, "\"")
+			return osName, nil
+		}
+	}
+
+	return "", fmt.Errorf("no PRETTY_NAME found in /etc/os-release")
+}
+
+// getKernelVersion gets kernel version
+func (sm *SystemMonitor) getKernelVersion() (string, error) {
+	cmd := exec.Command("uname", "-r")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// getArchitecture gets system architecture
+func (sm *SystemMonitor) getArchitecture() (string, error) {
+	// Try runtime.GOARCH first
+	goArch := runtime.GOARCH
+	if goArch != "" {
+		// Convert Go architecture names to standard names
+		switch goArch {
+		case "amd64":
+			return "x86_64", nil
+		case "arm64":
+			return "aarch64", nil
+		default:
+			return goArch, nil
+		}
+	}
+
+	// Fallback to uname
+	cmd := exec.Command("uname", "-m")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// getUptimeInfo gets system uptime information
+func (sm *SystemMonitor) getUptimeInfo() (int64, string, string, error) {
+	// Read /proc/uptime
+	file, err := os.Open("/proc/uptime")
+	if err != nil {
+		return 0, "", "", err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	if !scanner.Scan() {
+		return 0, "", "", fmt.Errorf("failed to read /proc/uptime")
+	}
+
+	line := scanner.Text()
+	fields := strings.Fields(line)
+	if len(fields) < 1 {
+		return 0, "", "", fmt.Errorf("invalid /proc/uptime format")
+	}
+
+	uptimeSeconds, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	uptimeInt := int64(uptimeSeconds)
+	uptimeHuman := sm.formatUptime(uptimeInt)
+
+	// Calculate boot time
+	bootTime := time.Now().Add(-time.Duration(uptimeInt) * time.Second).Format(time.RFC3339)
+
+	return uptimeInt, uptimeHuman, bootTime, nil
+}
+
+// formatUptime converts uptime seconds to human readable format
+func (sm *SystemMonitor) formatUptime(seconds int64) string {
+	days := seconds / 86400
+	hours := (seconds % 86400) / 3600
+	minutes := (seconds % 3600) / 60
+
+	var parts []string
+	if days > 0 {
+		if days == 1 {
+			parts = append(parts, "1 day")
+		} else {
+			parts = append(parts, fmt.Sprintf("%d days", days))
+		}
+	}
+	if hours > 0 {
+		if hours == 1 {
+			parts = append(parts, "1 hour")
+		} else {
+			parts = append(parts, fmt.Sprintf("%d hours", hours))
+		}
+	}
+	if minutes > 0 {
+		if minutes == 1 {
+			parts = append(parts, "1 minute")
+		} else {
+			parts = append(parts, fmt.Sprintf("%d minutes", minutes))
+		}
+	}
+
+	if len(parts) == 0 {
+		return "less than 1 minute"
+	}
+
+	if len(parts) == 1 {
+		return parts[0]
+	}
+
+	return strings.Join(parts[:len(parts)-1], ", ") + ", " + parts[len(parts)-1]
+}
+
+// getProcessInfo gets process information from /proc/stat
+func (sm *SystemMonitor) getProcessInfo() (int, int, int, error) {
+	// Get total process count by counting /proc/*/ directories
+	total := 0
+	procDir, err := os.Open("/proc")
+	if err == nil {
+		defer procDir.Close()
+		names, _ := procDir.Readdirnames(-1)
+		for _, name := range names {
+			if _, err := strconv.Atoi(name); err == nil {
+				total++
+			}
+		}
+	}
+
+	// For simplicity, we'll use defaults for running/sleeping
+	running := 1 // at least the current process
+	sleeping := total - running
+
+	return total, running, sleeping, nil
 }

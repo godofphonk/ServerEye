@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# ServerEye Agent Installation Script
-# This script installs and configures ServerEye agent with automatic startup
+# ServerEye Agent Local Installation Script
+# Uses locally built binary instead of GitHub releases
 
 set -e
 
@@ -10,12 +10,11 @@ AGENT_DIR="/opt/servereye"
 CONFIG_DIR="/etc/servereye"
 LOG_DIR="/var/log/servereye"
 SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
-AGENT_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/servereye-agent-linux-amd64"
-CHECKSUM_URL="https://github.com/godofphonk/ServerEye/releases/latest/download/checksums.txt"
+LOCAL_BINARY="/home/gospodin/Рабочий стол/homeProjects/ServerEye/build/servereye-agent"
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
 AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
 # Backend API configuration
-DEFAULT_BACKEND_URL="https://api.servereye.dev"
+DEFAULT_BACKEND_URL="http://localhost:8080"
 BACKEND_URL="${SERVEREYE_BACKEND_URL:-$DEFAULT_BACKEND_URL}"
 API_KEY="${SERVEREYE_API_KEY:-sPnMkMxyxIcjq1kJD7FOtEjUrHxvSmEU}"
 
@@ -38,7 +37,7 @@ ensure_api_env() {
         cat <<EOF
 [ERROR] BACKEND_URL is required for key registration.
   - Option 1: export it before running the installer
-      BACKEND_URL=https://api.servereye.dev bash install-agent.sh
+      BACKEND_URL=https://api.servereye.dev bash install-local.sh
   - Option 2: rerun this installer from an interactive shell and enter the value when prompted
 EOF
         exit 1
@@ -137,81 +136,23 @@ EOF
     fi
 }
 
-register_key_with_api() {
-    local secret_key="$1"
-    local agent_version="$2"
-    local os_info="$3"
-    local hostname="$4"
+echo "[*] Installing ServerEye Agent (Local Build)..."
 
-    if [ -z "$BACKEND_URL" ]; then
-        echo "[WARNING] BACKEND_URL not set - skipping backend API registration"
-        return 1
-    fi
-
-    local payload
-    payload=$(cat << EOF
-{
-  "secret_key": "$secret_key",
-  "agent_version": "$agent_version",
-  "os_info": "$os_info",
-  "hostname": "$hostname"
-}
-EOF
-)
-
-    local response_file
-    response_file=$(mktemp)
-    local http_code
-    
-    # Prepare curl headers
-    local curl_headers="-H 'Content-Type: application/json' -H 'X-API-Key: $API_KEY'"
-    
-    echo "[*] Registering key with backend API at $BACKEND_URL"
-    
-    # Use backend API endpoint
-    local endpoint="$BACKEND_URL/api/v1/register-key"
-    
-    # Build curl command without eval
-    local curl_cmd=(curl -s -o "$response_file" -w "%{http_code}" -X POST "$endpoint" -H "Content-Type: application/json" -H "X-API-Key: $API_KEY")
-    
-    # Add payload
-    curl_cmd+=(-d "$payload")
-    
-    # Execute curl
-    http_code=$("${curl_cmd[@]}")
-
-    if [ "$http_code" = "200" ]; then
-        echo "[OK] Key registered with ServerEye backend API!"
-        rm -f "$response_file"
-        return 0
-    fi
-
-    echo "[WARNING] Backend API registration failed (status $http_code)"
-    if [ -s "$response_file" ]; then
-        echo "          Response: $(cat "$response_file")"
-    fi
-    rm -f "$response_file"
-    return 1
-}
-
-echo "[*] Installing ServerEye Agent..."
+# Check if local binary exists
+if [ ! -f "$LOCAL_BINARY" ]; then
+    echo "[ERROR] Local binary not found at $LOCAL_BINARY"
+    echo "[*] Please build the agent first: cd /home/gospodin/Рабочий\ стол/homeProjects/ServerEye && make build-agent"
+    exit 1
+fi
 
 # Check dependencies
 echo "[*] Checking dependencies..."
-for cmd in wget curl openssl systemctl sha256sum; do
+for cmd in curl systemctl; do
     if ! command -v $cmd &> /dev/null; then
         echo "[ERROR] Required command '$cmd' not found. Please install it first."
         exit 1
     fi
 done
-
-# Check for netcat (optional, for Kafka auto-detection)
-if ! command -v nc &> /dev/null; then
-    echo "[INFO] netcat not found - Kafka auto-detection will be limited"
-    NETCAT_AVAILABLE=false
-else
-    NETCAT_AVAILABLE=true
-fi
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
@@ -274,11 +215,11 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
     echo "[*] Checking installed version..."
     INSTALLED_VERSION=$("$AGENT_DIR/servereye-agent" --version 2>/dev/null | grep -oP 'version \K[0-9.]+' || echo "unknown")
     
-    # Get latest version from GitHub
-    LATEST_VERSION=$(curl -sL https://api.github.com/repos/godofphonk/ServerEye/releases/latest | grep -oP '"tag_name": "\K[^"]+' | sed 's/^v//' || echo "unknown")
+    # Get local build version
+    LOCAL_VERSION=$("$LOCAL_BINARY" --version 2>/dev/null | grep -oP 'version \K[0-9.]+' || echo "unknown")
     
-    if [ "$INSTALLED_VERSION" != "unknown" ] && [ "$LATEST_VERSION" != "unknown" ] && [ "$INSTALLED_VERSION" = "$LATEST_VERSION" ]; then
-        echo "[OK] You already have the latest version ($INSTALLED_VERSION)!"
+    if [ "$INSTALLED_VERSION" != "unknown" ] && [ "$LOCAL_VERSION" != "unknown" ] && [ "$INSTALLED_VERSION" = "$LOCAL_VERSION" ]; then
+        echo "[OK] You already have the same version ($INSTALLED_VERSION)!"
         echo ""
         
         # Show existing key
@@ -298,67 +239,17 @@ if [ "$UPDATE_MODE" = true ] && [ -f "$AGENT_DIR/servereye-agent" ]; then
         exit 0
     fi
     
-    if [ "$INSTALLED_VERSION" != "unknown" ] && [ "$LATEST_VERSION" != "unknown" ]; then
-        echo "[*] Updating from version $INSTALLED_VERSION to $LATEST_VERSION..."
+    if [ "$INSTALLED_VERSION" != "unknown" ] && [ "$LOCAL_VERSION" != "unknown" ]; then
+        echo "[*] Updating from version $INSTALLED_VERSION to $LOCAL_VERSION..."
     fi
     
     echo "[*] Backing up current binary..."
     cp "$AGENT_DIR/servereye-agent" "$AGENT_DIR/servereye-agent.backup"
 fi
 
-# Download and install agent binary
-echo "[*] Downloading ServerEye agent..."
-wget -q -O "$AGENT_DIR/servereye-agent.new" "$AGENT_URL" || {
-    echo "[ERROR] Failed to download agent binary"
-    exit 1
-}
-
-# Get expected SHA256 from checksums.txt
-echo "[*] Verifying binary integrity..."
-echo "[*] Downloading checksums..."
-
-CHECKSUMS=$(curl -sL "$CHECKSUM_URL" 2>/dev/null || wget -qO- "$CHECKSUM_URL" 2>/dev/null)
-
-if [ -z "$CHECKSUMS" ]; then
-    echo "[ERROR] Failed to download checksums file"
-    echo "   Cannot verify binary integrity without checksum"
-    exit 1
-fi
-
-# Extract SHA256 for our binary
-EXPECTED_CHECKSUM=$(echo "$CHECKSUMS" | grep "servereye-agent-linux-amd64" | awk '{print $1}')
-
-if [ -z "$EXPECTED_CHECKSUM" ]; then
-    echo "[ERROR] Could not retrieve SHA256 checksum from GitHub"
-    echo "   This could indicate:"
-    echo "   - Network connectivity issues"
-    echo "   - GitHub API rate limit"
-    echo "   - Release format changed"
-    echo ""
-    echo "[SECURITY] For security, installation requires checksum verification"
-    rm -f "$AGENT_DIR/servereye-agent.new"
-    exit 1
-fi
-
-# Calculate actual checksum
-ACTUAL_CHECKSUM=$(sha256sum "$AGENT_DIR/servereye-agent.new" | awk '{print $1}')
-
-# Verify checksum
-if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-    echo "[ERROR] Binary integrity check failed!"
-    echo "Expected: $EXPECTED_CHECKSUM"
-    echo "Actual:   $ACTUAL_CHECKSUM"
-    echo ""
-    echo "[SECURITY] Installation aborted for security reasons"
-    rm -f "$AGENT_DIR/servereye-agent.new"
-    exit 1
-fi
-
-echo "[OK] Binary integrity verified"
-echo "   Checksum: ${ACTUAL_CHECKSUM:0:16}..."
-
-# Move new binary to final location
-mv "$AGENT_DIR/servereye-agent.new" "$AGENT_DIR/servereye-agent"
+# Copy local binary
+echo "[*] Installing local ServerEye agent..."
+cp "$LOCAL_BINARY" "$AGENT_DIR/servereye-agent"
 chmod +x "$AGENT_DIR/servereye-agent"
 chown "$AGENT_USER:$AGENT_USER" "$AGENT_DIR/servereye-agent"
 
@@ -409,62 +300,60 @@ else
         echo "[ERROR] Failed to register server with API"
         echo "[INFO] Please check your network connection and API credentials"
         echo "[INFO] BACKEND_URL: $BACKEND_URL"
+        echo "[INFO] Make sure local API server is running on localhost:8080"
         exit 1
     fi
 
-    # Create configuration file
-    echo "[*] Creating configuration..."
-    
     # Create configuration with enhanced features and environment variable support
-    echo "[*] Creating enhanced configuration..."
+    echo "[*] Creating enhanced configuration for local development..."
     
-    # Determine environment from variables or default to production
-    ENVIRONMENT="${SERVEREYE_ENVIRONMENT:-production}"
+    # Default to development environment for local builds
+    ENVIRONMENT="${SERVEREYE_ENVIRONMENT:-development}"
     
     # Base configuration template with environment variables
     cat > "$CONFIG_DIR/config.yaml" << EOF
 server:
   name: "$HOSTNAME"
-  description: "ServerEye monitored server ($ENVIRONMENT)"
+  description: "ServerEye monitored server ($ENVIRONMENT - local build)"
   secret_key: "\${SERVEREYE_SERVER_KEY}"
   server_id: "\${SERVEREYE_SERVER_ID}"
 
 api:
-  base_url: "\${SERVEREYE_API_URL:-$BACKEND_URL}"
+  base_url: "\${SERVEREYE_API_URL:-http://localhost:8080}"
   api_key: "\${SERVEREYE_API_KEY:-$API_KEY}"
-  timeout: "30s"
+  timeout: "60s"
 
 websocket:
   enabled: true
-  url: "\${SERVEREYE_WS_URL:-wss://api.servereye.dev/ws}"
-  reconnect_interval: "5s"
-  max_reconnect_attempts: 10
-  ping_interval: "30s"
-  write_timeout: "10s"
-  read_timeout: "10s"
-  handshake_timeout: "10s"
-  buffer_size: 1000
-  enable_compression: true
-  metric_buffer_size: 100
-  metric_buffer_flush: "30s"
-  command_queue_size: 100
+  url: "\${SERVEREYE_WS_URL:-ws://localhost:8080/ws}"
+  reconnect_interval: "10s"
+  max_reconnect_attempts: 5
+  ping_interval: "60s"
+  write_timeout: "30s"
+  read_timeout: "30s"
+  handshake_timeout: "30s"
+  buffer_size: 500
+  enable_compression: false
+  metric_buffer_size: 50
+  metric_buffer_flush: "10s"
+  command_queue_size: 50
   command_timeout: "30s"
 
 metrics:
-  cpu_usage: false
+  cpu_usage: true
   memory_usage: true
-  disk_usage: false
+  disk_usage: true
   cpu_temperature: true
-  interval: "\${SERVEREYE_METRICS_INTERVAL:-30s}"
+  interval: "\${SERVEREYE_METRICS_INTERVAL:-10s}"
 
 logging:
-  level: "\${SERVEREYE_LOG_LEVEL:-info}"
+  level: "\${SERVEREYE_LOG_LEVEL:-debug}"
   file: "\${SERVEREYE_LOG_FILE:-/var/log/servereye/agent.log}"
 
 # Enhanced configuration features
 features:
   auto_updates: false
-  telemetry: true
+  telemetry: false
   remote_commands: true
   alerting: true
   docker_monitoring: true
@@ -474,19 +363,19 @@ security:
   tls_cert_file: ""
   tls_key_file: ""
   allowed_ips: []
-  rate_limit_per_sec: 10
-  max_connections: 100
+  rate_limit_per_sec: 5
+  max_connections: 50
 
 performance:
-  worker_count: 4
-  queue_size: 1000
-  batch_size: 100
-  flush_interval: "30s"
-  connection_timeout: "10s"
+  worker_count: 2
+  queue_size: 500
+  batch_size: 50
+  flush_interval: "10s"
+  connection_timeout: "30s"
 EOF
 
-    # Create environment-specific override if it exists in configs
-    if [ -f "./deployments/configs/config.$ENVIRONMENT.yaml" ]; then
+    # Create environment-specific override if it exists
+    if [ -f "./configs/config.$ENVIRONMENT.yaml" ]; then
         echo "[*] Applying $ENVIRONMENT-specific configuration overrides..."
         # Merge environment-specific configuration
         python3 -c "
@@ -498,7 +387,7 @@ with open('$CONFIG_DIR/config.yaml', 'r') as f:
     base_config = yaml.safe_load(f)
 
 # Load environment override
-with open('./deployments/configs/config.$ENVIRONMENT.yaml', 'r') as f:
+with open('./configs/config.$ENVIRONMENT.yaml', 'r') as f:
     env_config = yaml.safe_load(f)
 
 # Merge configurations (env overrides base)
@@ -517,21 +406,23 @@ with open('$CONFIG_DIR/config.yaml', 'w') as f:
 " 2>/dev/null || {
         echo "[*] Python merge not available, using simple override..."
         # Fallback: just copy the environment config
-        cp "./deployments/configs/config.$ENVIRONMENT.yaml" "$CONFIG_DIR/config.yaml"
+        cp "./configs/config.$ENVIRONMENT.yaml" "$CONFIG_DIR/config.yaml"
     }
     fi
 
     # Set environment variables for the agent
     cat > "$CONFIG_DIR/agent.env" << EOF
-# ServerEye Agent Environment Variables
+# ServerEye Agent Environment Variables (Local Development)
 SERVEREYE_SERVER_KEY="$SECRET_KEY"
 SERVEREYE_SERVER_ID="$SERVER_ID"
-SERVEREYE_API_URL="$BACKEND_URL"
+SERVEREYE_API_URL="http://localhost:8080"
 SERVEREYE_API_KEY="$API_KEY"
 SERVEREYE_ENVIRONMENT="$ENVIRONMENT"
-SERVEREYE_METRICS_INTERVAL="30s"
-SERVEREYE_LOG_LEVEL="info"
+SERVEREYE_WS_URL="ws://localhost:8080/ws"
+SERVEREYE_METRICS_INTERVAL="10s"
+SERVEREYE_LOG_LEVEL="debug"
 SERVEREYE_LOG_FILE="/var/log/servereye/agent.log"
+BACKEND_URL="http://localhost:8080"
 EOF
     echo "[OK] Configuration created with server-provided key"
 
@@ -548,21 +439,32 @@ EOF
     echo "🔧 Enhanced Configuration Features:"
     echo "  - Environment variable overrides supported"
     echo "  - Hot-reload configuration changes"
-    echo "  - Environment-specific configurations"
+    echo "  - Development-optimized settings"
     echo "  - Comprehensive validation"
     echo ""
-    echo "📝 Configuration Management:"
+    echo "📝 Local Development Configuration:"
+    echo "  - Debug logging enabled"
+    echo "  - Local WebSocket endpoint (ws://localhost:8080/ws)"
+    echo "  - All metrics enabled"
+    echo "  - 10-second intervals for faster testing"
+    echo ""
+    echo "🔨 Configuration Management:"
     echo "  - Edit: $CONFIG_DIR/config.yaml"
     echo "  - Local overrides: $CONFIG_DIR/local.env"
     echo "  - Reload: sudo systemctl restart servereye-agent"
     echo "  - Logs: sudo journalctl -u servereye-agent -f"
+    echo ""
+    echo "🚀 Development Workflow:"
+    echo "  - Build: cd /home/gospodin/Рабочий\\ стол/homeProjects/ServerEye && make build-agent"
+    echo "  - Install: sudo ./scripts/install-local.sh"
+    echo "  - Test: sudo systemctl status servereye-agent"
 fi
 
 # Install systemd service with enhanced environment support
 echo "[*] Installing systemd service..."
 cat > "$SERVICE_FILE" << 'EOF'
 [Unit]
-Description=ServerEye Agent - Server Monitoring Agent
+Description=ServerEye Agent - Server Monitoring Agent (Local Development)
 After=network.target
 Wants=network.target
 
@@ -617,7 +519,7 @@ if systemctl is-active --quiet servereye-agent; then
         echo "Your secret key: $SECRET_KEY"
         echo ""
         echo "What was updated:"
-        echo "  - Agent binary updated to latest version"
+        echo "  - Agent binary updated to local build"
         echo "  - Configuration preserved"
         echo "  - Service restarted"
         echo "  - Previous version backed up"

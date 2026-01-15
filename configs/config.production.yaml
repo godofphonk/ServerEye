@@ -1,0 +1,56 @@
+# Production Environment Configuration
+# Overrides base configuration for production deployment
+
+server:
+  name: "Production ServerEye Agent"
+  description: "Production monitoring agent"
+
+api:
+  base_url: "https://api.servereye.dev"
+  timeout: "15s"
+
+websocket:
+  enabled: true
+  url: "wss://api.servereye.dev/ws"
+  reconnect_interval: "3s"
+  max_reconnect_attempts: 20
+  ping_interval: "15s"
+  write_timeout: "5s"
+  read_timeout: "5s"
+  handshake_timeout: "5s"
+  buffer_size: 2000
+  enable_compression: true
+
+metrics:
+  cpu_usage: true
+  memory_usage: true
+  disk_usage: true
+  cpu_temperature: true
+  interval: "15s"
+
+logging:
+  level: "warn"
+  file: "/var/log/servereye/agent.log"
+
+# Production-specific settings
+features:
+  auto_updates: true
+  telemetry: true
+  remote_commands: true
+  alerting: true
+  docker_monitoring: true
+
+security:
+  enable_tls: true
+  tls_cert_file: "/etc/ssl/certs/servereye.crt"
+  tls_key_file: "/etc/ssl/private/servereye.key"
+  allowed_ips: []
+  rate_limit_per_sec: 20
+  max_connections: 200
+
+performance:
+  worker_count: 8
+  queue_size: 2000
+  batch_size: 200
+  flush_interval: "15s"
+  connection_timeout: "5s"
