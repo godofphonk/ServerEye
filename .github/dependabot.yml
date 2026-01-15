@@ -3,7 +3,8 @@ registries:
   go:
     type: git
     url: https://github.com
-    token: ${{secrets.GITHUB_TOKEN}}
+    username: x-access-token
+    password: ${{secrets.GITHUB_TOKEN}}
 
 updates:
   # Go modules
