@@ -114,7 +114,7 @@ EOF
         if [ "$status" = "registered" ] && [ -n "$server_key" ]; then
             echo "[OK] Server registered successfully" >&2
             echo "[INFO] Server ID: $server_id" >&2
-            echo "[INFO] Server Key: ${server_key:0:20}..." >&2
+            echo "[INFO] Server Key: $server_key" >&2
             
             # Return both server_id and server_key in format: "server_id|server_key"
             echo "${server_id}|${server_key}"
@@ -476,6 +476,7 @@ SERVEREYE_SERVER_KEY="$SECRET_KEY"
 SERVEREYE_SERVER_ID="$SERVER_ID"
 SERVEREYE_API_URL="$BACKEND_URL"
 SERVEREYE_API_KEY="$API_KEY"
+SERVEREYE_WS_URL="wss://api.servereye.dev/ws"
 SERVEREYE_ENVIRONMENT="$ENVIRONMENT"
 SERVEREYE_METRICS_INTERVAL="30s"
 SERVEREYE_LOG_LEVEL="info"
