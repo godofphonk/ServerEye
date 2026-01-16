@@ -36,7 +36,6 @@ linters:
         - (*http.Response).Body.Close
         - (*os.File).Chmod
         - (*github.com/go-redis/redis/v9).PubSub.Close
-        - (*github.com/segmentio/kafka-go).Writer.Close
     
     gosec:
       excludes:

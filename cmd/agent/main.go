@@ -152,16 +152,6 @@ func handleInstall() error {
   description: "ServerEye monitored server"
   secret_key: "%s"
 
-kafka:
-  enabled: true
-  brokers:
-    - "192.168.0.104:9093"
-  topic_prefix: "metrics"  # Change to "prod" or "dev" for environment isolation
-  compression: "snappy"
-  max_attempts: 3
-  batch_size: 100
-  required_acks: 1
-
 metrics:
   cpu_temperature: true
   interval: "30s"
