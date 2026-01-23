@@ -55,6 +55,22 @@ func NewSystemMonitor(logger *logrus.Logger) *SystemMonitor {
 func (s *SystemMonitor) GetMemoryInfo() (*protocol.MemoryInfo, error) {
 	s.logger.Debug("Getting memory information")
 
+	// Platform check - only Linux supported for now
+	if runtime.GOOS != "linux" {
+		s.logger.Warnf("Memory metrics not implemented for %s, returning basic info", runtime.GOOS)
+		// Return basic memory info using Go runtime for cross-platform support
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+
+		memInfo := &protocol.MemoryInfo{
+			Total:       m.Sys,           // System memory
+			Used:        m.Alloc,         // Allocated memory
+			Available:   m.Sys - m.Alloc, // Available approximation
+			UsedPercent: float64(m.Alloc) / float64(m.Sys) * 100,
+		}
+		return memInfo, nil
+	}
+
 	// Read /proc/meminfo for detailed memory stats
 	cmd := exec.Command("cat", "/proc/meminfo")
 	output, err := cmd.Output()
@@ -122,6 +138,14 @@ func (s *SystemMonitor) GetMemoryInfo() (*protocol.MemoryInfo, error) {
 func (s *SystemMonitor) GetDiskInfo() (*protocol.DiskInfoPayload, error) {
 	s.logger.Debug("Getting disk information")
 
+	// Platform check - only Linux supported for now
+	if runtime.GOOS != "linux" {
+		s.logger.Warnf("Disk metrics not implemented for %s, returning empty info", runtime.GOOS)
+		return &protocol.DiskInfoPayload{
+			Disks: []protocol.DiskInfo{},
+		}, nil
+	}
+
 	// Use df command to get disk usage
 	cmd := exec.Command("df", "-h", "-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs")
 	output, err := cmd.Output()
@@ -181,6 +205,17 @@ func (s *SystemMonitor) GetDiskInfo() (*protocol.DiskInfoPayload, error) {
 // GetUptime retrieves system uptime information
 func (s *SystemMonitor) GetUptime() (*protocol.UptimeInfo, error) {
 	s.logger.Debug("Getting uptime information")
+
+	// Platform check - use Go runtime for cross-platform uptime
+	if runtime.GOOS != "linux" {
+		s.logger.Warnf("Linux uptime not available on %s, using agent uptime", runtime.GOOS)
+		// Return agent uptime as fallback
+		uptime := time.Since(s.prevNetTime).Seconds()
+		return &protocol.UptimeInfo{
+			Uptime:    uint64(uptime),
+			Formatted: s.formatUptime(int64(uptime)),
+		}, nil
+	}
 
 	// Read /proc/uptime
 	cmd := exec.Command("cat", "/proc/uptime")
@@ -301,6 +336,16 @@ func (s *SystemMonitor) GetTopProcesses(limit int) (*protocol.ProcessesPayload, 
 // GetNetworkInfo retrieves network interface statistics
 func (s *SystemMonitor) GetNetworkInfo() (*protocol.NetworkInfo, error) {
 	s.logger.Debug("Getting network information")
+
+	// Platform check - only Linux supported for now
+	if runtime.GOOS != "linux" {
+		s.logger.Warnf("Network metrics not implemented for %s, returning empty info", runtime.GOOS)
+		return &protocol.NetworkInfo{
+			Interfaces:    []protocol.NetworkInterfaceInfo{},
+			DownloadSpeed: 0,
+			UploadSpeed:   0,
+		}, nil
+	}
 
 	// Read /proc/net/dev
 	cmd := exec.Command("cat", "/proc/net/dev")
