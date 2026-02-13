@@ -10,7 +10,7 @@ AGENT_DIR="/opt/servereye"
 CONFIG_DIR="/etc/servereye"
 LOG_DIR="/var/log/servereye"
 SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
-LOCAL_BINARY="/home/gospodin/Рабочий стол/homeProjects/ServerEye/build/servereye-agent"
+LOCAL_BINARY="${SERVEREYE_LOCAL_BINARY:-$(pwd)/build/servereye-agent}"
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
 AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
 # Backend API configuration
@@ -141,7 +141,7 @@ echo "[*] Installing ServerEye Agent (Local Build)..."
 # Check if local binary exists
 if [ ! -f "$LOCAL_BINARY" ]; then
     echo "[ERROR] Local binary not found at $LOCAL_BINARY"
-    echo "[*] Please build the agent first: cd /home/gospodin/Рабочий\ стол/homeProjects/ServerEye && make build-agent"
+    echo "[*] Please build the agent first: cd '$(pwd)' && make build-agent"
     exit 1
 fi
 
@@ -312,7 +312,7 @@ metrics:
   memory_usage: true
   disk_usage: true
   cpu_temperature: true
-  interval: "\${SERVEREYE_METRICS_INTERVAL:-10s}"
+  interval: "\${SERVEREYE_METRICS_INTERVAL:-1s}"
 
 logging:
   level: "\${SERVEREYE_LOG_LEVEL:-debug}"
@@ -381,7 +381,7 @@ SERVEREYE_API_URL="http://localhost:8080"
 SERVEREYE_API_KEY="$API_KEY"
 SERVEREYE_WS_URL="ws://localhost:8080/ws"
 SERVEREYE_ENVIRONMENT="$ENVIRONMENT"
-SERVEREYE_METRICS_INTERVAL="10s"
+SERVEREYE_METRICS_INTERVAL="1s"
 SERVEREYE_LOG_LEVEL="debug"
 SERVEREYE_LOG_FILE="/var/log/servereye/agent.log"
 BACKEND_URL="http://localhost:8080"

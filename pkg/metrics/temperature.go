@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -43,6 +44,19 @@ func NewTemperatureMetrics(logger *logrus.Logger) *TemperatureMetrics {
 
 // GetTemperatureInfo collects detailed temperature information
 func (tm *TemperatureMetrics) GetTemperatureInfo() (*TemperatureInfo, error) {
+	// Platform check - only Linux supported for now
+	if runtime.GOOS != "linux" {
+		tm.logger.Warnf("Temperature metrics not implemented for %s, returning zero values", runtime.GOOS)
+		return &TemperatureInfo{
+			CPUTemperature:      0,
+			GPUTemperature:      0,
+			SystemTemperature:   0,
+			HighestTemperature:  0,
+			TemperatureUnit:     "celsius",
+			StorageTemperatures: []StorageTemperature{},
+		}, nil
+	}
+
 	tempInfo := &TemperatureInfo{
 		TemperatureUnit:     "celsius",
 		StorageTemperatures: []StorageTemperature{},
