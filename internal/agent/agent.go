@@ -18,20 +18,21 @@ import (
 
 // Agent представляет агент ServerEye
 type Agent struct {
-	config             *config.AgentConfig
-	logger             interfaces.Logger
-	wsPublisher        interfaces.MetricsPublisher // Interface instead of concrete type
-	wsCommandConsumer  interfaces.CommandConsumer  // Interface instead of concrete type
-	useWebSocket       bool                        // Use WebSocket instead of HTTP
-	cpuMetrics         *metrics.CPUMetrics         // Concrete type for now
-	systemMonitor      *metrics.SystemMonitor      // Concrete type for now
-	networkMetrics     *metrics.NetworkMetrics     // Concrete type for now
-	temperatureMetrics *metrics.TemperatureMetrics // Concrete type for now
-	dockerClient       *docker.Client              // Concrete type for now
+	config              *config.AgentConfig
+	logger              interfaces.Logger
+	wsPublisher         interfaces.MetricsPublisher  // Interface instead of concrete type
+	wsCommandConsumer   interfaces.CommandConsumer   // Interface instead of concrete type
+	httpPublisher       *metrics.HTTPPublisher       // HTTP publisher for metrics and heartbeat
+	useWebSocket        bool                         // Use WebSocket instead of HTTP
+	cpuMetrics          *metrics.CPUMetrics          // Concrete type for now
+	systemMonitor       *metrics.SystemMonitor       // Concrete type for now
+	networkMetrics      *metrics.NetworkMetrics      // Concrete type for now
+	temperatureMetrics  *metrics.TemperatureMetrics  // Concrete type for now
+	dockerClient        *docker.Client               // Concrete type for now
 	staticInfoPublisher *metrics.StaticInfoPublisher // HTTP publisher for static system info
-	ctx                context.Context
-	cancel             context.CancelFunc
-	startTime          time.Time // Start time for uptime calculation
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	startTime           time.Time // Start time for uptime calculation
 }
 
 // initializeWebSocketPublisher создает WebSocket publisher для метрик
@@ -188,6 +189,14 @@ func InitializeAgentEnhanced(ctx context.Context, configPath string) (*Agent, er
 		}
 	}
 
+	// Initialize HTTP publisher (always available)
+	agent.httpPublisher = metrics.NewHTTPPublisher(
+		cfg.Server.SecretKey,
+		cfg.Server.ServerID,
+		cfg.API.BaseURL,
+		logger,
+	)
+
 	// Initialize metrics collectors
 	agent.cpuMetrics = metrics.NewCPUMetrics()
 	agent.systemMonitor = metrics.NewSystemMonitor(logger)
@@ -251,12 +260,12 @@ func (a *Agent) Start() error {
 	// Запускаем heartbeat
 	go a.startHeartbeat()
 
-	// Запускаем сборщик метрик
-	if a.useWebSocket && a.wsPublisher != nil {
-		a.logger.Info("Starting metrics collection")
+	// Запускаем сборщик метрик - всегда используем HTTP
+	if a.httpPublisher != nil {
+		a.logger.Info("Starting metrics collection via HTTP")
 		go a.collectAndSendMetrics()
 	} else {
-		a.logger.Warn("No WebSocket publisher available - metrics disabled")
+		a.logger.Error("No HTTP publisher available - metrics disabled")
 	}
 
 	// Start static info publisher
@@ -282,6 +291,15 @@ func (a *Agent) Stop() error {
 		if err := a.wsPublisher.Close(); err != nil {
 			if a.logger != nil {
 				a.logger.WithError(err).Error("Ошибка при закрытии WebSocket publisher")
+			}
+		}
+	}
+
+	// Закрываем HTTP publisher
+	if a.httpPublisher != nil {
+		if err := a.httpPublisher.Close(); err != nil {
+			if a.logger != nil {
+				a.logger.WithError(err).Error("Ошибка при закрытии HTTP publisher")
 			}
 		}
 	}
@@ -421,6 +439,6 @@ func initializeStaticInfoPublisher(cfg *config.AgentConfig, logger *logrus.Logge
 		ServerID:  cfg.Server.ServerID,
 		Interval:  24 * time.Hour,
 	}
-	
+
 	return metrics.NewStaticInfoPublisher(staticConfig, logger)
 }

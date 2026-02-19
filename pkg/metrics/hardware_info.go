@@ -33,6 +33,7 @@ func (h *HardwareInfoCollector) CollectMotherboardInfo() (*types.MotherboardInfo
 	motherboard := &types.MotherboardInfo{
 		Manufacturer: "Unknown",
 		Model:        "Unknown",
+		Chipset:      "Unknown",
 	}
 
 	// Try DMI (Linux)
@@ -52,51 +53,21 @@ func (h *HardwareInfoCollector) CollectMotherboardInfo() (*types.MotherboardInfo
 	return motherboard, nil
 }
 
-// CollectMemoryInfo collects detailed memory information
-func (h *HardwareInfoCollector) CollectMemoryInfo() (*types.MemoryInfo, error) {
-	h.logger.Debug("Collecting memory information")
+// CollectMemoryModules collects detailed memory modules information
+func (h *HardwareInfoCollector) CollectMemoryModules() ([]types.MemoryModule, error) {
+	h.logger.Debug("Collecting memory modules information")
 
-	memory := &types.MemoryInfo{
-		MemoryType:  "Unknown",
-		MemorySpeed: 0,
-		SlotsTotal:  0,
-		SlotsUsed:   0,
-		Modules:     []types.MemoryModule{},
+	// Get memory devices from dmidecode
+	cmd := exec.Command("sudo", "dmidecode", "-t", "17")
+	output, err := cmd.Output()
+	if err != nil {
+		return []types.MemoryModule{}, err
 	}
 
-	// Get total memory from /proc/meminfo
-	if totalGB, err := h.getTotalMemory(); err == nil {
-		memory.TotalMemoryGB = totalGB
-	}
+	// Parse memory devices
+	memoryDevices := h.parseDMIMemoryDevices(string(output))
 
-	// Collect detailed memory info
-	if runtime.GOOS == "linux" {
-		if err := h.collectMemoryFromDMI(memory); err != nil {
-			h.logger.WithError(err).Warn("Failed to collect memory from DMI")
-		}
-	}
-
-	// Fallback to dmidecode command
-	if len(memory.Modules) == 0 {
-		if err := h.collectMemoryFromDMIDecode(memory); err != nil {
-			h.logger.WithError(err).Warn("Failed to collect memory from dmidecode")
-		}
-	}
-
-	// If still no modules, create a generic one
-	if len(memory.Modules) == 0 && memory.TotalMemoryGB > 0 {
-		memory.Modules = append(memory.Modules, types.MemoryModule{
-			Manufacturer: "Unknown",
-			SizeGB:       uint64(memory.TotalMemoryGB),
-			Speed:        memory.MemorySpeed,
-			Type:         memory.MemoryType,
-			Slot:         0,
-		})
-		memory.SlotsUsed = 1
-		memory.SlotsTotal = 1
-	}
-
-	return memory, nil
+	return memoryDevices, nil
 }
 
 // collectMotherboardFromDMI collects motherboard info from /sys/class/dmi
@@ -135,86 +106,6 @@ func (h *HardwareInfoCollector) collectMotherboardFromDMIDecode(motherboard *typ
 	return nil
 }
 
-// collectMemoryFromDMI collects memory info from /sys/class/dmi
-func (h *HardwareInfoCollector) collectMemoryFromDMI(memory *types.MemoryInfo) error {
-	// Try to get memory type from /sys/class/dmi/id/memory_device
-	if memType, err := os.ReadFile("/sys/class/dmi/id/memory_device"); err == nil {
-		memory.MemoryType = strings.TrimSpace(string(memType))
-	}
-
-	// Get memory speed
-	if speed, err := os.ReadFile("/sys/class/dmi/id/memory_speed"); err == nil {
-		if s, err := strconv.Atoi(strings.TrimSpace(string(speed))); err == nil {
-			memory.MemorySpeed = s
-		}
-	}
-
-	return nil
-}
-
-// collectMemoryFromDMIDecode uses dmidecode command for detailed memory info
-func (h *HardwareInfoCollector) collectMemoryFromDMIDecode(memory *types.MemoryInfo) error {
-	// First get memory array info (type 16)
-	cmd := exec.Command("sudo", "dmidecode", "-t", "16")
-	output, err := cmd.Output()
-	if err == nil {
-		h.parseMemoryArrayInfo(string(output), memory)
-	}
-
-	// Then get memory devices (type 17)
-	cmd = exec.Command("sudo", "dmidecode", "-t", "17")
-	output, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-
-	// Parse memory devices
-	memoryDevices := h.parseDMIMemoryDevices(string(output))
-
-	for _, device := range memoryDevices {
-		if device.SizeGB > 0 { // Only include populated slots
-			memory.Modules = append(memory.Modules, device)
-			memory.SlotsUsed++
-		}
-	}
-
-	// Set memory type and speed from first module if available
-	if len(memory.Modules) > 0 {
-		if memory.MemoryType == "Unknown" {
-			memory.MemoryType = memory.Modules[0].Type
-		}
-		if memory.MemorySpeed == 0 {
-			memory.MemorySpeed = memory.Modules[0].Speed
-		}
-	}
-
-	return nil
-}
-
-// parseMemoryArrayInfo parses memory array information from dmidecode type 16
-func (h *HardwareInfoCollector) parseMemoryArrayInfo(output string, memory *types.MemoryInfo) {
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Number Of Devices:") {
-			if slots := h.extractNumber(line); slots > 0 {
-				memory.SlotsTotal = slots
-			}
-		}
-	}
-}
-
-// extractNumber extracts number from string
-func (h *HardwareInfoCollector) extractNumber(line string) int {
-	re := regexp.MustCompile(`(\d+)`)
-	matches := re.FindStringSubmatch(line)
-	if len(matches) == 2 {
-		num, _ := strconv.Atoi(matches[1])
-		return num
-	}
-	return 0
-}
-
 // parseDMIMemoryDevices parses dmidecode output for memory devices
 func (h *HardwareInfoCollector) parseDMIMemoryDevices(output string) []types.MemoryModule {
 	var devices []types.MemoryModule
@@ -247,17 +138,35 @@ func (h *HardwareInfoCollector) parseDMIMemoryDevices(output string) []types.Mem
 		} else if strings.Contains(line, "Type:") {
 			memType := strings.TrimSpace(strings.TrimPrefix(line, "Type:"))
 			if memType != "Unknown" {
-				currentDevice.Type = memType
+				currentDevice.MemoryType = memType
 			}
 		} else if strings.Contains(line, "Speed:") {
 			if speed := h.parseMemorySpeed(line); speed > 0 {
-				currentDevice.Speed = speed
+				currentDevice.FrequencyMHz = speed
 			}
 		} else if strings.Contains(line, "Locator:") {
-			// Extract slot number from locator
-			if slot := h.extractSlotNumber(line); slot >= 0 {
-				currentDevice.Slot = slot
+			// Extract slot name from locator
+			slotName := strings.TrimSpace(strings.TrimPrefix(line, "Locator:"))
+			currentDevice.SlotName = slotName
+		} else if strings.Contains(line, "Part Number:") {
+			partNumber := strings.TrimSpace(strings.TrimPrefix(line, "Part Number:"))
+			if partNumber != "Not Specified" && partNumber != "Unknown" {
+				currentDevice.PartNumber = partNumber
 			}
+		} else if strings.Contains(line, "Configured Memory Speed:") {
+			if speed := h.parseMemorySpeed(line); speed > 0 {
+				currentDevice.SpeedMTS = speed * 2 // Convert MHz to MT/s for DDR
+			}
+		} else if strings.Contains(line, "Voltage:") {
+			if voltage := h.parseVoltage(line); voltage > 0 {
+				currentDevice.Voltage = voltage
+			}
+		} else if strings.Contains(line, "Error Correction Type:") {
+			ecc := strings.TrimSpace(strings.TrimPrefix(line, "Error Correction Type:"))
+			currentDevice.ECC = ecc == "Multi-bit ECC" || ecc == "Single-bit ECC"
+		} else if strings.Contains(line, "Type Detail:") {
+			detail := strings.TrimSpace(strings.TrimPrefix(line, "Type Detail:"))
+			currentDevice.Registered = strings.Contains(detail, "Registered")
 		}
 	}
 
@@ -297,6 +206,17 @@ func (h *HardwareInfoCollector) parseMemorySpeed(line string) int {
 	if len(matches) == 3 {
 		speed, _ := strconv.Atoi(matches[1])
 		return speed
+	}
+	return 0
+}
+
+// parseVoltage parses voltage from dmidecode output
+func (h *HardwareInfoCollector) parseVoltage(line string) float64 {
+	re := regexp.MustCompile(`([\d.]+)\s*V`)
+	matches := re.FindStringSubmatch(line)
+	if len(matches) == 2 {
+		voltage, _ := strconv.ParseFloat(matches[1], 64)
+		return voltage
 	}
 	return 0
 }

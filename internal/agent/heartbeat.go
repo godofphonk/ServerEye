@@ -2,9 +2,11 @@ package agent
 
 import (
 	"time"
+
+	"github.com/godofphonk/ServerEye/pkg/types"
 )
 
-// startHeartbeat запускает отправку heartbeat сообщений через WebSocket
+// startHeartbeat запускает отправку heartbeat сообщений через HTTP
 func (a *Agent) startHeartbeat() {
 	ticker := time.NewTicker(60 * time.Second) // 60 секунд как требует бэкенд
 	defer ticker.Stop()
@@ -22,40 +24,30 @@ func (a *Agent) startHeartbeat() {
 	}
 }
 
-// sendHeartbeat отправляет heartbeat сообщение через WebSocket
+// sendHeartbeat отправляет heartbeat сообщение через HTTP
 func (a *Agent) sendHeartbeat() {
-	// Check if WebSocket publisher is available
-	if a.wsPublisher == nil {
-		a.logger.Warn("Heartbeat skipped: No WebSocket publisher available")
+	// Check if HTTP publisher is available
+	if a.httpPublisher == nil {
+		a.logger.Warn("Heartbeat skipped: No HTTP publisher available")
 		return
 	}
 
-	// Check if WebSocket is connected
-	if !a.wsPublisher.IsConnected() {
-		a.logger.Warn("Heartbeat skipped: WebSocket not connected")
-		return
+	// Create heartbeat metric with empty data as per API spec
+	metric := &types.Metric{
+		ServerID:   a.config.Server.ServerID,
+		ServerKey:  a.config.Server.SecretKey,
+		ServerName: a.config.Server.Name,
+		Type:       "heartbeat",
+		Version:    "1.0",
+		Value:      nil,
+		Timestamp:  time.Now(),
+		Data:       map[string]interface{}{}, // Empty data for heartbeat
 	}
 
-	// Calculate uptime
-	uptime := time.Since(a.startTime).String()
-
-	// Create heartbeat metric
-	heartbeatData := map[string]interface{}{
-		"status":    "alive",
-		"timestamp": time.Now().Unix(),
-		"uptime":    uptime,
-	}
-
-	tags := map[string]string{
-		"type": "heartbeat",
-	}
-
-	metric := a.CreateMetricFromData("heartbeat", heartbeatData, tags)
-
-	a.logger.Info("Sending heartbeat via WebSocket")
-	if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-		a.logger.WithError(err).Error("Failed to send heartbeat")
+	a.logger.Info("Sending heartbeat via HTTP")
+	if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
+		a.logger.WithError(err).Error("Failed to send heartbeat via HTTP")
 	} else {
-		a.logger.Info("Heartbeat sent successfully")
+		a.logger.Info("Heartbeat sent successfully via HTTP")
 	}
 }

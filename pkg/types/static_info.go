@@ -4,24 +4,31 @@ package types
 type StaticInfoRequest struct {
 	ServerInfo        ServerInfo         `json:"server_info"`
 	HardwareInfo      HardwareInfo       `json:"hardware_info"`
-	MotherboardInfo   MotherboardInfo    `json:"motherboard_info"`
-	MemoryInfo        MemoryInfo         `json:"memory_info"`
-	NetworkInterfaces []NetworkInterface `json:"network_interfaces"`
-	DiskInfo          []DiskInfo         `json:"disk_info"`
+	MotherboardInfo   *MotherboardInfo   `json:"motherboard_info,omitempty"`
+	MemoryModules     []MemoryModule     `json:"memory_modules,omitempty"`
+	NetworkInterfaces []NetworkInterface `json:"network_interfaces,omitempty"`
+	DiskInfo          []DiskInfo         `json:"disk_info,omitempty"`
 }
 
 // ServerInfo represents server information
 type ServerInfo struct {
-	Hostname  string `json:"hostname"`
-	OS        string `json:"os"`
-	OSVersion string `json:"os_version"`
+	Hostname     string `json:"hostname"`
+	OS           string `json:"os"`
+	OSVersion    string `json:"os_version"`
+	Kernel       string `json:"kernel"`
+	Architecture string `json:"architecture"`
 }
 
 // HardwareInfo represents hardware information
 type HardwareInfo struct {
-	CPUModel      string  `json:"cpu_model"`
-	CPUCores      int     `json:"cpu_cores"`
-	TotalMemoryGB float64 `json:"total_memory_gb"`
+	CPUModel        string  `json:"cpu_model"`
+	CPUCores        int     `json:"cpu_cores"`
+	CPUThreads      int     `json:"cpu_threads"`
+	CPUFrequencyMHz float64 `json:"cpu_frequency_mhz"`
+	GPUModel        string  `json:"gpu_model"`
+	GPUDriver       string  `json:"gpu_driver"`
+	GPUMemoryGB     int     `json:"gpu_memory_gb"`
+	TotalMemoryGB   float64 `json:"total_memory_gb"`
 }
 
 // NetworkInterface represents network interface information
@@ -30,43 +37,44 @@ type NetworkInterface struct {
 	MACAddress    string `json:"mac_address"`
 	InterfaceType string `json:"interface_type"`
 	SpeedMbps     int    `json:"speed_mbps"`
+	Vendor        string `json:"vendor"`
+	Driver        string `json:"driver"`
 	IsPhysical    bool   `json:"is_physical"`
 }
 
 // DiskInfo represents disk information
 type DiskInfo struct {
-	DeviceName   string `json:"device_name"`
-	Model        string `json:"model"`
-	SizeGB       uint64 `json:"size_gb"`
-	DiskType     string `json:"disk_type"`
-	Filesystem   string `json:"filesystem"`
-	MountPoint   string `json:"mount_point"`
-	IsSystemDisk bool   `json:"is_system_disk"`
+	DeviceName    string `json:"device_name"`
+	Model         string `json:"model"`
+	SerialNumber  string `json:"serial_number"`
+	SizeGB        uint64 `json:"size_gb"`
+	DiskType      string `json:"disk_type"`
+	InterfaceType string `json:"interface_type"`
+	Filesystem    string `json:"filesystem"`
+	MountPoint    string `json:"mount_point"`
+	IsSystemDisk  bool   `json:"is_system_disk"`
 }
 
 // MotherboardInfo represents motherboard information
 type MotherboardInfo struct {
-	Manufacturer string `json:"manufacturer"`
-	Model        string `json:"model"`
-}
-
-// MemoryInfo represents memory information
-type MemoryInfo struct {
-	TotalMemoryGB float64        `json:"total_memory_gb"`
-	MemoryType    string         `json:"memory_type"`  // DDR3/DDR4/DDR5
-	MemorySpeed   int            `json:"memory_speed"` // MHz
-	SlotsTotal    int            `json:"slots_total"`
-	SlotsUsed     int            `json:"slots_used"`
-	Modules       []MemoryModule `json:"modules"`
+	Manufacturer string `json:"manufacturer,omitempty"`
+	Model        string `json:"model,omitempty"`
+	Chipset      string `json:"chipset,omitempty"`
 }
 
 // MemoryModule represents individual memory module
 type MemoryModule struct {
-	Manufacturer string `json:"manufacturer"`
-	SizeGB       uint64 `json:"size_gb"`
-	Speed        int    `json:"speed"` // MHz
-	Type         string `json:"type"`  // DDR3/DDR4/DDR5
-	Slot         int    `json:"slot"`  // Slot number
+	SlotName     string  `json:"slot_name"`
+	SizeGB       uint64  `json:"size_gb"`
+	MemoryType   string  `json:"memory_type"`
+	FrequencyMHz int     `json:"frequency_mhz"`
+	Manufacturer string  `json:"manufacturer"`
+	PartNumber   string  `json:"part_number"`
+	SpeedMTS     int     `json:"speed_mts"`
+	Voltage      float64 `json:"voltage"`
+	Timings      string  `json:"timings"`
+	ECC          bool    `json:"ecc"`
+	Registered   bool    `json:"registered"`
 }
 
 // StaticInfoResponse represents the API response

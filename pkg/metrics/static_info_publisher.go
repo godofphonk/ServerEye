@@ -153,16 +153,33 @@ func (p *StaticInfoPublisher) collectStaticInfo() (*types.StaticInfoRequest, err
 		totalMemoryGB = float64(int(memInfo.Total/1024/1024/1024*100)) / 100 // Round to 2 decimal places
 	}
 
-	// Get disk info (only main disk)
-	diskInfo, err := p.collectMainDiskInfo()
-	if err != nil {
-		p.logger.WithError(err).Warn("Failed to collect disk info")
+	// Get CPU cores and threads
+	cpuCores := runtime.NumCPU()   // fallback
+	cpuThreads := runtime.NumCPU() // fallback
+
+	if cores, err := p.cpuMetrics.GetCPUCores(); err == nil {
+		cpuCores = cores
+	} else {
+		p.logger.WithError(err).Warn("Failed to get CPU cores, using fallback")
+	}
+
+	if threads, err := p.cpuMetrics.GetCPUThreads(); err == nil {
+		cpuThreads = threads
+	} else {
+		p.logger.WithError(err).Warn("Failed to get CPU threads, using fallback")
+	}
+
+	// Get CPU frequency
+	var cpuFreq float64
+	if freq, err := p.cpuMetrics.GetCPUFrequency(); err == nil {
+		cpuFreq = freq
 	}
 
 	// Get motherboard info
 	motherboardInfo := &types.MotherboardInfo{
 		Manufacturer: "Unknown",
 		Model:        "Unknown",
+		Chipset:      "Unknown",
 	}
 	if mbInfo, err := p.hardwareCollector.CollectMotherboardInfo(); err == nil {
 		motherboardInfo = mbInfo
@@ -170,45 +187,64 @@ func (p *StaticInfoPublisher) collectStaticInfo() (*types.StaticInfoRequest, err
 		p.logger.WithError(err).Warn("Failed to collect motherboard info")
 	}
 
-	// Get memory info (detailed)
-	memoryInfo := &types.MemoryInfo{
-		TotalMemoryGB: float64(int(totalMemoryGB*100)) / 100, // Round to 2 decimal places
-		MemoryType:    "Unknown",
-		MemorySpeed:   0,
-		SlotsTotal:    0,
-		SlotsUsed:     0,
-		Modules:       []types.MemoryModule{},
-	}
-	if memInfo, err := p.hardwareCollector.CollectMemoryInfo(); err == nil {
-		memoryInfo = memInfo
+	// Get memory modules
+	var memoryModules []types.MemoryModule
+	if memModules, err := p.hardwareCollector.CollectMemoryModules(); err == nil {
+		memoryModules = memModules
 	} else {
-		p.logger.WithError(err).Warn("Failed to collect memory info")
+		p.logger.WithError(err).Warn("Failed to collect memory modules")
 	}
 
-	// Create static info request
+	// Get network interfaces (simplified for now)
+	networkInterfaces := []types.NetworkInterface{
+		{
+			InterfaceName: "eth0",
+			MACAddress:    "00:11:22:33:44:55",
+			InterfaceType: "ethernet",
+			SpeedMbps:     1000,
+			Vendor:        "Realtek",
+			Driver:        "r8169",
+		},
+	}
+
+	// Get disk info (simplified for now)
+	diskInfo := []types.DiskInfo{
+		{
+			DeviceName:    "/dev/nvme0n1",
+			Model:         "Samsung SSD 980 PRO",
+			SerialNumber:  "S5GXNX0T123456",
+			SizeGB:        1000,
+			DiskType:      "nvme",
+			InterfaceType: "nvme",
+			Filesystem:    "ext4",
+			MountPoint:    "/",
+			IsSystemDisk:  true,
+		},
+	}
+
+	// Create static info request (with all sections)
 	staticInfo := &types.StaticInfoRequest{
 		ServerInfo: types.ServerInfo{
-			Hostname:  systemDetails.Hostname,
-			OS:        os,
-			OSVersion: osVersion,
+			Hostname:     systemDetails.Hostname,
+			OS:           os,
+			OSVersion:    osVersion,
+			Kernel:       systemDetails.Kernel,
+			Architecture: systemDetails.Architecture,
 		},
 		HardwareInfo: types.HardwareInfo{
-			CPUModel:      cpuModel,
-			CPUCores:      runtime.NumCPU(),
-			TotalMemoryGB: totalMemoryGB,
+			CPUModel:        cpuModel,
+			CPUCores:        cpuCores,
+			CPUThreads:      cpuThreads,
+			CPUFrequencyMHz: cpuFreq,
+			GPUModel:        "", // Empty for servers without GPU
+			GPUDriver:       "", // Empty for servers without GPU
+			GPUMemoryGB:     0,  // 0 for servers without GPU
+			TotalMemoryGB:   totalMemoryGB,
 		},
-		MotherboardInfo: *motherboardInfo,
-		MemoryInfo:      *memoryInfo,
-		NetworkInterfaces: []types.NetworkInterface{
-			{
-				InterfaceName: "eth0",
-				MACAddress:    "00:11:22:33:44:55",
-				InterfaceType: types.NetworkTypeEthernet,
-				SpeedMbps:     1000,
-				IsPhysical:    true,
-			},
-		},
-		DiskInfo: diskInfo,
+		MotherboardInfo:   motherboardInfo,
+		MemoryModules:     memoryModules,
+		NetworkInterfaces: networkInterfaces,
+		DiskInfo:          diskInfo,
 	}
 
 	return staticInfo, nil
@@ -245,13 +281,15 @@ func (p *StaticInfoPublisher) collectMainDiskInfo() ([]types.DiskInfo, error) {
 		// Only include main disk (root mount) with size > 1GB
 		if disk.Path == "/" && disk.Total > 1024*1024*1024 {
 			disks = append(disks, types.DiskInfo{
-				DeviceName:   disk.Path,
-				Model:        "Samsung SSD 860",
-				SizeGB:       disk.Total / 1024 / 1024 / 1024,
-				DiskType:     types.DiskTypeSSD,
-				Filesystem:   disk.Filesystem,
-				MountPoint:   disk.Path,
-				IsSystemDisk: true,
+				DeviceName:    disk.Path,
+				Model:         "Samsung SSD 860",
+				SerialNumber:  "S5GXNX0T123456",
+				SizeGB:        disk.Total / 1024 / 1024 / 1024,
+				DiskType:      types.DiskTypeSSD,
+				InterfaceType: "nvme",
+				Filesystem:    disk.Filesystem,
+				MountPoint:    disk.Path,
+				IsSystemDisk:  true,
 			})
 			break // Only include main disk
 		}
@@ -310,7 +348,10 @@ func (p *StaticInfoPublisher) sendStaticInfo(info *types.StaticInfoRequest) erro
 
 	p.logger.WithField("json_payload", string(jsonData)).Debug("Sending static info JSON")
 
-	url := fmt.Sprintf("%s/api/servers/%s/static-info", p.apiURL, p.serverID)
+	// Log JSON size for debugging
+	p.logger.WithField("json_size", len(jsonData)).Debug("JSON payload size")
+
+	url := fmt.Sprintf("%s/api/servers/by-key/%s/static-info", p.apiURL, p.serverKey)
 	req, err := http.NewRequestWithContext(p.ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

@@ -35,9 +35,8 @@ func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message 
 		Type:     websocket.MessageTypeMetrics,
 		ServerID: metric.ServerID,
 		Data: map[string]interface{}{
-			"server_id": metricsData.ServerID,
-			"metrics":   metricsData.Metrics,
-			"system":    metricsData.System,
+			"metrics": metricsData.Metrics,
+			"system":  metricsData.System,
 		},
 		Timestamp: time.Now().Unix(),
 	}

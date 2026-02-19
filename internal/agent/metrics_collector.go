@@ -336,7 +336,22 @@ func (a *Agent) collectSystemMetrics(metrics map[string]interface{}) {
 
 // sendUnifiedMetrics creates and sends the unified metrics message
 func (a *Agent) sendUnifiedMetrics(metrics map[string]interface{}) {
-	// Create unified metric message
+	// Get system details and add to metrics
+	if a.systemMonitor != nil {
+		if details, err := a.systemMonitor.GetSystemDetails(); err == nil {
+			// Update system_details with full system info
+			if systemDetails, ok := metrics["system_details"].(map[string]interface{}); ok {
+				systemDetails["hostname"] = details.Hostname
+				systemDetails["os"] = details.OS
+				systemDetails["kernel"] = details.Kernel
+				systemDetails["architecture"] = details.Architecture
+				systemDetails["uptime_seconds"] = details.UptimeSeconds
+				metrics["system_details"] = systemDetails
+			}
+		}
+	}
+
+	// Create unified metric message with correct structure for API
 	unifiedMetric := &types.Metric{
 		ServerID:   a.config.Server.ServerID,
 		ServerKey:  a.config.Server.SecretKey,
@@ -346,15 +361,14 @@ func (a *Agent) sendUnifiedMetrics(metrics map[string]interface{}) {
 		Value:      nil,
 		Timestamp:  time.Now(),
 		Data: map[string]interface{}{
-			"server_id": a.config.Server.ServerID,
-			"metrics":   metrics,
+			"metrics": metrics,
 		},
 	}
 
-	// Send unified metrics
-	if err := a.wsPublisher.Publish(a.ctx, unifiedMetric); err != nil {
-		a.logger.WithError(err).Error("Failed to send unified metrics")
+	// Send unified metrics via HTTP
+	if err := a.httpPublisher.Publish(a.ctx, unifiedMetric); err != nil {
+		a.logger.WithError(err).Error("Failed to send unified metrics via HTTP")
 	} else {
-		a.logger.WithField("metrics_count", len(metrics)).Info("Unified metrics sent successfully")
+		a.logger.WithField("metrics_count", len(metrics)).Info("Unified metrics sent successfully via HTTP")
 	}
 }
