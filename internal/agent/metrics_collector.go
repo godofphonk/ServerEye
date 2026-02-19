@@ -324,13 +324,8 @@ func (a *Agent) collectSystemMetrics(metrics map[string]interface{}) {
 
 	// Add system metrics to unified structure
 	systemDetailsMap := map[string]interface{}{
-		"hostname":           systemDetails.Hostname,
-		"os":                 systemDetails.OS,
-		"kernel":             systemDetails.Kernel,
-		"architecture":       systemDetails.Architecture,
 		"uptime_seconds":     systemDetails.UptimeSeconds,
 		"uptime_human":       systemDetails.UptimeHuman,
-		"boot_time":          systemDetails.BootTime,
 		"processes_total":    systemDetails.ProcessesTotal,
 		"processes_running":  systemDetails.ProcessesRunning,
 		"processes_sleeping": systemDetails.ProcessesSleeping,

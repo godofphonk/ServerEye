@@ -28,6 +28,7 @@ type Agent struct {
 	networkMetrics     *metrics.NetworkMetrics     // Concrete type for now
 	temperatureMetrics *metrics.TemperatureMetrics // Concrete type for now
 	dockerClient       *docker.Client              // Concrete type for now
+	staticInfoPublisher *metrics.StaticInfoPublisher // HTTP publisher for static system info
 	ctx                context.Context
 	cancel             context.CancelFunc
 	startTime          time.Time // Start time for uptime calculation
@@ -193,6 +194,9 @@ func InitializeAgentEnhanced(ctx context.Context, configPath string) (*Agent, er
 	agent.networkMetrics = metrics.NewNetworkMetrics(logger)
 	agent.temperatureMetrics = metrics.NewTemperatureMetrics(logger)
 	agent.dockerClient = docker.NewClient(logger)
+	logger.Info("Initializing static info publisher")
+	logger.Info("Static info publisher initialized")
+	agent.staticInfoPublisher = initializeStaticInfoPublisher(cfg, logger)
 
 	// Setup configuration reload callback
 	provider.AddReloadCallback(func(newConfig *config.AgentConfig) {
@@ -255,19 +259,54 @@ func (a *Agent) Start() error {
 		a.logger.Warn("No WebSocket publisher available - metrics disabled")
 	}
 
+	// Start static info publisher
+	if a.staticInfoPublisher != nil {
+		a.logger.Info("Starting static info publisher")
+		if err := a.staticInfoPublisher.Start(); err != nil {
+			a.logger.WithError(err).Error("Failed to start static info publisher")
+		}
+	}
+
 	return nil
 }
 
 // Stop останавливает агент
 func (a *Agent) Stop() error {
-	a.logger.Info("Остановка агента")
+	if a.logger != nil {
+		a.logger.Info("Остановка агента")
+	}
 	a.cancel()
 
 	// Закрываем WebSocket компоненты
 	if a.wsPublisher != nil {
 		if err := a.wsPublisher.Close(); err != nil {
-			a.logger.WithError(err).Error("Ошибка при закрытии WebSocket publisher")
+			if a.logger != nil {
+				a.logger.WithError(err).Error("Ошибка при закрытии WebSocket publisher")
+			}
 		}
+	}
+
+	// Stop static info publisher
+	if a.staticInfoPublisher != nil {
+		if err := a.staticInfoPublisher.Stop(); err != nil {
+			if a.logger != nil {
+				a.logger.WithError(err).Error("Failed to stop static info publisher")
+			}
+		}
+	}
+
+	if a.wsCommandConsumer != nil {
+		if err := a.wsCommandConsumer.Stop(); err != nil {
+			if a.logger != nil {
+				a.logger.WithError(err).Error("Ошибка при закрытии WebSocket command consumer")
+			}
+		}
+	}
+
+	if a.logger != nil {
+		a.logger.Info("Agent stopped successfully")
+	} else {
+		fmt.Println("Agent stopped (no logger available)")
 	}
 
 	if a.wsCommandConsumer != nil {
@@ -373,3 +412,15 @@ func (a *Agent) CreateMetricFromData(metricType string, value interface{}, tags 
 
 // Command handlers are in separate files:
 // - handlers.go: All command handlers
+
+// initializeStaticInfoPublisher creates static info publisher
+func initializeStaticInfoPublisher(cfg *config.AgentConfig, logger *logrus.Logger) *metrics.StaticInfoPublisher {
+	staticConfig := metrics.StaticInfoConfig{
+		APIURL:    cfg.API.BaseURL,
+		ServerKey: cfg.Server.SecretKey,
+		ServerID:  cfg.Server.ServerID,
+		Interval:  24 * time.Hour,
+	}
+	
+	return metrics.NewStaticInfoPublisher(staticConfig, logger)
+}

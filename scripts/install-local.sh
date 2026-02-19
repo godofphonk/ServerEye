@@ -10,7 +10,7 @@ AGENT_DIR="/opt/servereye"
 CONFIG_DIR="/etc/servereye"
 LOG_DIR="/var/log/servereye"
 SERVICE_FILE="/etc/systemd/system/servereye-agent.service"
-LOCAL_BINARY="${SERVEREYE_LOCAL_BINARY:-$(pwd)/build/servereye-agent}"
+LOCAL_BINARY="${SERVEREYE_LOCAL_BINARY:-$(pwd)/servereye-agent}"
 BOT_URL="${SERVEREYE_BOT_URL:-https://api.servereye.dev}"
 AGENT_ENV_FILE="$CONFIG_DIR/agent.env"
 # Backend API configuration

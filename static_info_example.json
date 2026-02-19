@@ -1,0 +1,36 @@
+{
+  "server_info": {
+    "hostname": "gospodin-A620M-Pro-RS",
+    "os": "Ubuntu",
+    "os_version": "25.10",
+    "kernel": "6.17.0-14-generic",
+    "architecture": "x86_64"
+  },
+  "hardware_info": {
+    "cpu_model": "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz",
+    "cpu_cores": 8,
+    "cpu_threads": 16,
+    "cpu_frequency_mhz": 3600.0,
+    "total_memory_gb": 32.0
+  },
+  "network_interfaces": [
+    {
+      "interface_name": "eth0",
+      "mac_address": "00:11:22:33:44:55",
+      "interface_type": "ethernet",
+      "speed_mbps": 1000,
+      "is_physical": true
+    }
+  ],
+  "disk_info": [
+    {
+      "device_name": "/dev/sda",
+      "model": "Samsung SSD 860",
+      "size_gb": 1000,
+      "disk_type": "ssd",
+      "filesystem": "ext4",
+      "mount_point": "/",
+      "is_system_disk": true
+    }
+  ]
+}

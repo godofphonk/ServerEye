@@ -26,6 +26,7 @@ var ProviderSet = wire.NewSet(
 	provideSystemMonitor,
 	provideDockerManager,
 	provideMetricsPublisher,
+	provideStaticInfoPublisher,
 	provideCommandConsumer,
 	provideAgent,
 	provideConfigValidator,
@@ -182,6 +183,7 @@ func provideAgent(
 	dockerManager interfaces.DockerManager,
 	metricsPublisher interfaces.MetricsPublisher,
 	commandConsumer interfaces.CommandConsumer,
+	staticInfoPublisher *metrics.StaticInfoPublisher,
 ) (*Agent, error) {
 	// Convert unified config to legacy config for backward compatibility
 	legacyConfig := cfg.ToAgentConfig()
@@ -198,6 +200,7 @@ func provideAgent(
 		cpuMetrics:        metricsCollector,
 		systemMonitor:     systemMonitor,
 		dockerClient:      dockerManager,
+		staticInfoPublisher: staticInfoPublisher,
 		startTime:         time.Now(),
 	}
 
@@ -216,4 +219,24 @@ func parseDuration(str string, fallback time.Duration) time.Duration {
 		return duration
 	}
 	return fallback
+}
+}
+
+// provideStaticInfoPublisher creates static info publisher
+func provideStaticInfoPublisher(
+	cfg *config.UnifiedConfig,
+	logger interfaces.Logger,
+) (*metrics.StaticInfoPublisher, error) {
+	logrusLogger := logger.(*interfaces.LogrusAdapter).Entry.Logger
+	
+	staticConfig := metrics.StaticInfoConfig{
+		APIURL:     cfg.API.BaseURL,
+		APIKey:     cfg.API.APIKey,
+		ServerID:   cfg.Server.ServerID,
+		ServerKey:  cfg.Server.SecretKey,
+		ServerName: cfg.Server.Name,
+		Interval:   24 * time.Hour,
+	}
+	
+	return metrics.NewStaticInfoPublisher(staticConfig, logrusLogger), nil
 }
