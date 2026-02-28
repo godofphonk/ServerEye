@@ -329,16 +329,45 @@ func (tm *TemperatureMetrics) getSensorsTemperature(prefix string) (float64, err
 func (tm *TemperatureMetrics) getStorageTemperatures() ([]StorageTemperature, error) {
 	var storageTemps []StorageTemperature
 
+	tm.logger.Debug("Attempting to collect storage temperatures")
+
 	// Get NVMe temperatures
 	if nvmeTemps, err := tm.getNVMeTemperatures(); err == nil {
 		storageTemps = append(storageTemps, nvmeTemps...)
+		tm.logger.WithField("nvme_count", len(nvmeTemps)).Debug("NVMe temperatures collected")
+	} else {
+		tm.logger.WithError(err).Debug("Failed to get NVMe temperatures")
 	}
 
 	// Get HDD/SSD temperatures via smartctl
 	if smartTemps, err := tm.getSmartctlTemperatures(); err == nil {
 		storageTemps = append(storageTemps, smartTemps...)
+		tm.logger.WithField("smartctl_count", len(smartTemps)).Debug("Smartctl temperatures collected")
+	} else {
+		tm.logger.WithError(err).Debug("Failed to get smartctl temperatures")
 	}
 
+	// Try hddtemp as fallback
+	if len(storageTemps) == 0 {
+		if hddTemps, err := tm.getHDDTemp(); err == nil {
+			storageTemps = append(storageTemps, hddTemps...)
+			tm.logger.WithField("hddtemp_count", len(hddTemps)).Debug("HDDtemp temperatures collected")
+		} else {
+			tm.logger.WithError(err).Debug("Failed to get HDDtemp temperatures")
+		}
+	}
+
+	// Try sysfs thermal zones as last resort
+	if len(storageTemps) == 0 {
+		if thermalTemps, err := tm.getThermalZoneTemperatures(); err == nil {
+			storageTemps = append(storageTemps, thermalTemps...)
+			tm.logger.WithField("thermal_count", len(thermalTemps)).Debug("Thermal zone temperatures collected")
+		} else {
+			tm.logger.WithError(err).Debug("Failed to get thermal zone temperatures")
+		}
+	}
+
+	tm.logger.WithField("total_storage_temps", len(storageTemps)).Debug("Total storage temperatures collected")
 	return storageTemps, nil
 }
 
@@ -359,28 +388,73 @@ func (tm *TemperatureMetrics) getNVMeTemperatures() ([]StorageTemperature, error
 		if len(fields) >= 2 && fields[1] == "0" { // Non-rotating = SSD/NVMe
 			device := fields[0]
 			if strings.HasPrefix(device, "nvme") {
-				// Get NVMe temperature
+				// Try smartctl first
 				cmd := exec.Command("smartctl", "-A", "/dev/"+device)
 				output, err := cmd.Output()
-				if err != nil {
-					continue
-				}
-
-				lines := strings.Split(string(output), "\n")
-				for _, line := range lines {
-					if strings.Contains(line, "Temperature:") {
-						fields := strings.Fields(line)
-						for i, field := range fields {
-							if field == "Temperature:" && i+1 < len(fields) {
-								tempStr := strings.TrimSuffix(fields[i+1], "C")
-								if temp, err := strconv.ParseFloat(tempStr, 64); err == nil {
-									temps = append(temps, StorageTemperature{
-										Device:      "/dev/" + device,
-										Type:        "NVMe",
-										Temperature: temp,
-									})
+				if err == nil {
+					lines := strings.Split(string(output), "\n")
+					for _, line := range lines {
+						if strings.Contains(line, "Temperature:") {
+							fields := strings.Fields(line)
+							for i, field := range fields {
+								if field == "Temperature:" && i+1 < len(fields) {
+									tempStr := strings.TrimSuffix(fields[i+1], "C")
+									if temp, err := strconv.ParseFloat(tempStr, 64); err == nil {
+										temps = append(temps, StorageTemperature{
+											Device:      "/dev/" + device,
+											Type:        "NVMe",
+											Temperature: temp,
+										})
+									}
+									break
 								}
-								break
+							}
+						}
+					}
+				} else {
+					// Fallback: try hwmon for NVMe temperature
+					tm.logger.WithError(err).Debug("smartctl failed, trying hwmon for NVMe")
+					if hwmonTemp, err := tm.getNVMeHwmonTemp(device); err == nil {
+						temps = append(temps, StorageTemperature{
+							Device:      "/dev/" + device,
+							Type:        "NVMe",
+							Temperature: hwmonTemp,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return temps, nil
+}
+
+// getNVMeHwmonTemp gets NVMe temperature from hwmon
+func (tm *TemperatureMetrics) getNVMeHwmonTemp(device string) (float64, error) {
+	// Try to find hwmon device for NVMe
+	hwmonPaths, err := filepath.Glob("/sys/class/hwmon/hwmon*")
+	if err != nil {
+		return 0, err
+	}
+
+	for _, hwmonPath := range hwmonPaths {
+		// Check if this hwmon device is for NVMe
+		namePath := filepath.Join(hwmonPath, "name")
+		if nameData, err := os.ReadFile(namePath); err == nil {
+			name := strings.TrimSpace(string(nameData))
+			if strings.Contains(strings.ToLower(name), "nvme") {
+				// Look for temperature input files
+				tempFiles, err := filepath.Glob(filepath.Join(hwmonPath, "temp*_input"))
+				if err == nil {
+					for _, tempFile := range tempFiles {
+						if tempData, err := os.ReadFile(tempFile); err == nil {
+							tempStr := strings.TrimSpace(string(tempData))
+							if tempMilliC, err := strconv.ParseFloat(tempStr, 64); err == nil {
+								tempC := tempMilliC / 1000.0
+								// Reasonable temperature range check
+								if tempC > 20 && tempC < 100 {
+									return tempC, nil
+								}
 							}
 						}
 					}
@@ -389,7 +463,7 @@ func (tm *TemperatureMetrics) getNVMeTemperatures() ([]StorageTemperature, error
 		}
 	}
 
-	return temps, nil
+	return 0, fmt.Errorf("NVMe hwmon temperature not found")
 }
 
 // getSmartctlTemperatures gets HDD/SSD temperatures via smartctl
@@ -437,6 +511,100 @@ func (tm *TemperatureMetrics) getSmartctlTemperatures() ([]StorageTemperature, e
 						}
 					}
 				}
+			}
+		}
+	}
+
+	return temps, nil
+}
+
+// getHDDTemp gets storage temperatures using hddtemp
+func (tm *TemperatureMetrics) getHDDTemp() ([]StorageTemperature, error) {
+	var temps []StorageTemperature
+
+	// Find block devices
+	cmd := exec.Command("lsblk", "-d", "-o", "NAME")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines[1:] { // Skip header
+		device := strings.TrimSpace(line)
+		if device != "" {
+			// Try hddtemp
+			cmd := exec.Command("hddtemp", "/dev/"+device)
+			output, err := cmd.Output()
+			if err != nil {
+				continue
+			}
+
+			// Parse hddtemp output: "device: model: temp°C"
+			parts := strings.Split(strings.TrimSpace(string(output)), ":")
+			if len(parts) >= 3 {
+				tempStr := strings.TrimSpace(parts[2])
+				tempStr = strings.TrimSuffix(tempStr, "°C")
+				tempStr = strings.TrimSuffix(tempStr, "C")
+
+				if temp, err := strconv.ParseFloat(tempStr, 64); err == nil {
+					deviceType := "SSD"
+					if strings.Contains(strings.ToLower(string(output)), "hdd") {
+						deviceType = "HDD"
+					}
+
+					temps = append(temps, StorageTemperature{
+						Device:      "/dev/" + device,
+						Type:        deviceType,
+						Temperature: temp,
+					})
+				}
+			}
+		}
+	}
+
+	return temps, nil
+}
+
+// getThermalZoneTemperatures gets temperatures from sysfs thermal zones
+func (tm *TemperatureMetrics) getThermalZoneTemperatures() ([]StorageTemperature, error) {
+	var temps []StorageTemperature
+
+	// Try to read from thermal zones
+	thermalZones, err := filepath.Glob("/sys/class/thermal/thermal_zone*/temp")
+	if err != nil {
+		return nil, err
+	}
+
+	for i, zonePath := range thermalZones {
+		// Read temperature
+		tempData, err := os.ReadFile(zonePath)
+		if err != nil {
+			continue
+		}
+
+		tempStr := strings.TrimSpace(string(tempData))
+		if tempMilliC, err := strconv.ParseFloat(tempStr, 64); err == nil {
+			tempC := tempMilliC / 1000.0 // Convert from millidegrees
+
+			// Try to get zone type
+			zoneTypePath := strings.Replace(zonePath, "temp", "type", 1)
+			zoneType := "Unknown"
+			if typeData, err := os.ReadFile(zoneTypePath); err == nil {
+				zoneType = strings.TrimSpace(string(typeData))
+			}
+
+			// Only include storage-related thermal zones
+			if strings.Contains(strings.ToLower(zoneType), "storage") ||
+				strings.Contains(strings.ToLower(zoneType), "disk") ||
+				strings.Contains(strings.ToLower(zoneType), "nvme") ||
+				strings.Contains(strings.ToLower(zoneType), "ssd") ||
+				strings.Contains(strings.ToLower(zoneType), "hdd") {
+				temps = append(temps, StorageTemperature{
+					Device:      fmt.Sprintf("thermal_zone%d", i),
+					Type:        zoneType,
+					Temperature: tempC,
+				})
 			}
 		}
 	}

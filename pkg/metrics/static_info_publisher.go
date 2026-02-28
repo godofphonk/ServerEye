@@ -147,10 +147,19 @@ func (p *StaticInfoPublisher) collectStaticInfo() (*types.StaticInfoRequest, err
 	// Parse OS and version
 	os, osVersion := p.parseOSAndVersion(systemDetails.OS)
 
-	// Get memory info
+	// Get memory info - use dmidecode for accurate total memory
 	var totalMemoryGB float64
-	if memInfo, err := p.systemMon.GetMemoryInfo(); err == nil {
+	if memModules, err := p.hardwareCollector.CollectMemoryModules(); err == nil && len(memModules) > 0 {
+		for _, module := range memModules {
+			totalMemoryGB += float64(module.SizeGB)
+		}
+		p.logger.WithField("total_memory_gb", totalMemoryGB).Info("Memory calculated from modules")
+	} else if memInfo, err := p.systemMon.GetMemoryInfo(); err == nil {
 		totalMemoryGB = float64(int(memInfo.Total/1024/1024/1024*100)) / 100 // Round to 2 decimal places
+		p.logger.WithField("total_memory_gb", totalMemoryGB).Warn("Memory calculated from system info (fallback)")
+	} else {
+		totalMemoryGB = 0
+		p.logger.Error("Failed to get memory info")
 	}
 
 	// Get CPU cores and threads
@@ -173,6 +182,27 @@ func (p *StaticInfoPublisher) collectStaticInfo() (*types.StaticInfoRequest, err
 	var cpuFreq float64
 	if freq, err := p.cpuMetrics.GetCPUFrequency(); err == nil {
 		cpuFreq = freq
+	}
+
+	// Get GPU information
+	gpuMetrics := NewGPUMetrics()
+	gpuInfo, err := gpuMetrics.GetGPUInfo()
+	var gpuModel, gpuDriver string
+	var gpuMemoryGB int
+	if err == nil && gpuInfo != nil {
+		gpuModel = gpuInfo.Model
+		gpuDriver = gpuInfo.Driver
+		gpuMemoryGB = int(gpuInfo.MemoryGB)
+		p.logger.WithFields(map[string]interface{}{
+			"gpu_model":     gpuModel,
+			"gpu_driver":    gpuDriver,
+			"gpu_memory_gb": gpuMemoryGB,
+		}).Info("GPU information collected")
+	} else {
+		p.logger.WithError(err).Warn("Failed to collect GPU info, using defaults")
+		gpuModel = ""
+		gpuDriver = ""
+		gpuMemoryGB = 0
 	}
 
 	// Get motherboard info
@@ -236,9 +266,9 @@ func (p *StaticInfoPublisher) collectStaticInfo() (*types.StaticInfoRequest, err
 			CPUCores:        cpuCores,
 			CPUThreads:      cpuThreads,
 			CPUFrequencyMHz: cpuFreq,
-			GPUModel:        "", // Empty for servers without GPU
-			GPUDriver:       "", // Empty for servers without GPU
-			GPUMemoryGB:     0,  // 0 for servers without GPU
+			GPUModel:        gpuModel,
+			GPUDriver:       gpuDriver,
+			GPUMemoryGB:     gpuMemoryGB,
 			TotalMemoryGB:   totalMemoryGB,
 		},
 		MotherboardInfo:   motherboardInfo,
