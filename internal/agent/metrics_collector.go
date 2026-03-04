@@ -41,14 +41,6 @@ func (a *Agent) collectAndSendMetrics() {
 func (a *Agent) collectAndSendMetricsOnce() {
 	a.logger.Info("collectAndSendMetrics() called - starting metrics collection")
 
-	// Check if WebSocket publisher is available
-	if a.wsPublisher == nil {
-		a.logger.Error("No WebSocket publisher available - cannot publish metrics")
-		return
-	}
-
-	a.logger.Info("Publisher is available, proceeding with metrics collection")
-
 	// Collect all metrics and send as unified message
 	a.collectAndSendUnifiedMetrics()
 
@@ -90,7 +82,7 @@ func (a *Agent) collectAndSendMetricsOnce() {
 							"path": disk.Path,
 						}
 						metric := a.CreateMetricFromData("disk_usage", disk.UsedPercent, tags)
-						if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
+						if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
 							a.logger.WithError(err).Error("Failed to send disk metric")
 						}
 					}
@@ -104,12 +96,6 @@ func (a *Agent) collectAndSendMetricsOnce() {
 //
 //nolint:unused // This function is used within the same file
 func (a *Agent) sendMetric(metricType string, value float64, unit string) {
-	// Check if WebSocket publisher is available
-	if a.wsPublisher == nil {
-		a.logger.Error("No WebSocket publisher available - cannot send metric")
-		return
-	}
-
 	tags := map[string]string{
 		"unit": unit,
 	}
@@ -122,9 +108,9 @@ func (a *Agent) sendMetric(metricType string, value float64, unit string) {
 		"server_id":  metric.ServerID,
 		"server_key": metric.ServerKey,
 		"value":      metric.Value,
-	}).Info("Publishing metric via WebSocket API")
+	}).Info("Publishing metric via HTTP API")
 
-	if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
+	if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
 		a.logger.WithError(err).WithField("type", metricType).Error("Failed to send metric")
 	} else {
 		a.logger.WithField("type", metricType).Info("Metric sent successfully")
