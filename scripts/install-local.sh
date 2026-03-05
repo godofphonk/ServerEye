@@ -294,17 +294,17 @@ api:
 websocket:
   enabled: true
   url: "\${SERVEREYE_WS_URL:-ws://localhost:8080/ws}"
-  reconnect_interval: "10s"
-  max_reconnect_attempts: 5
-  ping_interval: "60s"
-  write_timeout: "30s"
-  read_timeout: "30s"
-  handshake_timeout: "30s"
-  buffer_size: 500
-  enable_compression: false
-  metric_buffer_size: 50
-  metric_buffer_flush: "10s"
-  command_queue_size: 50
+  reconnect_interval: "5s"
+  max_reconnect_attempts: 10
+  ping_interval: "30s"
+  write_timeout: "10s"
+  read_timeout: "300s"
+  handshake_timeout: "10s"
+  buffer_size: 1000
+  enable_compression: true
+  metric_buffer_size: 100
+  metric_buffer_flush: "30s"
+  command_queue_size: 100
   command_timeout: "30s"
 
 metrics:
@@ -312,7 +312,7 @@ metrics:
   memory_usage: true
   disk_usage: true
   cpu_temperature: true
-  interval: "\${SERVEREYE_METRICS_INTERVAL:-1s}"
+  interval: "\${SERVEREYE_METRICS_INTERVAL:-30s}"
 
 logging:
   level: "\${SERVEREYE_LOG_LEVEL:-debug}"
@@ -381,7 +381,7 @@ SERVEREYE_API_URL="http://localhost:8080"
 SERVEREYE_API_KEY="$API_KEY"
 SERVEREYE_WS_URL="ws://localhost:8080/ws"
 SERVEREYE_ENVIRONMENT="$ENVIRONMENT"
-SERVEREYE_METRICS_INTERVAL="1s"
+SERVEREYE_METRICS_INTERVAL="30s"
 SERVEREYE_LOG_LEVEL="debug"
 SERVEREYE_LOG_FILE="/var/log/servereye/agent.log"
 BACKEND_URL="http://localhost:8080"
