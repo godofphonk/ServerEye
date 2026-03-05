@@ -351,10 +351,25 @@ func (a *Agent) sendUnifiedMetrics(metrics map[string]interface{}) {
 		},
 	}
 
-	// Send unified metrics via HTTP
-	if err := a.httpPublisher.Publish(a.ctx, unifiedMetric); err != nil {
-		a.logger.WithError(err).Error("Failed to send unified metrics via HTTP")
+	// Send unified metrics via WebSocket or HTTP
+	if a.useWebSocket && a.wsPublisher != nil {
+		a.logger.Debug("Sending unified metrics via WebSocket")
+		if err := a.wsPublisher.Publish(a.ctx, unifiedMetric); err != nil {
+			a.logger.WithError(err).Debug("Failed to send unified metrics via WebSocket, falling back to HTTP")
+			if err := a.httpPublisher.Publish(a.ctx, unifiedMetric); err != nil {
+				a.logger.WithError(err).Error("Failed to send unified metrics via HTTP")
+			} else {
+				a.logger.WithField("metrics_count", len(metrics)).Debug("Unified metrics sent successfully via HTTP")
+			}
+		} else {
+			a.logger.WithField("metrics_count", len(metrics)).Debug("Unified metrics sent successfully via WebSocket")
+		}
 	} else {
-		a.logger.WithField("metrics_count", len(metrics)).Info("Unified metrics sent successfully via HTTP")
+		// Use HTTP
+		if err := a.httpPublisher.Publish(a.ctx, unifiedMetric); err != nil {
+			a.logger.WithError(err).Error("Failed to send unified metrics via HTTP")
+		} else {
+			a.logger.WithField("metrics_count", len(metrics)).Debug("Unified metrics sent successfully via HTTP")
+		}
 	}
 }
