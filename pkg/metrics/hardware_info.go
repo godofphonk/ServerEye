@@ -1,8 +1,6 @@
 package metrics
 
 import (
-	"bufio"
-	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
@@ -106,6 +104,51 @@ func (h *HardwareInfoCollector) collectMotherboardFromDMIDecode(motherboard *typ
 	return nil
 }
 
+// parseDMIDecodeLine parses a single line from dmidecode output
+func (h *HardwareInfoCollector) parseDMIDecodeLine(line string, currentDevice *types.MemoryModule) bool {
+	if strings.Contains(line, "Size:") {
+		if size := h.parseMemorySize(line); size > 0 {
+			currentDevice.SizeGB = size
+		}
+	} else if strings.Contains(line, "Manufacturer:") {
+		currentDevice.Manufacturer = strings.TrimSpace(strings.TrimPrefix(line, "Manufacturer:"))
+	} else if strings.Contains(line, "Type:") {
+		memType := strings.TrimSpace(strings.TrimPrefix(line, "Type:"))
+		if memType != "Unknown" {
+			currentDevice.MemoryType = memType
+		}
+	} else if strings.Contains(line, "Speed:") {
+		if speed := h.parseMemorySpeed(line); speed > 0 {
+			currentDevice.FrequencyMHz = speed
+		}
+	} else if strings.Contains(line, "Locator:") {
+		slotName := strings.TrimSpace(strings.TrimPrefix(line, "Locator:"))
+		currentDevice.SlotName = slotName
+	} else if strings.Contains(line, "Part Number:") {
+		partNumber := strings.TrimSpace(strings.TrimPrefix(line, "Part Number:"))
+		if partNumber != "Not Specified" && partNumber != "Unknown" {
+			currentDevice.PartNumber = partNumber
+		}
+	} else if strings.Contains(line, "Configured Memory Speed:") {
+		if speed := h.parseMemorySpeed(line); speed > 0 {
+			currentDevice.SpeedMTS = speed * 2 // Convert MHz to MT/s for DDR
+		}
+	} else if strings.Contains(line, "Voltage:") {
+		if voltage := h.parseVoltage(line); voltage > 0 {
+			currentDevice.Voltage = voltage
+		}
+	} else if strings.Contains(line, "Error Correction Type:") {
+		ecc := strings.TrimSpace(strings.TrimPrefix(line, "Error Correction Type:"))
+		currentDevice.ECC = ecc == "Multi-bit ECC" || ecc == "Single-bit ECC"
+	} else if strings.Contains(line, "Type Detail:") {
+		detail := strings.TrimSpace(strings.TrimPrefix(line, "Type Detail:"))
+		currentDevice.Registered = strings.Contains(detail, "Registered")
+	} else {
+		return false // Line not processed
+	}
+	return true // Line processed
+}
+
 // parseDMIMemoryDevices parses dmidecode output for memory devices
 func (h *HardwareInfoCollector) parseDMIMemoryDevices(output string) []types.MemoryModule {
 	var devices []types.MemoryModule
@@ -129,45 +172,7 @@ func (h *HardwareInfoCollector) parseDMIMemoryDevices(output string) []types.Mem
 			continue
 		}
 
-		if strings.Contains(line, "Size:") {
-			if size := h.parseMemorySize(line); size > 0 {
-				currentDevice.SizeGB = size
-			}
-		} else if strings.Contains(line, "Manufacturer:") {
-			currentDevice.Manufacturer = strings.TrimSpace(strings.TrimPrefix(line, "Manufacturer:"))
-		} else if strings.Contains(line, "Type:") {
-			memType := strings.TrimSpace(strings.TrimPrefix(line, "Type:"))
-			if memType != "Unknown" {
-				currentDevice.MemoryType = memType
-			}
-		} else if strings.Contains(line, "Speed:") {
-			if speed := h.parseMemorySpeed(line); speed > 0 {
-				currentDevice.FrequencyMHz = speed
-			}
-		} else if strings.Contains(line, "Locator:") {
-			// Extract slot name from locator
-			slotName := strings.TrimSpace(strings.TrimPrefix(line, "Locator:"))
-			currentDevice.SlotName = slotName
-		} else if strings.Contains(line, "Part Number:") {
-			partNumber := strings.TrimSpace(strings.TrimPrefix(line, "Part Number:"))
-			if partNumber != "Not Specified" && partNumber != "Unknown" {
-				currentDevice.PartNumber = partNumber
-			}
-		} else if strings.Contains(line, "Configured Memory Speed:") {
-			if speed := h.parseMemorySpeed(line); speed > 0 {
-				currentDevice.SpeedMTS = speed * 2 // Convert MHz to MT/s for DDR
-			}
-		} else if strings.Contains(line, "Voltage:") {
-			if voltage := h.parseVoltage(line); voltage > 0 {
-				currentDevice.Voltage = voltage
-			}
-		} else if strings.Contains(line, "Error Correction Type:") {
-			ecc := strings.TrimSpace(strings.TrimPrefix(line, "Error Correction Type:"))
-			currentDevice.ECC = ecc == "Multi-bit ECC" || ecc == "Single-bit ECC"
-		} else if strings.Contains(line, "Type Detail:") {
-			detail := strings.TrimSpace(strings.TrimPrefix(line, "Type Detail:"))
-			currentDevice.Registered = strings.Contains(detail, "Registered")
-		}
+		h.parseDMIDecodeLine(line, &currentDevice)
 	}
 
 	// Add last device
@@ -219,40 +224,4 @@ func (h *HardwareInfoCollector) parseVoltage(line string) float64 {
 		return voltage
 	}
 	return 0
-}
-
-// extractSlotNumber extracts slot number from locator string
-func (h *HardwareInfoCollector) extractSlotNumber(line string) int {
-	re := regexp.MustCompile(`(\d+)`)
-	matches := re.FindStringSubmatch(line)
-	if len(matches) == 2 {
-		slot, _ := strconv.Atoi(matches[1])
-		return slot
-	}
-	return -1
-}
-
-// getTotalMemory gets total memory from /proc/meminfo
-func (h *HardwareInfoCollector) getTotalMemory() (float64, error) {
-	file, err := os.Open("/proc/meminfo")
-	if err != nil {
-		return 0, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "MemTotal:") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				kb, err := strconv.ParseUint(fields[1], 10, 64)
-				if err == nil {
-					return float64(kb) / 1024 / 1024, nil // Convert to GB
-				}
-			}
-		}
-	}
-
-	return 0, fmt.Errorf("MemTotal not found in /proc/meminfo")
 }

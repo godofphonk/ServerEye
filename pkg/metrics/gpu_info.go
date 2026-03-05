@@ -91,9 +91,9 @@ func (g *GPUMetrics) getGPUInfoFromLspci() (*GPUInfo, error) {
 					model = strings.TrimSpace(model[:idx])
 				}
 				// Clean up model name - remove controller prefixes
-				model = strings.Replace(model, "VGA compatible controller: ", "", -1)
-				model = strings.Replace(model, "3D controller: ", "", -1)
-				model = strings.Replace(model, "Display controller: ", "", -1)
+				model = strings.ReplaceAll(model, "VGA compatible controller: ", "")
+				model = strings.ReplaceAll(model, "3D controller: ", "")
+				model = strings.ReplaceAll(model, "Display controller: ", "")
 				model = strings.TrimSpace(model)
 				info.Model = model
 			}

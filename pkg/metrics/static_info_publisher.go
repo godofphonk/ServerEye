@@ -299,35 +299,6 @@ func (p *StaticInfoPublisher) parseOSAndVersion(osString string) (string, string
 	return os, version
 }
 
-// collectMainDiskInfo collects only main disk information
-func (p *StaticInfoPublisher) collectMainDiskInfo() ([]types.DiskInfo, error) {
-	diskInfo, err := p.systemMon.GetDiskInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	var disks []types.DiskInfo
-	for _, disk := range diskInfo.Disks {
-		// Only include main disk (root mount) with size > 1GB
-		if disk.Path == "/" && disk.Total > 1024*1024*1024 {
-			disks = append(disks, types.DiskInfo{
-				DeviceName:    disk.Path,
-				Model:         "Samsung SSD 860",
-				SerialNumber:  "S5GXNX0T123456",
-				SizeGB:        disk.Total / 1024 / 1024 / 1024,
-				DiskType:      types.DiskTypeSSD,
-				InterfaceType: "nvme",
-				Filesystem:    disk.Filesystem,
-				MountPoint:    disk.Path,
-				IsSystemDisk:  true,
-			})
-			break // Only include main disk
-		}
-	}
-
-	return disks, nil
-}
-
 // sendStaticInfoWithRetry sends static info via HTTP with retry logic
 func (p *StaticInfoPublisher) sendStaticInfoWithRetry(info *types.StaticInfoRequest) error {
 	retryDelays := []time.Duration{5 * time.Minute, 30 * time.Minute, 1 * time.Hour}
