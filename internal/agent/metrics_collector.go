@@ -3,10 +3,11 @@ package agent
 import (
 	"time"
 
+	"github.com/godofphonk/ServerEye/pkg/protocol"
 	"github.com/godofphonk/ServerEye/pkg/types"
 )
 
-// collectAndSendMetrics собирает и отправляет все метрики в цикле
+// collectAndSendMetrics запускает цикл сбора и отправки метрик
 func (a *Agent) collectAndSendMetrics() {
 	a.logger.Info("Starting metrics collection loop")
 
@@ -39,337 +40,183 @@ func (a *Agent) collectAndSendMetrics() {
 
 // collectAndSendMetricsOnce собирает и отправляет метрики один раз
 func (a *Agent) collectAndSendMetricsOnce() {
-	a.logger.Info("collectAndSendMetrics() called - starting metrics collection")
+	metrics := a.collectMetrics()
+	if metrics == nil {
+		a.logger.Error("Failed to collect metrics")
+		return
+	}
 
-	// Collect all metrics and send as unified message
-	a.collectAndSendUnifiedMetrics()
+	// Send via WebSocket or HTTP
+	a.sendMetrics(metrics)
+}
 
-	// DISABLED: Individual metrics to avoid conflicts with unified metrics
-	// Only send unified metrics to prevent Redis overwrites
+// collectMetrics collects all metrics
+func (a *Agent) collectMetrics() *protocol.Metrics {
+	a.logger.Info("Collecting metrics...")
 
-	/*
-		// CPU Temperature (if enabled and cpuMetrics available)
-		if a.config.Metrics.CPUTemperature && a.cpuMetrics != nil {
-			a.logger.Info("Attempting to collect CPU temperature")
-			if temp, err := a.cpuMetrics.GetTemperature(); err == nil {
-				a.logger.WithField("temperature", temp).Info("CPU temperature collected")
-				a.sendMetric("cpu_temperature", temp, "°C")
-			} else {
-				a.logger.WithError(err).Error("Failed to get CPU temperature")
-			}
-		} else {
-			a.logger.WithFields(map[string]interface{}{
-				"enabled":    a.config.Metrics.CPUTemperature,
-				"cpuMetrics": a.cpuMetrics != nil,
-			}).Info("CPU temperature collection skipped")
-		}
+	metrics := &protocol.Metrics{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
 
-		// Memory метрики (if enabled and systemMonitor available)
-		if a.config.Metrics.MemoryUsage && a.systemMonitor != nil {
-			if memInfo, err := a.systemMonitor.GetMemoryInfo(); err == nil {
-				a.sendMetric("memory_usage", memInfo.UsedPercent, "%")
-				a.sendMetric("memory_total", float64(memInfo.Total)/1024/1024/1024, "GB")
-				a.sendMetric("memory_used", float64(memInfo.Used)/1024/1024/1024, "GB")
-				a.sendMetric("memory_available", float64(memInfo.Available)/1024/1024/1024, "GB")
+	// Collect CPU metrics
+	if a.cpuMetrics != nil {
+		cpuUsage, err := a.cpuMetrics.GetDetailedUsage()
+		if err == nil {
+			metrics.CPUUsage = protocol.CPUUsage{
+				UsageTotal:   cpuUsage.UsageTotal,
+				UsageUser:    cpuUsage.UsageUser,
+				UsageSystem:  cpuUsage.UsageSystem,
+				UsageIdle:    cpuUsage.UsageIdle,
+				FrequencyMHz: cpuUsage.Frequency,
 			}
 
-			// Disk метрики (if enabled)
-			if a.config.Metrics.DiskUsage {
-				if diskInfo, err := a.systemMonitor.GetDiskInfo(); err == nil {
-					for _, disk := range diskInfo.Disks {
-						// Отправляем информацию о каждом диске
-						tags := map[string]string{
-							"path": disk.Path,
-						}
-						metric := a.CreateMetricFromData("disk_usage", disk.UsedPercent, tags)
-						if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
-							a.logger.WithError(err).Error("Failed to send disk metric")
-						}
-					}
+			if cpuUsage.LoadAverage != nil {
+				metrics.CPUUsage.LoadAverage = protocol.LoadAverage{
+					Load1Min:  cpuUsage.LoadAverage.Load1Min,
+					Load5Min:  cpuUsage.LoadAverage.Load5Min,
+					Load15Min: cpuUsage.LoadAverage.Load15Min,
 				}
 			}
 		}
-	*/
-}
-
-// sendMetric отправляет метрику через publisher
-//
-//nolint:unused // This function is used within the same file
-func (a *Agent) sendMetric(metricType string, value float64, unit string) {
-	tags := map[string]string{
-		"unit": unit,
 	}
 
-	metric := a.CreateMetricFromData(metricType, value, tags)
-
-	// Log the actual topic and metric data before publishing
-	a.logger.WithFields(map[string]interface{}{
-		"type":       metric.Type,
-		"server_id":  metric.ServerID,
-		"server_key": metric.ServerKey,
-		"value":      metric.Value,
-	}).Info("Publishing metric via HTTP API")
-
-	if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
-		a.logger.WithError(err).WithField("type", metricType).Error("Failed to send metric")
-	} else {
-		a.logger.WithField("type", metricType).Info("Metric sent successfully")
-	}
-}
-
-// collectAndSendUnifiedMetrics collects all metrics and sends them as unified message
-func (a *Agent) collectAndSendUnifiedMetrics() {
-	// Create unified metrics structure
-	metrics := map[string]interface{}{
-		"time": time.Now().Format(time.RFC3339),
-	}
-
-	// Collect all metric types
-	a.collectCPUMetrics(metrics)
-	a.collectMemoryMetrics(metrics)
-	a.collectDiskMetrics(metrics)
-	a.collectNetworkMetrics(metrics)
-	a.collectTemperatureMetrics(metrics)
-	a.collectSystemMetrics(metrics)
-
-	// Create and send unified metric message
-	a.sendUnifiedMetrics(metrics)
-}
-
-// collectCPUMetrics collects CPU metrics and adds them to the unified structure
-func (a *Agent) collectCPUMetrics(metrics map[string]interface{}) {
-	if a.cpuMetrics == nil {
-		return
-	}
-
-	cpuUsage, err := a.cpuMetrics.GetDetailedUsage()
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to get detailed CPU usage")
-		return
-	}
-
-	a.logger.WithField("cpu_usage", cpuUsage).Info("Detailed CPU usage collected")
-
-	// Add CPU metrics to unified structure
-	metrics["cpu"] = cpuUsage.UsageTotal // For backward compatibility
-	metrics["cpu_usage"] = map[string]interface{}{
-		"usage_total":  cpuUsage.UsageTotal,
-		"usage_user":   cpuUsage.UsageUser,
-		"usage_system": cpuUsage.UsageSystem,
-		"usage_idle":   cpuUsage.UsageIdle,
-		"cores":        cpuUsage.Cores,
-		"frequency":    cpuUsage.Frequency,
-	}
-
-	if cpuUsage.LoadAverage != nil {
-		metrics["cpu_usage"].(map[string]interface{})["load_average"] = map[string]interface{}{
-			"load_1min":  cpuUsage.LoadAverage.Load1Min,
-			"load_5min":  cpuUsage.LoadAverage.Load5Min,
-			"load_15min": cpuUsage.LoadAverage.Load15Min,
-		}
-	}
-}
-
-// collectMemoryMetrics collects memory metrics and adds them to the unified structure
-func (a *Agent) collectMemoryMetrics(metrics map[string]interface{}) {
-	if a.systemMonitor == nil {
-		a.logger.Error("System monitor is nil - memory metrics collection skipped")
-		return
-	}
-
-	memInfo, err := a.systemMonitor.GetMemoryInfo()
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to get memory info")
-		return
-	}
-
-	a.logger.WithField("memory_info", memInfo).Info("Memory info collected")
-
-	// Add memory metrics to unified structure
-	metrics["memory"] = memInfo.UsedPercent // For backward compatibility
-	memoryDetails := map[string]interface{}{
-		"total_gb":     float64(memInfo.Total) / 1024 / 1024 / 1024,
-		"used_gb":      float64(memInfo.Used) / 1024 / 1024 / 1024,
-		"available_gb": float64(memInfo.Available) / 1024 / 1024 / 1024,
-		"free_gb":      float64(memInfo.Free) / 1024 / 1024 / 1024,
-		"buffers_gb":   float64(memInfo.Buffers) / 1024 / 1024 / 1024,
-		"cached_gb":    float64(memInfo.Cached) / 1024 / 1024 / 1024,
-		"used_percent": memInfo.UsedPercent,
-	}
-	metrics["memory_details"] = memoryDetails
-	a.logger.WithField("memory_details", memoryDetails).Debug("Memory details added to metrics")
-}
-
-// collectDiskMetrics collects disk metrics and adds them to the unified structure
-func (a *Agent) collectDiskMetrics(metrics map[string]interface{}) {
-	if a.systemMonitor == nil {
-		a.logger.Error("System monitor is nil - disk metrics collection skipped")
-		return
-	}
-
-	diskInfo, err := a.systemMonitor.GetDiskInfo()
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to get disk info")
-		return
-	}
-
-	a.logger.WithField("disk_info", diskInfo).Info("Disk info collected")
-
-	// Convert disk info for unified structure
-	disks := make([]map[string]interface{}, len(diskInfo.Disks))
-	for i, disk := range diskInfo.Disks {
-		disks[i] = map[string]interface{}{
-			"path":         disk.Path,
-			"total_gb":     float64(disk.Total) / 1024 / 1024 / 1024,
-			"used_gb":      float64(disk.Used) / 1024 / 1024 / 1024,
-			"free_gb":      float64(disk.Free) / 1024 / 1024 / 1024,
-			"used_percent": disk.UsedPercent,
-			"filesystem":   disk.Filesystem,
-		}
-	}
-
-	// Add disk metrics to unified structure
-	if len(disks) > 0 {
-		// Use first disk for backward compatibility
-		metrics["disk"] = disks[0]["used_percent"]
-		metrics["disk_details"] = disks
-		a.logger.WithField("disk_details", disks).Debug("Disk details added to metrics")
-	}
-}
-
-// collectNetworkMetrics collects network metrics and adds them to the unified structure
-func (a *Agent) collectNetworkMetrics(metrics map[string]interface{}) {
-	if a.networkMetrics == nil {
-		a.logger.Error("Network metrics is nil - network metrics collection skipped")
-		return
-	}
-
-	networkInfo, err := a.networkMetrics.GetNetworkInfo()
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to get network info")
-		return
-	}
-
-	a.logger.WithField("network_info", networkInfo).Info("Network info collected")
-
-	// Add network metrics to unified structure
-	metrics["network"] = networkInfo.TotalRxMbps + networkInfo.TotalTxMbps // For backward compatibility
-	networkDetails := map[string]interface{}{
-		"interfaces":    networkInfo.Interfaces,
-		"total_rx_mbps": networkInfo.TotalRxMbps,
-		"total_tx_mbps": networkInfo.TotalTxMbps,
-	}
-	metrics["network_details"] = networkDetails
-	a.logger.WithField("network_details", networkDetails).Debug("Network details added to metrics")
-}
-
-// collectTemperatureMetrics collects temperature metrics and adds them to the unified structure
-func (a *Agent) collectTemperatureMetrics(metrics map[string]interface{}) {
-	if a.temperatureMetrics == nil {
-		a.logger.Error("Temperature metrics is nil - temperature metrics collection skipped")
-		return
-	}
-
-	tempInfo, err := a.temperatureMetrics.GetTemperatureInfo()
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to get temperature info")
-		return
-	}
-
-	a.logger.WithField("temperature_info", tempInfo).Info("Temperature info collected")
-
-	// Add temperature metrics to unified structure
-	// Use highest temperature for backward compatibility
-	metrics["temperature"] = tempInfo.HighestTemperature
-	temperatureDetails := map[string]interface{}{
-		"cpu_temperature":      tempInfo.CPUTemperature,
-		"gpu_temperature":      tempInfo.GPUTemperature,
-		"system_temperature":   tempInfo.SystemTemperature,
-		"storage_temperatures": tempInfo.StorageTemperatures,
-		"highest_temperature":  tempInfo.HighestTemperature,
-		"temperature_unit":     tempInfo.TemperatureUnit,
-	}
-	metrics["temperature_details"] = temperatureDetails
-	a.logger.WithField("temperature_details", temperatureDetails).Debug("Temperature details added to metrics")
-}
-
-// collectSystemMetrics collects system metrics and adds them to the unified structure
-func (a *Agent) collectSystemMetrics(metrics map[string]interface{}) {
-	if a.systemMonitor == nil {
-		a.logger.Error("System monitor is nil - system details collection skipped")
-		return
-	}
-
-	systemDetails, err := a.systemMonitor.GetSystemDetails()
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to get system details")
-		return
-	}
-
-	a.logger.WithField("system_details", systemDetails).Info("System details collected")
-
-	// Add system metrics to unified structure
-	systemDetailsMap := map[string]interface{}{
-		"uptime_seconds":     systemDetails.UptimeSeconds,
-		"uptime_human":       systemDetails.UptimeHuman,
-		"processes_total":    systemDetails.ProcessesTotal,
-		"processes_running":  systemDetails.ProcessesRunning,
-		"processes_sleeping": systemDetails.ProcessesSleeping,
-	}
-	metrics["system_details"] = systemDetailsMap
-	a.logger.WithField("system_details", systemDetailsMap).Debug("System details added to metrics")
-}
-
-// sendUnifiedMetrics creates and sends the unified metrics message
-func (a *Agent) sendUnifiedMetrics(metrics map[string]interface{}) {
-	// Get system details and add to metrics
+	// Collect Memory metrics
 	if a.systemMonitor != nil {
-		if details, err := a.systemMonitor.GetSystemDetails(); err == nil {
-			// Update system_details with full system info
-			if systemDetails, ok := metrics["system_details"].(map[string]interface{}); ok {
-				systemDetails["hostname"] = details.Hostname
-				systemDetails["os"] = details.OS
-				systemDetails["kernel"] = details.Kernel
-				systemDetails["architecture"] = details.Architecture
-				systemDetails["uptime_seconds"] = details.UptimeSeconds
-				metrics["system_details"] = systemDetails
+		memInfo, err := a.systemMonitor.GetMemoryInfo()
+		if err == nil {
+			metrics.Memory = protocol.Memory{
+				TotalGB:     float64(memInfo.Total) / 1024 / 1024 / 1024,
+				UsedGB:      float64(memInfo.Used) / 1024 / 1024 / 1024,
+				AvailableGB: float64(memInfo.Available) / 1024 / 1024 / 1024,
+				FreeGB:      float64(memInfo.Free) / 1024 / 1024 / 1024,
+				BuffersGB:   float64(memInfo.Buffers) / 1024 / 1024 / 1024,
+				CachedGB:    float64(memInfo.Cached) / 1024 / 1024 / 1024,
+				UsedPercent: memInfo.UsedPercent,
+			}
+		}
+
+		// Collect Disk metrics
+		diskInfo, err := a.systemMonitor.GetDiskInfo()
+		if err == nil {
+			for _, disk := range diskInfo.Disks {
+				// Skip special filesystems
+				if disk.Path == "/boot/efi" || disk.Path == "/sys/firmware/efi/efivars" {
+					continue
+				}
+
+				diskV2 := protocol.Disk{
+					MountPoint:  disk.Path,
+					DeviceName:  disk.Filesystem,
+					UsedGB:      int(disk.Used / 1024 / 1024 / 1024),
+					FreeGB:      int(disk.Free / 1024 / 1024 / 1024),
+					UsedPercent: disk.UsedPercent,
+				}
+				metrics.Disks = append(metrics.Disks, diskV2)
+			}
+		}
+
+		// Collect Network metrics
+		if a.networkMetrics != nil {
+			netInfo, err := a.networkMetrics.GetNetworkInfo()
+			if err == nil {
+				metrics.Network.TotalRxMbps = netInfo.TotalRxMbps
+				metrics.Network.TotalTxMbps = netInfo.TotalTxMbps
+
+				for _, iface := range netInfo.Interfaces {
+					// Skip loopback
+					if iface.Name == "lo" {
+						continue
+					}
+
+					ifaceV2 := protocol.NetworkInterface{
+						Name:        iface.Name,
+						RxBytes:     int64(iface.RxBytes),
+						TxBytes:     int64(iface.TxBytes),
+						RxSpeedMbps: iface.RxSpeedMbps,
+						TxSpeedMbps: iface.TxSpeedMbps,
+						Status:      iface.Status,
+					}
+					metrics.Network.Interfaces = append(metrics.Network.Interfaces, ifaceV2)
+				}
 			}
 		}
 	}
 
-	// Create unified metric message with correct structure for API
-	unifiedMetric := &types.Metric{
-		ServerID:   a.config.Server.ServerID,
-		ServerKey:  a.config.Server.SecretKey,
-		ServerName: a.config.Server.Name,
-		Type:       "metrics",
-		Version:    "1.0",
-		Value:      nil,
-		Timestamp:  time.Now(),
+	// Collect Temperature metrics
+	if a.temperatureMetrics != nil {
+		tempInfo, err := a.temperatureMetrics.GetTemperatureInfo()
+		if err == nil {
+			metrics.Temperature.CPU = tempInfo.CPUTemperature
+			metrics.Temperature.GPU = tempInfo.GPUTemperature
+			metrics.Temperature.Highest = tempInfo.HighestTemperature
+
+			for _, storage := range tempInfo.StorageTemperatures {
+				storageTemp := protocol.StorageTemp{
+					Device:      storage.Device,
+					Temperature: storage.Temperature,
+				}
+				metrics.Temperature.Storage = append(metrics.Temperature.Storage, storageTemp)
+			}
+		}
+	}
+
+	// Collect System metrics
+	if a.systemMonitor != nil {
+		sysDetails, err := a.systemMonitor.GetSystemDetails()
+		if err == nil {
+			metrics.System = protocol.System{
+				ProcessesTotal:    sysDetails.ProcessesTotal,
+				ProcessesRunning:  sysDetails.ProcessesRunning,
+				ProcessesSleeping: sysDetails.ProcessesSleeping,
+				UptimeSeconds:     sysDetails.UptimeSeconds,
+			}
+		}
+	}
+
+	a.logger.WithField("metrics", metrics).Debug("Metrics collected")
+	return metrics
+}
+
+// sendMetrics sends metrics
+func (a *Agent) sendMetrics(metrics *protocol.Metrics) {
+	// Create metric message
+	metric := &types.Metric{
+		Type:      "metrics",
+		ServerID:  a.config.Server.ServerID,
+		ServerKey: a.config.Server.SecretKey,
+		Timestamp: time.Now(),
 		Data: map[string]interface{}{
-			"metrics": metrics,
+			"metrics": map[string]interface{}{
+				"cpu_usage":   metrics.CPUUsage,
+				"memory":      metrics.Memory,
+				"disks":       metrics.Disks,
+				"network":     metrics.Network,
+				"temperature": metrics.Temperature,
+				"system":      metrics.System,
+				"timestamp":   metrics.Timestamp,
+			},
 		},
 	}
 
-	// Send unified metrics via WebSocket or HTTP
+	// Send via WebSocket or HTTP
 	if a.useWebSocket && a.wsPublisher != nil {
-		a.logger.Debug("Sending unified metrics via WebSocket")
-		if err := a.wsPublisher.Publish(a.ctx, unifiedMetric); err != nil {
-			a.logger.WithError(err).Debug("Failed to send unified metrics via WebSocket, falling back to HTTP")
-			if err := a.httpPublisher.Publish(a.ctx, unifiedMetric); err != nil {
-				a.logger.WithError(err).Error("Failed to send unified metrics via HTTP")
+		a.logger.Debug("Sending metrics via WebSocket")
+		if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
+			a.logger.WithError(err).Debug("Failed to send metrics via WebSocket, falling back to HTTP")
+			if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
+				a.logger.WithError(err).Error("Failed to send metrics via HTTP")
 			} else {
-				a.logger.WithField("metrics_count", len(metrics)).Debug("Unified metrics sent successfully via HTTP")
+				a.logger.Info("Metrics sent successfully via HTTP")
 			}
 		} else {
-			a.logger.WithField("metrics_count", len(metrics)).Debug("Unified metrics sent successfully via WebSocket")
+			a.logger.Debug("Metrics sent successfully via WebSocket")
 		}
 	} else {
 		// Use HTTP
-		if err := a.httpPublisher.Publish(a.ctx, unifiedMetric); err != nil {
-			a.logger.WithError(err).Error("Failed to send unified metrics via HTTP")
+		if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
+			a.logger.WithError(err).Error("Failed to send metrics via HTTP")
 		} else {
-			a.logger.WithField("metrics_count", len(metrics)).Debug("Unified metrics sent successfully via HTTP")
+			a.logger.Info("Metrics sent successfully via HTTP")
 		}
 	}
 }

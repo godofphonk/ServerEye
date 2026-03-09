@@ -276,6 +276,10 @@ func (a *Agent) Start() error {
 		}
 	}
 
+	// Start static info sender (sends once per day)
+	a.logger.Info("Starting static info sender")
+	go a.sendStaticInfoPeriodically()
+
 	return nil
 }
 

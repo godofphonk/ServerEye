@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"github.com/godofphonk/ServerEye/pkg/protocol"
 	"github.com/godofphonk/ServerEye/pkg/websocket"
 )
 
@@ -16,6 +17,21 @@ func NewWebSocketAdapter() *WebSocketAdapter {
 
 // ToWebSocketMessage converts Metric to WebSocket metrics message
 func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message {
+	// For new metrics format, send data directly without conversion
+	if metric.Type == "metrics" && metric.Data != nil {
+		if metrics, ok := metric.Data["metrics"]; ok {
+			return websocket.Message{
+				Type:     websocket.MessageTypeMetrics,
+				ServerID: metric.ServerID,
+				Data: map[string]interface{}{
+					"metrics": metrics,
+				},
+				Timestamp: time.Now().Unix(),
+			}
+		}
+	}
+
+	// Fallback to old format for other metric types
 	serverMetrics := websocket.ServerMetrics{
 		Time: metric.Timestamp,
 	}
@@ -112,16 +128,68 @@ func (a *WebSocketAdapter) processUnifiedMetrics(metric *Metric, serverMetrics *
 
 // extractBasicMetrics extracts basic metrics values
 func (a *WebSocketAdapter) extractBasicMetrics(metrics map[string]interface{}, serverMetrics *websocket.ServerMetrics) {
-	if cpu, ok := metrics["cpu"].(float64); ok {
+	// Handle CPU - support both V2 struct and map formats
+	if cpuUsageStruct, ok := metrics["cpu_usage"].(protocol.CPUUsage); ok {
+		serverMetrics.CPU = cpuUsageStruct.UsageTotal
+	} else if cpuUsage, ok := metrics["cpu_usage"].(map[string]interface{}); ok {
+		if usageTotal, ok := cpuUsage["usage_total"].(float64); ok {
+			serverMetrics.CPU = usageTotal
+		}
+	}
+
+	// Handle Memory - support both V2 struct and map formats
+	if memoryStruct, ok := metrics["memory"].(protocol.Memory); ok {
+		serverMetrics.Memory = memoryStruct.UsedPercent
+	} else if memory, ok := metrics["memory"].(map[string]interface{}); ok {
+		if usedPercent, ok := memory["used_percent"].(float64); ok {
+			serverMetrics.Memory = usedPercent
+		}
+	}
+
+	// Handle Disk - support both V2 struct and map formats
+	if disksStruct, ok := metrics["disks"].([]protocol.Disk); ok && len(disksStruct) > 0 {
+		serverMetrics.Disk = disksStruct[0].UsedPercent
+	} else if disks, ok := metrics["disks"].([]interface{}); ok && len(disks) > 0 {
+		if firstDisk, ok := disks[0].(map[string]interface{}); ok {
+			if usedPercent, ok := firstDisk["used_percent"].(float64); ok {
+				serverMetrics.Disk = usedPercent
+			}
+		}
+	}
+
+	// Handle Network - support both V2 struct and map formats
+	if networkStruct, ok := metrics["network"].(protocol.Network); ok {
+		// Calculate total network from all interfaces
+		var totalRx, totalTx float64
+		for _, iface := range networkStruct.Interfaces {
+			totalRx += float64(iface.RxBytes) / 1024 / 1024 // Convert to MB
+			totalTx += float64(iface.TxBytes) / 1024 / 1024
+		}
+		serverMetrics.Network = totalRx + totalTx
+	} else if network, ok := metrics["network"].(map[string]interface{}); ok {
+		if totalRx, ok := network["total_rx_mbps"].(float64); ok {
+			if totalTx, ok := network["total_tx_mbps"].(float64); ok {
+				serverMetrics.Network = totalRx + totalTx
+			}
+		}
+	}
+
+	// Handle Temperature - support V2 struct format
+	if tempStruct, ok := metrics["temperature"].(protocol.Temperature); ok {
+		serverMetrics.Temperature = tempStruct.Highest
+	}
+
+	// Fallback to old format for backward compatibility
+	if cpu, ok := metrics["cpu"].(float64); ok && serverMetrics.CPU == 0 {
 		serverMetrics.CPU = cpu
 	}
-	if memory, ok := metrics["memory"].(float64); ok {
+	if memory, ok := metrics["memory"].(float64); ok && serverMetrics.Memory == 0 {
 		serverMetrics.Memory = memory
 	}
-	if disk, ok := metrics["disk"].(float64); ok {
+	if disk, ok := metrics["disk"].(float64); ok && serverMetrics.Disk == 0 {
 		serverMetrics.Disk = disk
 	}
-	if network, ok := metrics["network"].(float64); ok {
+	if network, ok := metrics["network"].(float64); ok && serverMetrics.Network == 0 {
 		serverMetrics.Network = network
 	}
 }
