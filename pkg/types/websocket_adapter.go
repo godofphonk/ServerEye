@@ -17,6 +17,16 @@ func NewWebSocketAdapter() *WebSocketAdapter {
 
 // ToWebSocketMessage converts Metric to WebSocket metrics message
 func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message {
+	// Handle heartbeat separately - no metrics data
+	if metric.Type == "heartbeat" {
+		return websocket.Message{
+			Type:      websocket.MessageTypeHeartbeat,
+			ServerID:  metric.ServerID,
+			Data:      map[string]interface{}{},
+			Timestamp: time.Now().Unix(),
+		}
+	}
+
 	// For new metrics format, send data directly without conversion
 	if metric.Type == "metrics" && metric.Data != nil {
 		if metrics, ok := metric.Data["metrics"]; ok {
@@ -31,7 +41,7 @@ func (a *WebSocketAdapter) ToWebSocketMessage(metric *Metric) websocket.Message 
 		}
 	}
 
-	// Fallback to old format for other metric types
+	// Fallback to old format for other metric types (not heartbeat)
 	serverMetrics := websocket.ServerMetrics{
 		Time: metric.Timestamp,
 	}
