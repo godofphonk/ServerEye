@@ -122,18 +122,8 @@ func (c *Client) getServerID() (string, error) {
 
 // Connect establishes WebSocket connection
 func (c *Client) Connect() error {
-	// First, try to get proper server_id from API
-	if c.config.APIURL != "" && c.config.APIKey != "" {
-		if serverID, err := c.getServerID(); err == nil {
-			c.mu.Lock()
-			c.config.ServerID = serverID
-			c.mu.Unlock()
-			c.logger.WithField("server_id", serverID).Info("Server ID updated from API")
-		} else {
-			c.logger.WithError(err).Warn("Failed to get server_id from API, using provided one")
-		}
-	}
-
+	// Use server_id from configuration
+	// Note: server_id is obtained during initial registration and stored in config
 	c.logger.WithFields(logrus.Fields{
 		"url":       c.config.URL,
 		"server_id": c.config.ServerID,
