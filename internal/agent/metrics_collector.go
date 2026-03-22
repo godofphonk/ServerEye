@@ -177,7 +177,7 @@ func (a *Agent) collectMetrics() *protocol.Metrics {
 	return metrics
 }
 
-// sendMetrics sends metrics
+// sendMetrics sends metrics via HTTP only (used in HTTP-only mode)
 func (a *Agent) sendMetrics(metrics *protocol.Metrics) {
 	// Create metric message
 	metric := &types.Metric{
@@ -198,25 +198,76 @@ func (a *Agent) sendMetrics(metrics *protocol.Metrics) {
 		},
 	}
 
-	// Send via WebSocket or HTTP
-	if a.useWebSocket && a.wsPublisher != nil {
-		a.logger.Debug("Sending metrics via WebSocket")
-		if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-			a.logger.WithError(err).Debug("Failed to send metrics via WebSocket, falling back to HTTP")
-			if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
-				a.logger.WithError(err).Error("Failed to send metrics via HTTP")
-			} else {
-				a.logger.Info("Metrics sent successfully via HTTP")
-			}
-		} else {
-			a.logger.Debug("Metrics sent successfully via WebSocket")
-		}
+	// Send via HTTP only
+	if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
+		a.logger.WithError(err).Error("Failed to send metrics via HTTP")
 	} else {
-		// Use HTTP
-		if err := a.httpPublisher.Publish(a.ctx, metric); err != nil {
-			a.logger.WithError(err).Error("Failed to send metrics via HTTP")
+		a.logger.Debug("Metrics sent successfully via HTTP")
+	}
+}
+
+// collectAndSendMetricsWebSocket запускает цикл сбора и отправки метрик через WebSocket
+func (a *Agent) collectAndSendMetricsWebSocket() {
+	a.logger.Info("Starting WebSocket metrics collection loop")
+
+	// Parse metrics interval from config
+	interval := 30 * time.Second // default
+	if a.config.Metrics.Interval != "" {
+		if parsedInterval, err := time.ParseDuration(a.config.Metrics.Interval); err == nil {
+			interval = parsedInterval
 		} else {
-			a.logger.Info("Metrics sent successfully via HTTP")
+			a.logger.WithError(err).Warn("Failed to parse metrics interval, using default 30s")
 		}
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	// Send first metrics immediately
+	a.sendMetricsWebSocket()
+
+	for {
+		select {
+		case <-ticker.C:
+			a.sendMetricsWebSocket()
+		case <-a.ctx.Done():
+			a.logger.Info("WebSocket metrics collection stopped")
+			return
+		}
+	}
+}
+
+// sendMetricsWebSocket sends metrics via WebSocket only (no HTTP fallback)
+func (a *Agent) sendMetricsWebSocket() {
+	metrics := a.collectMetrics()
+	if metrics == nil {
+		a.logger.Error("Failed to collect metrics")
+		return
+	}
+
+	// Create metric message
+	metric := &types.Metric{
+		Type:      "metrics",
+		ServerID:  a.config.Server.ServerID,
+		ServerKey: a.config.Server.SecretKey,
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"metrics": map[string]interface{}{
+				"cpu_usage":   metrics.CPUUsage,
+				"memory":      metrics.Memory,
+				"disks":       metrics.Disks,
+				"network":     metrics.Network,
+				"temperature": metrics.Temperature,
+				"system":      metrics.System,
+				"timestamp":   metrics.Timestamp,
+			},
+		},
+	}
+
+	// Send via WebSocket only - publisher handles buffering if disconnected
+	if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
+		a.logger.WithError(err).Debug("Failed to send metrics via WebSocket (will be buffered)")
+	} else {
+		a.logger.Debug("Metrics sent successfully via WebSocket")
 	}
 }

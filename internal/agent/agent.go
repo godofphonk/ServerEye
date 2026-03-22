@@ -260,12 +260,17 @@ func (a *Agent) Start() error {
 	// Запускаем heartbeat
 	go a.startHeartbeat()
 
-	// Запускаем сборщик метрик - всегда используем HTTP
-	if a.httpPublisher != nil {
+	// Запускаем сборщик метрик
+	if a.useWebSocket {
+		// WebSocket mode: metrics are sent via WebSocket publisher
+		a.logger.Info("Starting metrics collection via WebSocket")
+		go a.collectAndSendMetricsWebSocket()
+	} else if a.httpPublisher != nil {
+		// HTTP fallback mode: use HTTP publisher
 		a.logger.Info("Starting metrics collection via HTTP")
 		go a.collectAndSendMetrics()
 	} else {
-		a.logger.Error("No HTTP publisher available - metrics disabled")
+		a.logger.Error("No publisher available - metrics disabled")
 	}
 
 	// Start static info publisher

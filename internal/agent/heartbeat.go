@@ -24,7 +24,7 @@ func (a *Agent) startHeartbeat() {
 	}
 }
 
-// sendHeartbeat отправляет heartbeat сообщение через WebSocket или HTTP
+// sendHeartbeat отправляет heartbeat сообщение через WebSocket или HTTP (без дублирования)
 func (a *Agent) sendHeartbeat() {
 	// Create heartbeat metric with empty data as per API spec
 	metric := &types.Metric{
@@ -38,17 +38,17 @@ func (a *Agent) sendHeartbeat() {
 		Data:       map[string]interface{}{}, // Empty data for heartbeat
 	}
 
-	// Always try WebSocket first when enabled
+	// Send via WebSocket OR HTTP, not both
 	if a.useWebSocket && a.wsPublisher != nil {
+		// WebSocket mode: send only via WebSocket (publisher handles buffering)
 		a.logger.Debug("Sending heartbeat via WebSocket")
 		if err := a.wsPublisher.Publish(a.ctx, metric); err != nil {
-			a.logger.WithError(err).Debug("Failed to send heartbeat via WebSocket, falling back to HTTP")
-			a.sendHeartbeatHTTP(metric)
+			a.logger.WithError(err).Debug("Failed to send heartbeat via WebSocket (will be buffered)")
 		} else {
 			a.logger.Debug("Heartbeat sent successfully via WebSocket")
 		}
 	} else {
-		// Use HTTP fallback
+		// HTTP mode: send only via HTTP
 		a.sendHeartbeatHTTP(metric)
 	}
 }

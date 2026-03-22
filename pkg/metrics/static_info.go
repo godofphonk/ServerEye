@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,11 +28,16 @@ func NewStaticInfoCollector(logger *logrus.Logger) *StaticInfoCollector {
 
 // CollectStaticInfo collects all static server information
 func (s *StaticInfoCollector) CollectStaticInfo() (*protocol.StaticServerInfo, error) {
+	hostname, _ := os.Hostname()
+	osName, osVersion := s.getOSInfo()
+	kernel := s.getKernelVersion()
+
 	staticInfo := &protocol.StaticServerInfo{
-		ServerInfo:        s.collectServerInfo(),
-		HardwareInfo:      s.collectHardwareInfo(),
-		NetworkInterfaces: s.collectNetworkInterfaces(),
-		DiskInfo:          s.collectDiskInfo(),
+		Hostname:     hostname,
+		OS:           fmt.Sprintf("%s %s", osName, osVersion),
+		Kernel:       kernel,
+		Architecture: runtime.GOARCH,
+		Hardware:     s.collectHardwareInfo(),
 	}
 
 	return staticInfo, nil
@@ -104,23 +110,13 @@ func (s *StaticInfoCollector) getKernelVersion() string {
 
 // collectHardwareInfo collects hardware specifications
 func (s *StaticInfoCollector) collectHardwareInfo() protocol.HardwareInfo {
-	hwInfo := protocol.HardwareInfo{
-		CPUModel:        s.getCPUModel(),
-		CPUCores:        s.getCPUCores(),
-		CPUThreads:      runtime.NumCPU(),
-		CPUFrequencyMHz: s.getCPUFrequency(),
-		TotalMemoryGB:   s.getTotalMemory(),
+	return protocol.HardwareInfo{
+		CPUModel:            s.getCPUModel(),
+		CPUCores:            s.getCPUCores(),
+		CPUThreads:          runtime.NumCPU(),
+		CPUBaseFrequencyMHz: s.getCPUFrequency(),
+		MemoryTotalGB:       s.getTotalMemory(),
 	}
-
-	// Try to get GPU info
-	gpuModel, gpuDriver, gpuMemory := s.getGPUInfo()
-	if gpuModel != "" {
-		hwInfo.GPUModel = gpuModel
-		hwInfo.GPUDriver = gpuDriver
-		hwInfo.GPUMemoryGB = gpuMemory
-	}
-
-	return hwInfo
 }
 
 // getCPUModel retrieves CPU model name
