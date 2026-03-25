@@ -23,6 +23,7 @@ type HTTPCommandConsumer struct {
 	client       *http.Client
 	handler      CommandHandler
 	logger       *logrus.Logger
+	validator    *PayloadValidator
 }
 
 type CommandHandler interface {
@@ -84,8 +85,9 @@ func NewHTTPCommandConsumer(cfg HTTPConsumerConfig, handler CommandHandler, logg
 			Timeout:   15 * time.Second,
 			Transport: transport,
 		},
-		handler: handler,
-		logger:  logger,
+		handler:   handler,
+		logger:    logger,
+		validator: NewPayloadValidator(logger),
 	}
 }
 
@@ -171,6 +173,19 @@ func (c *HTTPCommandConsumer) pollCommands(ctx context.Context) error {
 
 func (c *HTTPCommandConsumer) processCommand(ctx context.Context, cmd Command) {
 	msgType := c.mapCommandToType(cmd.Command)
+
+	if err := c.validator.Validate(msgType, cmd.Params); err != nil {
+		c.logger.WithError(err).WithField("command_id", cmd.ID).Warn("Rejecting command due to invalid payload")
+		response := &CommandResponse{
+			RequestID: cmd.ID,
+			Success:   false,
+			Error:     "invalid request parameters: check server logs for details",
+		}
+		if sendErr := c.sendResponse(ctx, response); sendErr != nil {
+			c.logger.WithError(sendErr).Error("Failed to send validation error response")
+		}
+		return
+	}
 
 	protoMsg := &protocol.Message{
 		ID:        cmd.ID,
