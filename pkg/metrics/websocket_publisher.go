@@ -18,14 +18,15 @@ type WebSocketPublisher struct {
 	adapter  *types.WebSocketAdapter
 	logger   *logrus.Logger
 
+	// mu protects buffer, publishedCnt, failedCnt, and lastPublished
+	mu sync.RWMutex
+
 	// Buffer for offline metrics
 	buffer      []*types.Metric
-	bufferMu    sync.Mutex
 	bufferSize  int
 	bufferFlush time.Duration
 
 	// Metrics
-	metricsMu     sync.RWMutex
 	publishedCnt  int64
 	failedCnt     int64
 	lastPublished time.Time
@@ -205,8 +206,8 @@ func (p *WebSocketPublisher) IsConnected() bool {
 
 // GetMetrics returns publisher statistics
 func (p *WebSocketPublisher) GetMetrics() map[string]interface{} {
-	p.metricsMu.RLock()
-	defer p.metricsMu.RUnlock()
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
 	return map[string]interface{}{
 		"published_count": p.publishedCnt,
@@ -220,8 +221,8 @@ func (p *WebSocketPublisher) GetMetrics() map[string]interface{} {
 
 // bufferMetric adds metric to buffer
 func (p *WebSocketPublisher) bufferMetric(metric *types.Metric) {
-	p.bufferMu.Lock()
-	defer p.bufferMu.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	// If buffer is full, remove oldest metric
 	if len(p.buffer) >= p.bufferSize {
@@ -234,11 +235,11 @@ func (p *WebSocketPublisher) bufferMetric(metric *types.Metric) {
 
 // flushBuffer sends all buffered metrics
 func (p *WebSocketPublisher) flushBuffer() {
-	p.bufferMu.Lock()
+	p.mu.Lock()
 	metrics := make([]*types.Metric, len(p.buffer))
 	copy(metrics, p.buffer)
 	p.buffer = p.buffer[:0] // Clear buffer
-	p.bufferMu.Unlock()
+	p.mu.Unlock()
 
 	if len(metrics) > 0 && p.wsClient.IsConnected() {
 		if err := p.PublishBatch(context.Background(), metrics); err != nil {
@@ -329,19 +330,19 @@ func (p *WebSocketPublisher) registerCommandHandlers() {
 
 // Helper methods for metrics
 func (p *WebSocketPublisher) incrementPublished() {
-	p.metricsMu.Lock()
-	defer p.metricsMu.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.publishedCnt++
 }
 
 func (p *WebSocketPublisher) incrementFailed() {
-	p.metricsMu.Lock()
-	defer p.metricsMu.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.failedCnt++
 }
 
 func (p *WebSocketPublisher) setLastPublished(t time.Time) {
-	p.metricsMu.Lock()
-	defer p.metricsMu.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.lastPublished = t
 }
