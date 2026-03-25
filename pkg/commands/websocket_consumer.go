@@ -16,6 +16,7 @@ type WebSocketCommandConsumer struct {
 	wsClient *websocket.Client
 	handler  CommandHandlerInterface
 	logger   *logrus.Logger
+	validator *PayloadValidator
 
 	// Command processing
 	commandQueue chan *websocket.CommandMessage
@@ -76,6 +77,7 @@ func NewWebSocketCommandConsumer(config Config, handler CommandHandlerInterface,
 		wsClient:     websocket.NewClient(wsConfig, logger),
 		handler:      handler,
 		logger:       logger,
+		validator:    NewPayloadValidator(logger),
 		commandQueue: make(chan *websocket.CommandMessage, config.CommandQueueSize),
 	}
 
@@ -232,6 +234,11 @@ func (c *WebSocketCommandConsumer) websocketToProtocolMessage(cmdMsg *websocket.
 	params, ok := cmdMsg.Data["params"].(map[string]interface{})
 	if !ok {
 		params = make(map[string]interface{})
+	}
+
+	// Validate payload against the registered schema for this command type.
+	if err := c.validator.Validate(commandType, params); err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
 	}
 
 	// Create protocol message
