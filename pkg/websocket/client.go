@@ -204,7 +204,7 @@ func (c *Client) authenticate() error {
 	}
 
 	// Wait for authentication response
-	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
 	defer cancel()
 
 	select {
@@ -328,12 +328,18 @@ func (c *Client) readPump() {
 
 	c.conn.SetReadLimit(512 * 1024) // 512KB max message size
 	c.conn.SetReadDeadline(time.Now().Add(c.config.ReadTimeout))
-	c.conn.SetPongHandler(func(string) error {
+
+	// Set pong handler to extend read deadline on pong from server
+	c.conn.SetPongHandler(func(appData string) error {
+		c.logger.Debug("Received pong from server, extending read deadline")
 		c.conn.SetReadDeadline(time.Now().Add(c.config.ReadTimeout))
 		return nil
 	})
 
 	for {
+		// Update read deadline before each read attempt
+		c.conn.SetReadDeadline(time.Now().Add(c.config.ReadTimeout))
+
 		var msg Message
 		err := c.conn.ReadJSON(&msg)
 		if err != nil {
@@ -344,6 +350,9 @@ func (c *Client) readPump() {
 			}
 			break
 		}
+
+		// Update read deadline after successful read
+		c.conn.SetReadDeadline(time.Now().Add(c.config.ReadTimeout))
 
 		// Handle different message types
 		switch msg.Type {

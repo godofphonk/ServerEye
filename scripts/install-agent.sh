@@ -394,8 +394,8 @@ websocket:
   reconnect_interval: "5s"
   max_reconnect_attempts: 10
   ping_interval: "30s"
-  write_timeout: "10s"
-  read_timeout: "300s"
+  write_timeout: "30s"
+  read_timeout: "90s"
   handshake_timeout: "10s"
   buffer_size: 1000
   enable_compression: true
