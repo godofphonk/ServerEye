@@ -1,9 +1,9 @@
 module github.com/godofphonk/ServerEye
 
-go 1.21
+go 1.23
 
 require (
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
 	github.com/gorilla/websocket v1.5.3
